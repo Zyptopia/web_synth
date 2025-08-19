@@ -200,7 +200,7 @@
 (function(){
   const $ = s => document.querySelector(s);
   const $$ = s => Array.from(document.querySelectorAll(s));
-  const log = (...a)=>{ const L=$('#log'); L.textContent += a.join(' ') + '\\n'; L.scrollTop = L.scrollHeight; }
+  const log = (...a)=>{ const L=$('#log'); L.textContent += a.join(' ') + '\n'; L.scrollTop = L.scrollHeight; }
   const say = (html,cls='')=>{ $('#status').innerHTML = cls?`<span class="${cls}">${html}</span>`:html; }
   const fmtMs = v=>`${Math.round(v)}ms`;
   const fmtHz = v=>v>=1000 ? (v/1000).toFixed(1)+'k' : Math.round(v);
@@ -239,7 +239,7 @@
     localStorage.setItem('axiomActions', JSON.stringify(state.actions));
   };
 
-  // ---------- Build keyboard & pads FIRST (so UI appears even if audio fails) ----------
+  // ---------- Build keyboard & pads FIRST ----------
   const kb = $('#kb'); const knobs=$('#knobs'), pads=$('#pads'), padTools=$('#padTools');
 
   function buildKeys(){
@@ -348,8 +348,19 @@
           filter:{Q:1,type:'lowpass',rolloff:-24}, filterEnvelope:{attack:0.005,decay:0.2,sustain:0.2,release:0.1, baseFrequency:+$('#cutoff').value, octaves:2.5}});
         chain(mono);
       } else if (preset==='ep-bell'){
-        bell = new Tone.FMSynth({volume:-8, modulationIndex:12, harmonicity:2.5, oscillator:{type:'sine'}, envelope:env, modulationEnvelope:{attack:0.01, decay:0.3, sustain:0.2, release:env.release}});
-        poly = new Tone.PolySynth(bell); chain(poly);
+        // FIX: use constructor form PolySynth(Tone.FMSynth,...)
+        poly = new Tone.PolySynth(
+          Tone.FMSynth,
+          {
+            volume: -8,
+            modulationIndex: 12,
+            harmonicity: 2.5,
+            oscillator: { type: 'sine' },
+            envelope: env,
+            modulationEnvelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: env.release }
+          }
+        );
+        chain(poly);
       } else if (preset==='pluck'){
         mono = new Tone.PluckSynth({attackNoise:1.2, dampening:3200, resonance:0.9}).connect(reverb).connect(dly).connect(comp).connect(master);
       }
@@ -367,14 +378,13 @@
       clap: new Tone.NoiseSynth({volume:-10,noise:{type:'pink'}, envelope:{attack:0.001,decay:0.12,sustain:0}}),
       crash:new Tone.MetalSynth({volume:-16,resonance:300,modulationIndex:8})
     })) || {};
-    for (const k of Object.values(drum)) try{k.connect(reverb).connect(dly).connect(comp).connect(master);}catch(_){}
-  }
+    for (const k of Object.values(drum)) try{k.connect(reverb).connect(dly).connect(comp).connect(master);}catch(_){}}
 
   function currentPoly(){ return poly||null; }
   function setVoiceDetune(voice, cents){
-    try{ if (voice.oscillator?.detune) voice.oscillator.detune.value = cents; }catch(_){}
-    try{ if (voice.modulation?.detune) voice.modulation.detune.value = cents; }catch(_){}
-    try{ if (voice.detune) voice.detune.value = cents; }catch(_){}
+    try{ if (voice.oscillator?.detune) voice.oscillator.detune.value = cents; }catch(_){ }
+    try{ if (voice.modulation?.detune) voice.modulation.detune.value = cents; }catch(_){ }
+    try{ if (voice.detune) voice.detune.value = cents; }catch(_){ }
   }
   function applyDetune(cents){
     state.bendCents = cents;
@@ -407,10 +417,11 @@
     if ($('#preset').value==='drum-only') return;
 
     const P = currentPoly();
-    const time = (window.Tone?Tone.now():0);
+    const time = Tone.now();
+    const hz = Tone.Frequency(midi, 'midi').toFrequency(); // FIX: use Hz
     try{
-      if (P) P.triggerAttack(Tone.Frequency(midi,'midi'), time, Math.max(0.1,v));
-      else if (mono) mono.triggerAttack(Tone.Frequency(midi,'midi'), time, Math.max(0.1,v));
+      if (P) P.triggerAttack(hz, time, Math.max(0.1, v));
+      else if (mono) mono.triggerAttack(hz, time, Math.max(0.1, v));
     }catch(_){}
     state.held.add(midi); flashKey(midi,true);
     lcdShow('NOTE', `m${midi} v${vel}`);
@@ -420,7 +431,8 @@
     if (!state.held.has(midi)){ flashKey(midi,false); return; }
     if (state.sustain) return;
     try{
-      if (currentPoly()) currentPoly().triggerRelease(Tone.Frequency(midi,'midi'), Tone.now());
+      const hz = Tone.Frequency(midi, 'midi').toFrequency();
+      if (currentPoly()) currentPoly().triggerRelease(hz, Tone.now());
       else if (mono) mono.triggerRelease(Tone.now());
     }catch(_){}
     state.held.delete(midi); flashKey(midi,false);
@@ -431,7 +443,7 @@
   }
   function triggerPad(type, v){
     if (!drum) return;
-    const now=(window.Tone?Tone.now():0);
+    const now=Tone.now();
     ({kick:()=>drum.kick.triggerAttackRelease('C1',0.22,now,v),
       snare:()=>drum.snare.triggerAttackRelease(0.12,now,v),
       hhc:()=>drum.hhc.triggerAttackRelease(0.05,now,v*0.9),
@@ -461,7 +473,7 @@
   hookSlider('q',v=>v.toFixed(1),v=>{ if(filter) filter.Q.value=v; });
   hookSlider('reverb',v=>v.toFixed(2),v=>{ if(reverb) reverb.wet.value=v; });
   hookSlider('delay', v=>v.toFixed(2),v=>{ if(dly) dly.wet.value=v; });
-  hookSlider('tempo', v=>String(v), v=>{ if (window.Tone) Tone.Transport.bpm.value=v; });
+  hookSlider('tempo', v=>String(v), v=>{ Tone.Transport.bpm.value=v; });
   hookSlider('bendRange', v=>String(v), v=>{ state.bendRange=v; });
   $('#preset').onchange=()=>buildGraph($('#preset').value);
   $('#panic').onclick=allOff;
@@ -473,7 +485,7 @@
 
   // base note selector
   (function(){
-    const sel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m} (${window.Tone?Tone.Frequency(m,'midi').toNote():m})`; sel.appendChild(o); }
+    const sel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m} (${Tone.Frequency(m,'midi').toNote()})`; sel.appendChild(o); }
     sel.value=String(state.baseMidi);
     sel.onchange=()=>{ state.baseMidi=parseInt(sel.value,10); localStorage.setItem('axiomBaseMidi',String(state.baseMidi)); buildKeys(); };
   })();
@@ -486,14 +498,14 @@
   $('#tDown').onclick= ()=>{ state.transpose = clamp(state.transpose-1,-6,6); updateTZ(); saveAll(); };
 
   // transport + click
-  if (window.Tone){ Tone.Transport.bpm.value = +$('#tempo').value; }
-  let click = (window.Tone)? new Tone.Synth({oscillator:{type:'square'}, envelope:{attack:0.001,decay:0.02,sustain:0,release:0.02}}).toDestination() : null;
-  let step=0; const loop = (window.Tone)? new Tone.Loop(time => { const down=step%4===0; click.triggerAttackRelease(down ? "A5" : "E5", 0.04, time, down?0.6:0.25); step=(step+1)%16; }, "16n") : null;
-  $('#play').onclick=()=>{ if(!window.Tone) return; if(Tone.Transport.state!=='started'){ loop.start(0); Tone.Transport.start(); $('#play').classList.add('live'); lcdShow('Play'); } };
-  $('#stop').onclick=()=>{ if(!window.Tone) return; loop.stop(); Tone.Transport.stop(); $('#play').classList.remove('live'); lcdShow('Stop'); };
+  Tone.Transport.bpm.value = +$('#tempo').value;
+  let click = new Tone.Synth({oscillator:{type:'square'}, envelope:{attack:0.001,decay:0.02,sustain:0,release:0.02}}).toDestination();
+  let step=0; const loop = new Tone.Loop(time => { const down=step%4===0; click.triggerAttackRelease(down ? "A5" : "E5", 0.04, time, down?0.6:0.25); step=(step+1)%16; }, "16n");
+  $('#play').onclick=()=>{ if(Tone.Transport.state!=='started'){ loop.start(0); Tone.Transport.start(); $('#play').classList.add('live'); lcdShow('Play'); } };
+  $('#stop').onclick=()=>{ loop.stop(); Tone.Transport.stop(); $('#play').classList.remove('live'); lcdShow('Stop'); };
   let loopOn=false; $('#loop').onclick=()=>{ loopOn=!loopOn; $('#loop').classList.toggle('live',loopOn); lcdShow('Loop', loopOn?'On':'Off'); };
 
-  // ---------- Build audio graph (guarded) ----------
+  // ---------- Build audio graph ----------
   buildGraph('piano-lite');
 
   // ---------- Mappings Hub & Pad list ----------
@@ -508,7 +520,7 @@
   }
   function renderMappings(){
     const root=$('#mapList'); root.innerHTML='';
-    const rows=[['play','Play'],['stop','Stop'],['loop','Loop'],['sustain','Sustain'],['mod','Mod'],['bend','Bend (PB/CC)'],['octaveUp','Octave +'],['octaveDown','Octave –'],['transposeUp','Transpose +'],['transposeDown','Transpose –']];
+    const rows=[["play","Play"],["stop","Stop"],["loop","Loop"],["sustain","Sustain"],["mod","Mod"],["bend","Bend (PB/CC)"],["octaveUp","Octave +"],["octaveDown","Octave –"],["transposeUp","Transpose +"],["transposeDown","Transpose –"]];
     rows.forEach(([k,label])=>{
       const a=state.actions[k]; const tag=a.type==='cc'?`CC ${a.id}`:a.type==='note'?`Note ${a.id}`:a.type==='pb'?'Pitch Bend':'—';
       const row=document.createElement('div'); row.className='maprow';
@@ -605,7 +617,7 @@
     const txt=JSON.stringify(obj,null,2);
     navigator.clipboard?.writeText(txt);
     say('Config copied to clipboard.','ok');
-    const pb=$('#pastebox'); pb.value = (pb.value?pb.value+'\\n':'')+txt;
+    const pb=$('#pastebox'); pb.value = (pb.value?pb.value+'\n':'')+txt;
   };
   $('#importBtn').onclick=()=>{
     const txt=prompt('Paste exported JSON'); if(!txt) return;
@@ -624,7 +636,6 @@
     }catch(e){ say('Import failed: '+e.message,'bad'); }
   };
 
-  // Pad map/mappings lists once more
   function triggerAction(k){
     if (k==='play') $('#play').click();
     else if (k==='stop') $('#stop').click();
@@ -637,7 +648,7 @@
   }
   buildPadMapList(); renderMappings();
 
-  // final: initial graph already built
+  // initial graph already built
 })();
 </script>
 </body>
