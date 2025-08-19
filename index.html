@@ -11,14 +11,15 @@
   :root{
     --bg:#0d1016; --top:#171c27; --panel:#1b2230; --panel2:#222a3a; --rim:#2b3448;
     --text:#e7edf8; --muted:#9aa3b2; --accent:#6ee7ff; --accent2:#a78bfa; --ok:#34d399; --bad:#ff6b6b; --warn:#f59e0b;
-    --lcd:#0bd; --pad:#101827; --pad-lit:#10b981; --key:#f6f7fb; --key-lit:#ffe082;
+    --lcd1:#0cf; --lcd2:#058;
+    --pad:#101827; --pad-lit:#10b981; --key:#f6f7fb; --key-lit:#ffe082;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,Segoe UI,Roboto,Arial}
   .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
   .topbar{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center}
   .title{font-weight:700;font-size:20px}
-  button,select,input[type="range"]{background:var(--panel);color:var(--text);border:1px solid var(--rim);border-radius:10px;padding:10px 12px}
+  button,select,input[type="range"],input[type="number"]{background:var(--panel);color:var(--text);border:1px solid var(--rim);border-radius:10px;padding:10px 12px}
   button:hover{background:var(--panel2);cursor:pointer}
   .pill{border-radius:999px}
   .status{margin:10px 0 16px;color:var(--muted)}
@@ -29,23 +30,24 @@
   /* --- Device shell --- */
   .device{background:linear-gradient(180deg,#2a3447 0%,#1a2130 55%,#141a26 100%); border:1px solid #111520; border-radius:22px; padding:18px; box-shadow:0 20px 60px #0006 inset, 0 18px 50px #0008;}
   .face{display:grid;grid-template-columns:270px 1fr 220px; gap:16px}
-  .leftcol{display:grid;grid-template-rows:auto auto 1fr;gap:10px}
-  .lcd{background:radial-gradient(100% 140% at 50% 0%, #0df 0%, #069 80%); border:2px solid #0af4; border-radius:10px; padding:10px 12px; color:#00131e; font:700 20px "Share Tech Mono",monospace; text-shadow:0 0 3px #aff;}
+
+  .leftcol{display:grid;grid-template-rows:auto auto 1fr;gap:12px}
+  .lcd{background:radial-gradient(100% 140% at 50% 0%, var(--lcd1) 0%, var(--lcd2) 80%); border:2px solid #0af4; border-radius:10px; padding:10px 12px; color:#00131e; font:700 20px "Share Tech Mono",monospace; text-shadow:0 0 3px #aff;}
   .lcd small{display:block; font:600 11px Inter,system-ui; color:#012635; letter-spacing:.04em; margin-bottom:2px}
-  .mode-row{display:flex; gap:6px; flex-wrap:wrap}
-  .mode-btn{background:var(--panel); border:1px solid var(--rim); padding:8px 10px; border-radius:8px; font-size:12px; color:var(--muted)}
+
+  .rockers{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .rocker{display:grid;grid-template-columns:1fr 1fr; gap:6px}
   .rocker button{padding:10px 10px}
+
   .wheels{display:flex; gap:18px; margin-top:6px}
   .wheel{width:54px;height:86px;background:linear-gradient(180deg,#121826,#0a0e16); border:1px solid var(--rim); border-radius:12px; position:relative; overflow:hidden}
   .wheel::after{content:""; position:absolute; left:50%; width:4px; height:74%; top:12%; transform:translateX(-50%); background:linear-gradient(180deg,#2a3550,#0e1420);}
   .wheel .val{position:absolute; left:50%; bottom:4px; transform:translateX(-50%); font:600 11px Inter; color:var(--muted)}
-  .zone{display:flex; gap:6px; align-items:center; margin-top:6px}
-  .zone .tiny{font-size:11px;color:var(--muted)}
-  .transport{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:6px}
+
+  .transport{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:6px}
   .tbtn{padding:9px 0; border-radius:8px; text-align:center; user-select:none}
-  .tbtn.play.live{box-shadow:0 0 0 2px #0f05 inset, 0 0 18px #00ff90aa}
   .tbtn.live{background:#0a1614;border-color:#0d3; color:#0d8}
+  .tbtn.play.live{box-shadow:0 0 0 2px #0f05 inset, 0 0 18px #00ff90aa}
 
   /* center column */
   .keys-wrap{background:linear-gradient(180deg,#0c1018,#0b0f16); border:1px solid var(--rim); border-radius:16px; padding:12px}
@@ -59,15 +61,18 @@
   /* right column: knobs + pads */
   .knob-matrix{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
   .knob{background:#0c111a; border:1px solid var(--rim); border-radius:12px; padding:10px; text-align:center}
-  .dial{width:44px;height:44px; margin:0 auto 6px; border-radius:50%; background:radial-gradient(80% 70% at 50% 30%,#2d3548,#161c28); border:1px solid #2b3448; transform:rotate(0deg)}
+  .dial{width:44px;height:44px; margin:0 auto 6px; border-radius:50%; background:radial-gradient(80% 70% at 50% 30%,#2d3548,#161c28); border:1px solid #2b3448; transform:rotate(0deg); position:relative}
   .dial::after{content:""; position:absolute; width:2px; height:14px; top:6px; left:50%; transform:translateX(-50%); background:var(--accent)}
   .knob label{display:block; font-size:11px; color:var(--muted)}
+  .knob .mapto{font-size:11px;color:#9cc;margin-top:2px}
   .learn{font-size:11px; margin-top:4px; color:#9cc; cursor:pointer}
   .learn.active{color:#fff; text-decoration:underline}
+
   .pads{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:10px}
-  .pad{height:64px; border-radius:10px; background:var(--pad); border:1px solid #263143; box-shadow:inset 0 0 0 3px #0a0f18}
+  .pad{height:64px; border-radius:10px; background:var(--pad); border:1px solid #263143; box-shadow:inset 0 0 0 3px #0a0f18; position:relative}
   .pad.active{box-shadow:inset 0 0 0 3px var(--pad-lit), 0 0 18px #10b98166}
-  .pad small{position:relative; left:6px; top:6px; color:var(--muted); font-size:11px}
+  .pad small{position:absolute; left:6px; top:6px; color:var(--muted); font-size:11px}
+  .pad .learn{position:absolute; right:6px; bottom:6px}
 
   .card{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--rim); border-radius:16px; padding:14px}
   .card h3{margin:0 0 10px; color:var(--muted); font-size:13px; font-weight:600}
@@ -77,6 +82,8 @@
   .control label{font-size:12px; color:var(--muted)}
   .val{min-width:3ch; text-align:right; color:var(--accent)}
   .log{height:130px; overflow:auto; background:#0b0f16; border:1px solid var(--rim); border-radius:10px; padding:8px; font:12px ui-monospace,Consolas,monospace; white-space:pre-wrap}
+  .maprow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;margin-bottom:8px}
+  .badge{padding:2px 8px;border:1px solid var(--rim);border-radius:999px;background:#0b0f16;color:#9ec}
 </style>
 </head>
 <body>
@@ -94,49 +101,34 @@
     <div class="face">
       <!-- Left -->
       <div class="leftcol">
-        <div class="lcd" id="lcd">
-          <small>ZONE 1  •  CH 1  •  CC</small>
-          147
-        </div>
+        <div class="lcd" id="lcd"><small>ZONE 1 • CH 1</small>Ready</div>
 
-        <div class="mode-row">
-          <div class="mode-btn">Advanced</div>
-          <div class="mode-btn">Store</div>
-          <div class="mode-btn">Recall</div>
-          <div class="mode-btn">Prog</div>
-          <div class="mode-btn">Mute</div>
-          <div class="mode-btn">Null</div>
-        </div>
-
-        <div>
-          <div class="zone">
-            <span class="tiny">Transpose</span>
+        <div class="rockers">
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Transpose</div>
             <div class="rocker">
               <button id="tDown">–</button>
               <button id="tUp">+</button>
             </div>
           </div>
-          <div class="zone">
-            <span class="tiny">Octave</span>
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Octave</div>
             <div class="rocker">
               <button id="oDown">–</button>
               <button id="oUp">+</button>
             </div>
           </div>
+        </div>
 
-          <div class="wheels">
-            <div class="wheel"><div class="val">Pitch</div></div>
-            <div class="wheel"><div class="val">Mod</div></div>
-          </div>
+        <div class="wheels">
+          <div class="wheel"><div class="val">Pitch</div></div>
+          <div class="wheel"><div class="val">Mod</div></div>
+        </div>
 
-          <div class="transport">
-            <div class="tbtn" id="rew">⏪</div>
-            <div class="tbtn" id="back">◀</div>
-            <div class="tbtn" id="rec">⏺</div>
-            <div class="tbtn play" id="play">▶</div>
-            <div class="tbtn" id="stop">⏹</div>
-            <div class="tbtn" id="loop">🔁</div>
-          </div>
+        <div class="transport">
+          <div class="tbtn play" id="play">▶</div>
+          <div class="tbtn" id="stop">⏹</div>
+          <div class="tbtn" id="loop">🔁</div>
         </div>
       </div>
 
@@ -166,7 +158,7 @@
     </div>
   </div>
 
-  <!-- Controls + Monitor + Pad map -->
+  <!-- Controls + Monitor + Mappings + Pad map -->
   <div class="grid grid-2" style="margin-top:16px">
     <div class="card">
       <h3>Instrument</h3>
@@ -204,19 +196,14 @@
       </div>
 
       <div class="card">
-        <h3>Transport CC Mapping (Axiom often uses CC 114–119)</h3>
-        <div class="controls">
-          <div class="control"><label>Rew</label><input type="number" id="cc-rew" min="0" max="127" value="114"><div></div></div>
-          <div class="control"><label<Back</label><input type="number" id="cc-back" min="0" max="127" value="115"><div></div></div>
-          <div class="control"><label>Play</label><input type="number" id="cc-play" min="0" max="127" value="118"><div></div></div>
-          <div class="control"><label>Stop</label><input type="number" id="cc-stop" min="0" max="127" value="117"><div></div></div>
-          <div class="control"><label>Rec</label><input type="number" id="cc-rec" min="0" max="127" value="119"><div></div></div>
-          <div class="control"><label>Loop</label><input type="number" id="cc-loop" min="0" max="127" value="116"><div></div></div>
+        <h3>Mappings (click 🎯 then move a control / hit a pad)</h3>
+        <div id="mapList">
+          <!-- rows injected -->
         </div>
       </div>
 
       <div class="card">
-        <h3>Pad Mapping (saved locally)</h3>
+        <h3>Pad Mapping (notes → pad sounds) — now with Learn</h3>
         <div id="padMap" class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px"></div>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button id="saveMap">💾 Save</button>
@@ -237,29 +224,36 @@
   const fmtHz = v=>v>=1000 ? (v/1000).toFixed(1)+'k' : Math.round(v);
   const clamp = (v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 
-  // state
+  // -------- State
   const state = {
     midi:null, input:null, ch:1,
     transpose:0, octave:0,
     sustain:false, held:new Set(),
     baseMidi: parseInt(localStorage.getItem('axiomBaseMidi')||'48',10),
     ccMap: JSON.parse(localStorage.getItem('axiomCCMap')||'null') || {16:'cutoff',17:'q',18:'attack',19:'decay',20:'sustain',21:'release',22:'reverb',23:'delay'},
-    learn:null,
+    ccVals: JSON.parse(localStorage.getItem('axiomCCVals')||'null') || {},  // CC -> 0..127
+    ccMode: {}, // detect relative-64 mode per CC
+    learnParam:null,    // for parameter mapping (🎯 near sliders)
+    learnAction:null,   // for action mapping (Mappings panel)
+    learnPadIndex:null, // for pad learn
     padMap: JSON.parse(localStorage.getItem('axiomPadMap')||'null') || [
-      {midi:36,name:'Kick', type:'kick'},
-      {midi:38,name:'Snare',type:'snare'},
-      {midi:42,name:'CH',   type:'hhc'},
-      {midi:46,name:'OH',   type:'hho'},
-      {midi:41,name:'LT',   type:'toml'},
-      {midi:43,name:'HT',   type:'tomh'},
-      {midi:39,name:'Clap', type:'clap'},
-      {midi:49,name:'Crash',type:'crash'},
+      {midi:36,name:'Kick', type:'kick'},{midi:38,name:'Snare',type:'snare'},
+      {midi:42,name:'CH',type:'hhc'},{midi:46,name:'OH',type:'hho'},
+      {midi:41,name:'LT',type:'toml'},{midi:43,name:'HT',type:'tomh'},
+      {midi:39,name:'Clap',type:'clap'},{midi:49,name:'Crash',type:'crash'}
     ],
-    transportCC: JSON.parse(localStorage.getItem('axiomTransportCC')||'null') || {rew:114, back:115, loop:116, stop:117, play:118, rec:119},
+    actions: JSON.parse(localStorage.getItem('axiomActions')||'null') || {
+      play:{type:'cc', id:118}, stop:{type:'cc', id:117}, loop:{type:'cc', id:116},
+      sustain:{type:'cc', id:64}, mod:{type:'cc', id:1}, bend:{type:'pb', id:null},
+      octaveUp:{type:'none',id:null}, octaveDown:{type:'none',id:null},
+      transposeUp:{type:'none',id:null}, transposeDown:{type:'none',id:null}
+    },
     bendCents:0, bendRange:200, modDepth:0, atAmount:0
   };
+  const saveCCVals = () => localStorage.setItem('axiomCCVals', JSON.stringify(state.ccVals));
+  const saveActions = () => localStorage.setItem('axiomActions', JSON.stringify(state.actions));
 
-  // Tone graph
+  // -------- Tone graph
   let poly=null, bass=null, bell=null, filter=null, verb=null, dly=null, comp=null, drum=null, lfo=null;
 
   function buildGraph(preset){
@@ -284,13 +278,12 @@
     } else if (preset==='ep-bell'){
       bell = new Tone.FMSynth({volume:-8, modulationIndex:12, harmonicity:2.5, oscillator:{type:'sine'}, envelope:env, modulationEnvelope:{attack:0.01, decay:0.3, sustain:0.2, release:env.release}});
       poly = new Tone.PolySynth(bell); chain(poly);
-    } // drum-only = no melodic chain
+    } // drum-only => no melodic chain
 
-    // vibrato via mod wheel (detune in cents)
     if (lfo) lfo.dispose();
     lfo = new Tone.LFO({type:'sine', frequency:5, min:0, max:1}).start();
     lfo.callback = v => applyDetune(state.bendCents + v*state.modDepth*100);
-    // drums
+
     if (drum){ for(const k of Object.values(drum)){k.dispose&&k.dispose();} }
     drum = {
       kick: new Tone.MembraneSynth({volume:-4}),
@@ -306,21 +299,52 @@
   }
 
   function currentPoly(){ return poly||null; }
+  function applyDetune(cents){
+    state.bendCents = cents;
+    const setDet = voice=>{ try{ voice.set({detune:cents}); }catch(_){ } };
+    if (poly) poly.voices.forEach(setDet);
+    if (bass) setDet(bass);
+    if (bell) setDet(bell);
+  }
 
   function effectiveMidi(m){ return m + state.transpose + state.octave*12; }
 
+  // -------- Notes
   function noteOn(midi, vel=100){
-    midi = effectiveMidi(midi);
+    // check action learns bound to Note
+    if (state.learnPadIndex!==null){ // learning pad note
+      state.padMap[state.learnPadIndex].midi = midi;
+      buildPads(); buildPadEditor();
+      state.learnPadIndex = null;
+      say('Pad mapped to MIDI '+midi, 'ok');
+      return;
+    }
+    if (state.learnAction){ // learning actions
+      state.actions[state.learnAction] = {type:'note', id:midi};
+      saveActions(); renderMappings();
+      say(`Mapped ${state.learnAction} to Note ${midi}.`, 'ok');
+      state.learnAction=null; return;
+    }
+
     const v = vel/127;
-    // pads first
+    midi = effectiveMidi(midi);
+
+    // If a Note is mapped to an action, trigger and exit
+    for (const [k,a] of Object.entries(state.actions)){
+      if (a.type==='note' && a.id===midi){
+        triggerAction(k);
+        return;
+      }
+    }
+
     const pi = state.padMap.findIndex(p=>p.midi===midi);
     if (pi!==-1){ triggerPad(state.padMap[pi].type, v); flashPad(pi); lcdShow('PAD', `m${midi} v${vel}`); return; }
     if ($('#preset').value==='drum-only') return;
 
     if (currentPoly()){
-      currentPoly().triggerAttack(Tone.Frequency(midi,'midi'), Tone.now(), clamp(0.1+v*0.9,0,1));
+      currentPoly().triggerAttack(Tone.Frequency(midi,'midi'), Tone.now(), Math.max(0.1, v));
     } else if (bass){
-      bass.triggerAttack(Tone.Frequency(midi,'midi'), Tone.now(), clamp(0.1+v*0.9,0,1));
+      bass.triggerAttack(Tone.Frequency(midi,'midi'), Tone.now(), Math.max(0.1, v));
     }
     state.held.add(midi); flashKey(midi,true);
     lcdShow('NOTE ON', `m${midi} v${vel}`);
@@ -339,9 +363,8 @@
     if (bass) bass.triggerRelease();
     state.held.clear(); $$('.white,.black,.pad').forEach(el=>el.classList.remove('active'));
   }
-
   function triggerPad(type, v){
-    const now = Tone.now();
+    const now=Tone.now();
     ({kick:()=>drum.kick.triggerAttackRelease('C1',0.22,now,v),
       snare:()=>drum.snare.triggerAttackRelease(0.12,now,v),
       hhc:()=>drum.hhc.triggerAttackRelease(0.05,now,v*0.9),
@@ -353,7 +376,7 @@
     }[type]||(()=>{}))();
   }
 
-  // Build keys (25)
+  // -------- Keys UI
   const kb = $('#kb');
   function buildKeys(){
     kb.innerHTML='';
@@ -369,68 +392,66 @@
   }
   function midiVisible(m){ return m>=state.baseMidi-1 && m<state.baseMidi+32; }
   function keyEl(m){ return kb.querySelector(`[data-midi="${m}"]`); }
-  function flashKey(m,on){
-    if(!midiVisible(m)) return;
-    const el=keyEl(m); if(!el) return;
-    el.classList.toggle('active', !!on);
-  }
+  function flashKey(m,on){ if(!midiVisible(m)) return; const el=keyEl(m); if(!el) return; el.classList.toggle('active', !!on); }
   kb.addEventListener('mousedown',e=>{
     const t=e.target.closest('[data-midi]'); if(!t) return; const m=+t.dataset.midi; noteOn(m,110);
     const up=()=>{ noteOff(m); window.removeEventListener('mouseup',up); };
     window.addEventListener('mouseup',up);
   });
-  kb.addEventListener('touchstart',e=>{
-    const t=e.target.closest('[data-midi]'); if(!t) return; noteOn(+t.dataset.midi,110);
-  },{passive:true});
-  kb.addEventListener('touchend',e=>{
-    const t=e.target.closest('[data-midi]'); if(!t) return; noteOff(+t.dataset.midi);
-  });
+  kb.addEventListener('touchstart',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; noteOn(+t.dataset.midi,110); },{passive:true});
+  kb.addEventListener('touchend',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; noteOff(+t.dataset.midi); });
 
-  // Computer keyboard
+  // Computer keyboard (for testing)
   const keyMapW='asdfghjkl;'.split(''); const keyMapB='wetyuop'.split('');
   const offW=[0,2,4,5,7,9,11,12,14,16]; const offB=[1,3,6,8,10,13,15];
-  window.addEventListener('keydown',e=>{
-    if(e.repeat) return; const k=e.key.toLowerCase();
-    const iw=keyMapW.indexOf(k), ib=keyMapB.indexOf(k); let m=null;
-    if(iw>-1) m=state.baseMidi+offW[iw]; else if(ib>-1) m=state.baseMidi+offB[ib];
-    if(m!=null) noteOn(m,110);
-  });
-  window.addEventListener('keyup',e=>{
-    const k=e.key.toLowerCase(); const iw=keyMapW.indexOf(k), ib=keyMapB.indexOf(k); let m=null;
-    if(iw>-1) m=state.baseMidi+offW[iw]; else if(ib>-1) m=state.baseMidi+offB[ib];
-    if(m!=null) noteOff(m);
-  });
+  window.addEventListener('keydown',e=>{ if(e.repeat) return; const k=e.key.toLowerCase(); const iw=keyMapW.indexOf(k), ib=keyMapB.indexOf(k); let m=null; if(iw>-1) m=state.baseMidi+offW[iw]; else if(ib>-1) m=state.baseMidi+offB[ib]; if(m!=null) noteOn(m,110); });
+  window.addEventListener('keyup',e=>{ const k=e.key.toLowerCase(); const iw=keyMapW.indexOf(k), ib=keyMapB.indexOf(k); let m=null; if(iw>-1) m=state.baseMidi+offW[iw]; else if(ib>-1) m=state.baseMidi+offB[ib]; if(m!=null) noteOff(m); });
 
-  // Knobs + pads UI
+  // -------- Knobs & Pads UI
   const knobs=$('#knobs'), pads=$('#pads');
+  function setDial(ccOrIdx, val01){
+    const idx = typeof ccOrIdx==='number' && ccOrIdx>=16 ? ccOrIdx-16 : ccOrIdx;
+    const dial=knobs.querySelector(`.dial[data-idx="${idx}"]`); if(!dial) return;
+    const deg=-135+val01*270; dial.style.transform=`rotate(${deg}deg)`;
+  }
   function buildKnobs(){
     knobs.innerHTML='';
     for(let i=0;i<8;i++){
+      const cc=16+i;
       const box=document.createElement('div'); box.className='knob';
-      box.innerHTML=`<div class="dial" data-idx="${i}"></div><label>K${i+1}</label><div class="learn" data-learn-idx="${i}">🎯 learn</div>`;
+      const mapped = state.ccMap[cc] || '—';
+      box.innerHTML=`<div class="dial" data-idx="${i}"></div><label>K${i+1}</label><div class="mapto">${mapped}</div><div class="learn" data-learn-cc="${cc}">🎯 learn</div>`;
       knobs.appendChild(box);
+      // restore dial angle based on saved value:
+      const v = (state.ccVals[cc]!==undefined) ? state.ccVals[cc]/127 : 0.5;
+      setDial(i, v);
     }
     knobs.addEventListener('click',e=>{
-      const idx=e.target.dataset.learnIdx; if(idx==null) return;
-      const cc=16+Number(idx); state.learn = {param: state.ccMap[cc] || null, ccTarget: cc};
-      $$('.learn').forEach(l=>l.classList.remove('active')); e.target.classList.add('active');
-      say(`Learning: move a control to map to K${Number(idx)+1} (CC${cc})`, 'warn');
+      const cc=e.target.dataset.learnCc; if(!cc) return;
+      state.learnParam = {param: state.ccMap[cc] || 'cutoff', ccTarget: +cc};
+      $$('.learn').forEach(l=>l.classList.remove('active'));
+      e.target.classList.add('active');
+      say(`Learning: move a control to map to K${(+cc-15)} (CC${cc}).`,'warn');
     });
   }
   function buildPads(){
     pads.innerHTML='';
     for(let i=0;i<8;i++){
-      const p=document.createElement('div'); p.className='pad'; p.dataset.index=i; p.innerHTML=`<small>${state.padMap[i].name}</small>`;
+      const p=document.createElement('div'); p.className='pad'; p.dataset.index=i; p.innerHTML=`<small>${state.padMap[i].name}</small><div class="learn" data-learn-pad="${i}">🎯 learn</div>`;
       p.onmousedown=()=>triggerPad(state.padMap[i].type,1);
       p.ontouchstart=()=>triggerPad(state.padMap[i].type,1);
       pads.appendChild(p);
     }
+    pads.addEventListener('click',e=>{
+      const idx=e.target.dataset.learnPad; if(idx==null) return;
+      state.learnPadIndex = +idx;
+      say(`Pad ${+idx+1}: hit a hardware pad (NoteOn) to bind.`, 'warn');
+    });
   }
   function flashPad(i){ const el=pads.querySelector(`.pad[data-index="${i}"]`); if(!el) return; el.classList.add('active'); setTimeout(()=>el.classList.remove('active'),120); }
-  function setDial(cc,val01){ const idx=cc-16; if(idx<0||idx>7) return; const dial=knobs.querySelector(`.dial[data-idx="${idx}"]`); if(!dial) return; const deg=-135+val01*270; dial.style.transform=`rotate(${deg}deg)`; }
 
-  // Pad editor
-  const PAD_TYPES = [{id:'kick',label:'Kick'},{id:'snare',label:'Snare'},{id:'hhc',label:'Hi-Hat (Closed)'},{id:'hho',label:'Hi-Hat (Open)'},{id:'toml',label:'Tom (Low)'},{id:'tomh',label:'Tom (High)'},{id:'clap',label:'Clap'},{id:'crash',label:'Crash'}];
+  // -------- Pad editor
+  const PAD_TYPES=[{id:'kick',label:'Kick'},{id:'snare',label:'Snare'},{id:'hhc',label:'Hi-Hat (Closed)'},{id:'hho',label:'Hi-Hat (Open)'},{id:'toml',label:'Tom (Low)'},{id:'tomh',label:'Tom (High)'},{id:'clap',label:'Clap'},{id:'crash',label:'Crash'}];
   function buildPadEditor(){
     const root=$('#padMap'); root.innerHTML='';
     state.padMap.forEach((p,i)=>{
@@ -438,8 +459,8 @@
       wrap.innerHTML=`
         <div style="display:grid;gap:8px">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><b>Pad ${i+1}</b> <span class="status">MIDI ${p.midi}</span></div>
-            <input type="number" min="0" max="127" value="${p.midi}" data-index="${i}" data-kind="midi" style="width:84px;padding:6px;border-radius:8px;background:#0b0f16;border:1px solid #263143;color:#e7edf8">
+            <div><b>Pad ${i+1}</b> <span class="badge">MIDI ${p.midi}</span></div>
+            <button class="learn" data-learn-pad="${i}">🎯 learn</button>
           </div>
           <label>Sound:
             <select data-index="${i}" data-kind="type">
@@ -452,28 +473,31 @@
         </div>`;
       root.appendChild(wrap);
     });
-    root.oninput = e=>{
+    root.oninput=e=>{
       const idx=+e.target.dataset.index, kind=e.target.dataset.kind;
       if(!Number.isInteger(idx)||!kind) return;
-      if(kind==='midi') state.padMap[idx].midi = clamp(parseInt(e.target.value||0,10),0,127);
       if(kind==='type') state.padMap[idx].type = e.target.value;
       if(kind==='name') state.padMap[idx].name = e.target.value;
       buildPads();
     };
+    root.addEventListener('click',e=>{
+      const idx=e.target.dataset.learnPad; if(idx==null) return;
+      state.learnPadIndex=+idx;
+      say(`Pad ${+idx+1}: hit a hardware pad to bind.`, 'warn');
+    });
   }
   $('#saveMap').onclick=()=>{ localStorage.setItem('axiomPadMap',JSON.stringify(state.padMap)); say('Saved pad mapping.','ok'); };
-  $('#resetMap').onclick=()=>{ localStorage.removeItem('axiomPadMap'); state.padMap = JSON.parse('null') || state.padMap; location.reload(); };
+  $('#resetMap').onclick=()=>{ localStorage.removeItem('axiomPadMap'); location.reload(); };
 
-  // LCD
-  function lcdShow(line1, line2){ $('#lcd').innerHTML = `<small>ZONE 1  •  CH ${state.ch}  •  ${line1}</small>${line2}`; }
+  // -------- LCD
+  function lcdShow(line1,line2){ $('#lcd').innerHTML = `<small>ZONE 1 • CH ${state.ch}</small>${line1}${line2 ? ' — '+line2 : ''}`; }
 
-  // Sliders + learn
+  // -------- Sliders + param learn
   function hookSlider(id, fmt, on){
     const el=$('#'+id), lab=$('#'+id+'Val');
     const apply=()=>{ lab.textContent=fmt(+el.value); on(+el.value); };
     el.addEventListener('input',apply); apply();
   }
-  function human(val){ return val.toFixed(2).replace(/\.00$/,''); }
   function rebuild(){ buildGraph($('#preset').value); }
   hookSlider('attack',fmtMs,()=>rebuild());
   hookSlider('decay', fmtMs,()=>rebuild());
@@ -488,6 +512,11 @@
   $('#preset').onchange=rebuild;
   $('#panic').onclick=allOff;
 
+  // parameter Learn buttons
+  $$('.learn[data-learn]').forEach(btn=>{
+    btn.onclick=()=>{ state.learnParam={param:btn.dataset.learn}; btn.classList.add('active'); say(`Learning: move a control to map to ${btn.dataset.learn}.`,'warn'); };
+  });
+
   // Base note
   (function(){
     const sel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m} (${Tone.Frequency(m,'midi').toNote()})`; sel.appendChild(o); }
@@ -495,8 +524,8 @@
     sel.onchange=()=>{ state.baseMidi=parseInt(sel.value,10); localStorage.setItem('axiomBaseMidi',String(state.baseMidi)); buildKeys(); };
   })();
 
-  // Octave / Transpose buttons
-  const updateTZ = ()=>{ const txt=`Oct ${state.octave>=0?'+':''}${state.octave} • Tr ${state.transpose>=0?'+':''}${state.transpose}`; lcdShow('TUNE', txt); };
+  // Octave/Transpose buttons
+  const updateTZ = ()=>{ lcdShow('Tune', `Oct ${state.octave>=0?'+':''}${state.octave} • Tr ${state.transpose>=0?'+':''}${state.transpose}`); };
   $('#oUp').onclick = ()=>{ state.octave = clamp(state.octave+1,-3,3); updateTZ(); };
   $('#oDown').onclick= ()=>{ state.octave = clamp(state.octave-1,-3,3); updateTZ(); };
   $('#tUp').onclick = ()=>{ state.transpose = clamp(state.transpose+1,-6,6); updateTZ(); };
@@ -505,30 +534,53 @@
   // Transport & metronome
   Tone.Transport.bpm.value = +$('#tempo').value;
   let click = new Tone.Synth({oscillator:{type:'square'}, envelope:{attack:0.001,decay:0.02,sustain:0,release:0.02}}).toDestination();
-  let bar=0, step=0;
-  const loop = new Tone.Loop(time => {
-    const isDownbeat = step%4===0;
-    click.triggerAttackRelease(isDownbeat ? "A5" : "E5", 0.04, time, isDownbeat?0.6:0.25);
-    step=(step+1)%16;
-  }, "16n");
-  $('#play').onclick=()=>{ if(Tone.Transport.state!=='started'){ loop.start(0); Tone.Transport.start(); $('#play').classList.add('live'); lcdShow('PLAY','Transport'); } };
-  $('#stop').onclick=()=>{ loop.stop(); Tone.Transport.stop(); $('#play').classList.remove('live'); lcdShow('STOP','Transport'); };
-  $('#rec').onclick =()=>{ lcdShow('REC','(visual only)'); say('Record is visual in this demo.','warn'); };
-  $('#rew').onclick =()=>{ Tone.Transport.position='0:0:0'; step=0; lcdShow('REW','0:0:0'); };
-  $('#back').onclick=()=>{ Tone.Transport.seconds = Math.max(0,Tone.Transport.seconds-2); lcdShow('BACK','-2s'); };
-  let loopOn=false;
-  $('#loop').onclick=()=>{ loopOn=!loopOn; $('#loop').classList.toggle('live', loopOn); lcdShow('LOOP', loopOn?'ON':'OFF'); };
+  let step=0; const loop = new Tone.Loop(time => { const down=step%4===0; click.triggerAttackRelease(down ? "A5" : "E5", 0.04, time, down?0.6:0.25); step=(step+1)%16; }, "16n");
+  $('#play').onclick=()=>{ if(Tone.Transport.state!=='started'){ loop.start(0); Tone.Transport.start(); $('#play').classList.add('live'); lcdShow('Play'); } };
+  $('#stop').onclick=()=>{ loop.stop(); Tone.Transport.stop(); $('#play').classList.remove('live'); lcdShow('Stop'); };
+  let loopOn=false; $('#loop').onclick=()=>{ loopOn=!loopOn; $('#loop').classList.toggle('live',loopOn); lcdShow('Loop', loopOn?'On':'Off'); };
 
   // Build visuals initial
-  buildKeys(); buildKnobs(); buildPads(); buildPadEditor(); buildGraph('piano-lite');
+  buildKeys(); buildKnobs(); buildPads(); buildPadEditor(); buildGraph('piano-lite'); renderMappings();
 
-  // MIDI
+  // -------- Mappings panel
+  function renderMappings(){
+    const root=$('#mapList'); root.innerHTML='';
+    const rows = [
+      ['play','Play'],['stop','Stop'],['loop','Loop'],
+      ['sustain','Sustain'],['mod','Mod'],['bend','Bend (PB/CC)'],
+      ['octaveUp','Octave +'],['octaveDown','Octave –'],
+      ['transposeUp','Transpose +'],['transposeDown','Transpose –']
+    ];
+    rows.forEach(([k,label])=>{
+      const a=state.actions[k];
+      const tag = a.type==='cc'?`CC ${a.id}`: a.type==='note'?`Note ${a.id}`: a.type==='pb'?'Pitch Bend':'—';
+      const row=document.createElement('div'); row.className='maprow';
+      row.innerHTML = `<div>${label}</div><div class="badge">${tag}</div><button class="learn" data-learn-action="${k}">🎯 learn</button>`;
+      root.appendChild(row);
+    });
+    root.addEventListener('click', e=>{
+      const act=e.target.dataset.learnAction; if(!act) return;
+      state.learnAction = act;
+      say(`Learning: send a ${act} control (CC or Note; bend wheel for Bend).`,'warn');
+    }, {once:true});
+  }
+  function triggerAction(k){
+    if (k==='play') $('#play').click();
+    else if (k==='stop') $('#stop').click();
+    else if (k==='loop') $('#loop').click();
+    else if (k==='octaveUp') { state.octave = clamp(state.octave+1,-3,3); updateTZ(); }
+    else if (k==='octaveDown') { state.octave = clamp(state.octave-1,-3,3); updateTZ(); }
+    else if (k==='transposeUp') { state.transpose = clamp(state.transpose+1,-6,6); updateTZ(); }
+    else if (k==='transposeDown') { state.transpose = clamp(state.transpose-1,-6,6); updateTZ(); }
+  }
+
+  // -------- MIDI
   const midiSel=$('#midiIn'); let inputs=[];
   function refreshInputs(){
     midiSel.innerHTML=''; inputs=[];
     if(!state.midi) return;
     for(const input of state.midi.inputs.values()){
-      inputs.push(input); const o=document.createElement('option'); o.value=input.id; o.textContent=`${input.name} (CH?)`; midiSel.appendChild(o);
+      inputs.push(input); const o=document.createElement('option'); o.value=input.id; o.textContent=`${input.name}`; midiSel.appendChild(o);
     }
     if(inputs.length){ setInput(inputs[0]); midiSel.value=inputs[0].id; }
   }
@@ -539,64 +591,67 @@
     say(`Connected to <b>${input.name}</b>.`,'ok');
   }
 
-  function applyDetune(cents){
-    state.bendCents = cents;
-    const setDet = voice=>{
-      try{ voice.set({detune:cents}); }catch(_){}
-    };
-    if (poly) poly.voices.forEach(setDet);
-    if (bass) setDet(bass);
-    if (bell) setDet(bell);
-  }
-
   function onMsg(ev){
     const [s,d1,d2]=ev.data; const cmd=s&0xF0, ch=(s&0x0F)+1; state.ch=ch;
     log(`0x${s.toString(16)} ch${ch} d1=${d1} d2=${d2}`);
-    if (cmd===0x90 && d2>0){ noteOn(d1,d2); lcdShow('NOTE', `m${d1} v${d2}`); }
-    else if ((cmd===0x90 && d2===0) || cmd===0x80){ noteOff(d1); }
-    else if (cmd===0xB0){ handleCC(d1,d2); }
-    else if (cmd===0xE0){ // pitch bend
-      const bend = ((d2<<7)|d1) - 8192; // -8192..+8191
-      const cents = (bend/8192) * state.bendRange;
-      applyDetune(cents);
-      lcdShow('BEND', human(cents)+'¢');
+    if (cmd===0x90 && d2>0){ noteOn(d1,d2); lcdShow('Note', `m${d1} v${d2}`); return; }
+    if ((cmd===0x90 && d2===0) || cmd===0x80){ noteOff(d1); return; }
+    if (cmd===0xE0){ // pitch bend (also learn Bend)
+      if (state.learnAction==='bend'){ state.actions.bend={type:'pb',id:null}; saveActions(); renderMappings(); say('Mapped Bend to Pitch Bend.','ok'); state.learnAction=null; }
+      const bend = ((d2<<7)|d1) - 8192; const cents = (bend/8192) * state.bendRange; applyDetune(cents); lcdShow('Bend', Math.round(cents)+'¢'); return;
     }
-    else if (cmd===0xD0){ // channel pressure (aftertouch)
-      state.atAmount = d1/127; // reuse d1
-      if (filter){ const base=+$('#cutoff').value; filter.frequency.value = base*(1+state.atAmount*0.5); }
-      lcdShow('AFTERTOUCH', Math.round(state.atAmount*127));
+    if (cmd===0xD0){ // channel pressure → filter open
+      state.atAmount = d1/127; if (filter){ const base=+$('#cutoff').value; filter.frequency.value = base*(1+state.atAmount*0.5); } lcdShow('Aftertouch', d1); return;
     }
+    if (cmd===0xB0){ handleCC(d1,d2); return; }
   }
 
   function handleCC(cc,val){
-    // Sustain pedal
-    if (cc===64){ state.sustain = val>=64; if(!state.sustain){ [...state.held].forEach(m=>noteOff(m)); } lcdShow('SUSTAIN', state.sustain?'ON':'OFF'); return; }
-    // Mod wheel → vibrato depth
-    if (cc===1){ state.modDepth = val/127; lcdShow('MOD', Math.round(state.modDepth*127)); return; }
-
-    // Transport CCs
-    const t=state.transportCC;
-    if (cc===t.play && val>0){ $('#play').click(); return; }
-    if (cc===t.stop && val>0){ $('#stop').click(); return; }
-    if (cc===t.rec  && val>0){ $('#rec').click();  return; }
-    if (cc===t.rew  && val>0){ $('#rew').click();  return; }
-    if (cc===t.back && val>0){ $('#back').click(); return; }
-    if (cc===t.loop && val>0){ $('#loop').click(); return; }
-
-    // Learning?
-    if (state.learn){
-      // Map incoming CC to that parameter instead
-      state.ccMap[cc] = state.learn.param || 'cutoff';
+    // While learning…
+    if (state.learnParam){
+      // bind this CC to the selected parameter
+      state.ccMap[cc] = state.learnParam.param;
       localStorage.setItem('axiomCCMap', JSON.stringify(state.ccMap));
-      say(`Mapped CC${cc} → ${state.ccMap[cc]}.`, 'ok');
-      $$('.learn').forEach(l=>l.classList.remove('active'));
-      state.learn=null;
+      say(`Mapped CC${cc} → ${state.learnParam.param}.`, 'ok');
+      state.learnParam=null; $$('.learn').forEach(l=>l.classList.remove('active'));
+      buildKnobs(); // refresh labels
+    } else if (state.learnAction){
+      state.actions[state.learnAction] = {type:'cc', id:cc};
+      saveActions(); renderMappings();
+      say(`Mapped ${state.learnAction} to CC${cc}.`,'ok');
+      state.learnAction=null;
     }
 
-    const value01 = val/127;
+    // Check if this CC is bound to any action (play/stop/loop/sustain/mod/bend, octave/transpose if set to CC)
+    for(const [k,a] of Object.entries(state.actions)){
+      if (a.type==='cc' && a.id===cc){
+        if (k==='sustain'){ state.sustain = val>=64; lcdShow('Sustain', state.sustain?'On':'Off'); return; }
+        if (k==='mod'){ state.modDepth = val/127; lcdShow('Mod', val); return; }
+        if (k==='bend'){ const value01=val/127; const cents=(value01-0.5)*2*state.bendRange; applyDetune(cents); lcdShow('Bend(CC)', Math.round(cents)+'¢'); return; }
+        // momentary actions when value > 0
+        if (val>0) { triggerAction(k); return; }
+      }
+    }
+
+    // Normal knob routing (with absolute or relative-64 support)
+    let v;
+    if (state.ccMode[cc]==='rel'){
+      const delta = val-64; v = clamp((state.ccVals[cc] ?? 64) + delta*2, 0, 127);
+    } else {
+      // detect relative quickly
+      if (val>=61 && val<=67 && state.ccVals[cc]!==undefined && Math.abs(val-64)<=3){
+        state.ccMode[cc]='rel';
+        const delta = val-64; v = clamp(state.ccVals[cc] + delta*2, 0, 127);
+      } else {
+        v = val; // absolute
+      }
+    }
+    state.ccVals[cc]=v; saveCCVals();
+    const value01 = v/127;
     setDial(cc, value01);
+
     const map = state.ccMap[cc];
-    if (!map){ lcdShow('CC', `${cc}=${val}`); return; }
+    if (!map){ lcdShow('CC', `${cc}=${v}`); return; }
     switch(map){
       case 'cutoff': if(filter){ const f=200+value01*(10000-200); filter.frequency.value=f; $('#cutoff').value=Math.round(f); $('#cutoffVal').textContent=fmtHz(f); } break;
       case 'q': if(filter){ const q=0.2+value01*(18-0.2); filter.Q.value=q; $('#q').value=q.toFixed(1); $('#qVal').textContent=$('#q').value; } break;
@@ -607,21 +662,10 @@
       case 'reverb': $('#reverb').value=value01.toFixed(2); $('#reverb').dispatchEvent(new Event('input')); break;
       case 'delay':  $('#delay').value=value01.toFixed(2); $('#delay').dispatchEvent(new Event('input')); break;
     }
-    lcdShow('CC', `${cc}=${val} → ${map}`);
+    lcdShow('CC', `${cc}=${v} → ${map}`);
   }
 
-  // Learn buttons beside sliders
-  $$('.learn[data-learn]').forEach(btn=>{
-    btn.onclick=()=>{ state.learn={param:btn.dataset.learn}; btn.classList.add('active'); say(`Learning: move a control to map to ${btn.dataset.learn}.`,'warn'); };
-  });
-
-  // Transport CC inputs save
-  ['rew','back','play','stop','rec','loop'].forEach(k=>{
-    const el=$('#cc-'+k); el.value=state.transportCC[k];
-    el.oninput=()=>{ state.transportCC[k]=clamp(parseInt(el.value||0,10),0,127); localStorage.setItem('axiomTransportCC',JSON.stringify(state.transportCC)); };
-  });
-
-  // Buttons
+  // -------- Buttons
   $('#startBtn').onclick=async()=>{ try{ await Tone.start(); say('Audio started. Now Connect MIDI (or use Test Tone).','ok'); }catch(e){ say('Audio failed: '+e.message,'bad'); } };
   $('#testBtn').onclick=async()=>{ try{ await Tone.start(); const s=new Tone.Synth().toDestination(); s.triggerAttackRelease('A4',0.15); say('Heard a beep? Audio path OK.','ok'); }catch(e){ say('Test failed: '+e.message,'bad'); } };
   $('#midiBtn').onclick=async()=>{
