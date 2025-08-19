@@ -10,28 +10,28 @@
 <style>
   :root{
     --bg:#0d1016; --panel:#192131; --panel2:#212a3b; --rim:#2b3448;
-    --text:#e7edf8; --muted:#9aa3b2; --accent:#6ee7ff;
+    --text:#e7edf8; --muted:#9aa3b2; --accent:#6ee7ff; --accent2:#a78bfa;
     --ok:#34d399; --bad:#ff6b6b; --warn:#f59e0b;
     --lcd1:#0cf; --lcd2:#058; --pad:#101827; --pad-lit:#10b981;
     --key:#f6f7fb; --key-lit:#ffe082;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,Segoe UI,Roboto,Arial;min-height:100%;overflow:auto}
+  html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,Segoe UI,Roboto,Arial;min-height:100%}
   .wrap{min-height:100vh;display:flex;flex-direction:column;gap:12px;padding:16px}
   .topbar{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center}
   .title{font-weight:700;font-size:20px}
-  button,select,input[type="range"],input[type="number"],textarea{background:var(--panel);color:var(--text);border:1px solid var(--rim);border-radius:10px;padding:10px 12px}
+  button,select,input[type="range"],textarea{background:var(--panel);color:var(--text);border:1px solid var(--rim);border-radius:10px;padding:10px 12px}
   button:hover{background:var(--panel2);cursor:pointer}
   .pill{border-radius:999px}
   .status{color:var(--muted)}
   .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
 
-  /* device area */
   .device{background:linear-gradient(180deg,#2a3447 0%,#1a2130 55%,#141a26 100%);
     border:1px solid #111520;border-radius:22px;padding:16px;display:grid;grid-template-columns:300px 1fr 280px;gap:16px}
-  @media(max-width:1000px){.device{grid-template-columns:1fr;}}
+  @media(max-width:1100px){.device{grid-template-columns:1fr}}
   .lcd{background:radial-gradient(100% 140% at 50% 0%, var(--lcd1) 0%, var(--lcd2) 80%); border:2px solid #0af4; border-radius:10px; padding:10px 12px; color:#00131e; font:700 20px "Share Tech Mono",monospace; text-shadow:0 0 3px #aff;}
   .lcd small{display:block; font:600 11px Inter,system-ui; color:#012635; letter-spacing:.04em; margin-bottom:2px}
+
   .left{display:grid;grid-template-rows:auto auto auto 1fr;gap:10px}
   .row{display:flex;gap:10px;align-items:center}
   .rocker{display:grid;grid-template-columns:1fr 1fr;gap:6px}
@@ -59,8 +59,9 @@
   .dial::after{content:""; position:absolute; width:2px; height:14px; top:6px; left:50%; transform:translateX(-50%); background:var(--accent)}
   .knob label{display:block; font-size:11px; color:var(--muted)}
   .mapto{font-size:11px;color:#9cc;margin-top:2px}
-  .learn{font-size:11px;color:#9cc; cursor:pointer}
-  .learn.active{color:#fff; text-decoration:underline}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid #223047;border-radius:999px;background:#0b0f16;color:#9ec;font-size:11px}
+  .chip .dot{width:6px;height:6px;border-radius:999px;background:linear-gradient(0deg,#6ee7ff,#a78bfa)}
+  .chip:hover{filter:brightness(1.1);cursor:pointer}
 
   .padsWrap{background:#0b0f16;border:1px solid var(--rim);border-radius:12px;padding:10px}
   .pads{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
@@ -70,16 +71,15 @@
   .padTools{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px}
   .padTools .cell{display:flex;justify-content:space-between;align-items:center;font-size:12px}
 
-  /* footer cards */
-  .footer{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}
-  @media(max-width:1000px){.footer{grid-template-columns:1fr}}
+  .footer{display:grid;grid-template-columns:1.3fr .7fr;gap:16px;margin-top:12px}
+  @media(max-width:1100px){.footer{grid-template-columns:1fr}}
   .card{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--rim); border-radius:16px; padding:12px}
   .card h3{margin:0 0 8px; color:var(--muted); font:600 13px/1 Inter}
   .controls{display:grid; gap:8px; grid-template-columns:repeat(4,minmax(0,1fr))}
   .control{display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:6px}
   .control label{font-size:12px; color:var(--muted)}
   .val{min-width:3ch; text-align:right; color:var(--accent)}
-  .log{height:160px; overflow:auto; background:#0b0f16; border:1px solid var(--rim); border-radius:10px; padding:8px; font:12px ui-monospace,Consolas,monospace; white-space:pre-wrap}
+  .log{height:180px; overflow:auto; background:#0b0f16; border:1px solid var(--rim); border-radius:10px; padding:8px; font:12px ui-monospace,Consolas,monospace; white-space:pre-wrap}
   .maprow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;margin-bottom:6px}
   .badge{padding:2px 8px;border:1px solid var(--rim);border-radius:999px;background:#0b0f16;color:#9ec}
   .paste{height:110px;resize:vertical}
@@ -100,23 +100,16 @@
     <!-- left -->
     <div class="left">
       <div class="lcd" id="lcd"><small>ZONE 1 • CH 1</small>Ready</div>
-
       <div class="row">
-        <div>
-          <div class="status" style="font-size:12px;margin-bottom:4px">Transpose</div>
-          <div class="rocker"><button id="tDown">–</button><button id="tUp">+</button></div>
-        </div>
-        <div>
-          <div class="status" style="font-size:12px;margin-bottom:4px">Octave</div>
-          <div class="rocker"><button id="oDown">–</button><button id="oUp">+</button></div>
-        </div>
+        <div><div class="status" style="font-size:12px;margin-bottom:4px">Transpose</div>
+          <div class="rocker"><button id="tDown">–</button><button id="tUp">+</button></div></div>
+        <div><div class="status" style="font-size:12px;margin-bottom:4px">Octave</div>
+          <div class="rocker"><button id="oDown">–</button><button id="oUp">+</button></div></div>
       </div>
-
       <div class="wheels">
         <div class="wheel"><div class="val">Pitch</div></div>
         <div class="wheel"><div class="val">Mod</div></div>
       </div>
-
       <div class="transport">
         <div class="tbtn play" id="play">▶</div>
         <div class="tbtn" id="stop">⏹</div>
@@ -165,17 +158,17 @@
           <button id="panic">🛑</button>
         </div>
 
-        <div class="control"><label>Master Volume <span class="learn" data-learn="volume">🎯</span></label><input id="volume" type="range" min="-36" max="6" step="1" value="-6"><div id="volumeVal" class="val">-6dB</div></div>
+        <div class="control"><label>Master Volume <span class="chip map" data-learn="volume"><span class="dot"></span> MAP</span></label><input id="volume" type="range" min="-36" max="6" step="1" value="-6"><div id="volumeVal" class="val">-6dB</div></div>
 
-        <div class="control"><label>Attack <span class="learn" data-learn="attack">🎯</span></label><input id="attack" type="range" min="0" max="2000" step="10" value="20"><div id="attackVal" class="val">20ms</div></div>
-        <div class="control"><label>Decay <span class="learn" data-learn="decay">🎯</span></label><input id="decay" type="range" min="0" max="3000" step="10" value="200"><div id="decayVal" class="val">200ms</div></div>
-        <div class="control"><label>Sustain <span class="learn" data-learn="sustain">🎯</span></label><input id="sustain" type="range" min="0" max="1" step="0.01" value="0.6"><div id="sustainVal" class="val">0.60</div></div>
-        <div class="control"><label>Release <span class="learn" data-learn="release">🎯</span></label><input id="release" type="range" min="10" max="6000" step="10" value="400"><div id="releaseVal" class="val">400ms</div></div>
+        <div class="control"><label>Attack <span class="chip map" data-learn="attack"><span class="dot"></span> MAP</span></label><input id="attack" type="range" min="0" max="2000" step="10" value="20"><div id="attackVal" class="val">20ms</div></div>
+        <div class="control"><label>Decay <span class="chip map" data-learn="decay"><span class="dot"></span> MAP</span></label><input id="decay" type="range" min="0" max="3000" step="10" value="200"><div id="decayVal" class="val">200ms</div></div>
+        <div class="control"><label>Sustain <span class="chip map" data-learn="sustain"><span class="dot"></span> MAP</span></label><input id="sustain" type="range" min="0" max="1" step="0.01" value="0.6"><div id="sustainVal" class="val">0.60</div></div>
+        <div class="control"><label>Release <span class="chip map" data-learn="release"><span class="dot"></span> MAP</span></label><input id="release" type="range" min="10" max="6000" step="10" value="400"><div id="releaseVal" class="val">400ms</div></div>
 
-        <div class="control"><label>Filter Cutoff <span class="learn" data-learn="cutoff">🎯</span></label><input id="cutoff" type="range" min="150" max="12000" step="1" value="4500"><div id="cutoffVal" class="val">4.5k</div></div>
-        <div class="control"><label>Resonance Q <span class="learn" data-learn="q">🎯</span></label><input id="q" type="range" min="0.2" max="18" step="0.1" value="0.8"><div id="qVal" class="val">0.8</div></div>
-        <div class="control"><label>Reverb Mix <span class="learn" data-learn="reverb">🎯</span></label><input id="reverb" type="range" min="0" max="1" step="0.01" value="0.25"><div id="reverbVal" class="val">0.25</div></div>
-        <div class="control"><label>Delay Mix <span class="learn" data-learn="delay">🎯</span></label><input id="delay" type="range" min="0" max="1" step="0.01" value="0.12"><div id="delayVal" class="val">0.12</div></div>
+        <div class="control"><label>Filter Cutoff <span class="chip map" data-learn="cutoff"><span class="dot"></span> MAP</span></label><input id="cutoff" type="range" min="150" max="12000" step="1" value="4500"><div id="cutoffVal" class="val">4.5k</div></div>
+        <div class="control"><label>Resonance Q <span class="chip map" data-learn="q"><span class="dot"></span> MAP</span></label><input id="q" type="range" min="0.2" max="18" step="0.1" value="0.8"><div id="qVal" class="val">0.8</div></div>
+        <div class="control"><label>Reverb Mix <span class="chip map" data-learn="reverb"><span class="dot"></span> MAP</span></label><input id="reverb" type="range" min="0" max="1" step="0.01" value="0.25"><div id="reverbVal" class="val">0.25</div></div>
+        <div class="control"><label>Delay Mix <span class="chip map" data-learn="delay"><span class="dot"></span> MAP</span></label><input id="delay" type="range" min="0" max="1" step="0.01" value="0.12"><div id="delayVal" class="val">0.12</div></div>
 
         <div class="control"><label>Tempo</label><input id="tempo" type="range" min="40" max="200" step="1" value="110"><div id="tempoVal" class="val">110</div></div>
         <div class="control"><label>Bend Range (± cents)</label><input id="bendRange" type="range" min="50" max="400" step="10" value="200"><div id="bendRangeVal" class="val">200</div></div>
@@ -186,7 +179,7 @@
       <h3>MIDI Monitor</h3>
       <div id="log" class="log"></div>
 
-      <h3 style="margin-top:10px">Mappings Hub (click 🎯 then move a control / hit a pad)</h3>
+      <h3 style="margin-top:10px">Mappings Hub (click MAP then move a control / hit a pad)</h3>
       <div id="mapList"></div>
 
       <div class="row" style="margin-top:6px">
@@ -218,7 +211,7 @@
     midi:null, input:null, ch:1,
     transpose:0, octave:0,
     sustain:false, held:new Set(),
-    baseMidi: parseInt(localStorage.getItem('axiomBaseMidi')||'48',10),
+    baseMidi: parseInt(localStorage.getItem('axiomBaseMidi')||'60',10),
     ccMap: JSON.parse(localStorage.getItem('axiomCCMap')||'null') || {16:'cutoff',17:'q',18:'attack',19:'decay',20:'sustain',21:'release',22:'reverb',23:'delay'},
     ccVals: JSON.parse(localStorage.getItem('axiomCCVals')||'null') || {},  // CC -> 0..127
     ccMode: {}, // 'rel' when detected
@@ -246,56 +239,125 @@
     localStorage.setItem('axiomActions', JSON.stringify(state.actions));
   };
 
-  // ---------- Tone Graph ----------
+  // ---------- Build keyboard & pads FIRST (so UI appears even if audio fails) ----------
+  const kb = $('#kb'); const knobs=$('#knobs'), pads=$('#pads'), padTools=$('#padTools');
+
+  function buildKeys(){
+    kb.innerHTML='';
+    const WHITE=[0,2,4,5,7,9,11], BLACK={1:1,3:1,6:1,8:1,10:1};
+    for (let i=0;i<25;i++){
+      const n=state.baseMidi+i, s=n%12;
+      if (WHITE.includes(s)){
+        const w=document.createElement('div'); w.className='white'; w.dataset.midi=n; kb.appendChild(w);
+        const next=(s+1)%12; if (BLACK[next]){ const b=document.createElement('div'); b.className='black'; b.dataset.midi=n+1; w.appendChild(b); }
+      }
+    }
+  }
+  function midiVisible(m){ return m>=state.baseMidi-1 && m<state.baseMidi+32; }
+  function keyEl(m){ return kb.querySelector(`[data-midi="${m}"]`); }
+  function flashKey(m,on){ if(!midiVisible(m)) return; const el=keyEl(m); if(!el) return; el.classList.toggle('active', !!on); }
+  buildKeys();
+
+  function setDial(ccOrIdx, val01){
+    const idx = typeof ccOrIdx==='number' && ccOrIdx>=16 ? ccOrIdx-16 : ccOrIdx;
+    const dial=knobs.querySelector(`.dial[data-idx="${idx}"]`); if(!dial) return;
+    const deg=-135+val01*270; dial.style.transform=`rotate(${deg}deg)`;
+  }
+  function buildKnobs(){
+    knobs.innerHTML='';
+    for(let i=0;i<8;i++){
+      const cc=16+i, mapped=state.ccMap[cc] || '—';
+      const box=document.createElement('div'); box.className='knob';
+      box.innerHTML=`<div class="dial" data-idx="${i}"></div><label>K${i+1}</label><div class="mapto">${mapped}</div><span class="chip map" data-learn-cc="${cc}"><span class="dot"></span> MAP</span>`;
+      knobs.appendChild(box);
+      const v = (state.ccVals[cc]!==undefined) ? state.ccVals[cc]/127 : 0.5;
+      setDial(i, v);
+    }
+    knobs.onclick = (e)=>{
+      const cc=e.target.closest('.map')?.dataset.learnCc; if(!cc) return;
+      state.learnParam={param: state.ccMap[cc] || 'cutoff', ccTarget:+cc};
+      say(`Learning: move a control to map to K${(+cc-15)} (CC${cc}).`,'warn');
+    };
+  }
+  function buildPads(){
+    pads.innerHTML='';
+    for(let i=0;i<8;i++){
+      const p=document.createElement('div'); p.className='pad'; p.dataset.index=i; p.innerHTML=`<small>${state.padMap[i].name}</small>`;
+      p.onmousedown=()=>triggerPad(state.padMap[i].type,1);
+      p.ontouchstart=()=>triggerPad(state.padMap[i].type,1);
+      pads.appendChild(p);
+    }
+  }
+  function buildPadTools(){
+    padTools.innerHTML='';
+    for(let i=0;i<8;i++){
+      const c=document.createElement('div'); c.className='cell';
+      c.innerHTML=`<span>Pad ${i+1} <span class="badge">MIDI ${state.padMap[i].midi}</span></span><span class="chip map" data-learn-pad="${i}"><span class="dot"></span> MAP</span>`;
+      padTools.appendChild(c);
+    }
+    padTools.onclick = (e)=>{
+      const idx=e.target.closest('.map')?.dataset.learnPad; if(idx==null) return;
+      state.learnPadIndex=+idx; say(`Pad ${+idx+1}: hit a hardware pad to bind.`,'warn');
+    };
+  }
+  function flashPad(i){ const el=pads.querySelector(`.pad[data-index="${i}"]`); if(!el) return; el.classList.add('active'); setTimeout(()=>el.classList.remove('active'),120); }
+
+  buildKnobs(); buildPads(); buildPadTools();
+
+  // Clickable keys
+  kb.addEventListener('mousedown',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; const m=+t.dataset.midi; noteOn(m,110); const up=()=>{ noteOff(m); window.removeEventListener('mouseup',up); }; window.addEventListener('mouseup',up); });
+  kb.addEventListener('touchstart',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; noteOn(+t.dataset.midi,110); },{passive:true});
+  kb.addEventListener('touchend',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; noteOff(+t.dataset.midi); });
+
+  // ---------- Tone graph (guarded) ----------
   let poly=null, mono=null, bell=null, filter=null, reverb=null, dly=null, comp=null, vibrato=null, master=null, drum=null;
 
-  function buildGraph(preset){
-    [poly,mono,bell,filter,reverb,dly,comp,vibrato,master].forEach(n=>n&&n.dispose&&n.dispose());
-    master = new Tone.Gain(Tone.dbToGain(+$('#volume').value)).toDestination();
+  function safe(fn){ try{ return fn(); } catch(e){ console.error(e); say('Audio engine init error. You can still map & see MIDI. Try Start Audio/Test Tone again.', 'warn'); return null; } }
 
-    filter = new Tone.Filter({type:'lowpass', frequency:+$('#cutoff').value, Q:+$('#q').value});
-    // Freeverb = instant/algo reverb (no IR generate)
-    reverb = new Tone.Freeverb({roomSize:0.8, dampening:3000, wet:+$('#reverb').value});
-    dly    = new Tone.FeedbackDelay({delayTime:0.25, feedback:0.28, wet:+$('#delay').value});
-    comp   = new Tone.Compressor({threshold:-14, ratio:3, attack:0.003, release:0.25});
-    vibrato= new Tone.Vibrato({frequency:5, depth:0, wet:1}).start();
+  function buildGraph(preset){
+    safe(()=>[poly,mono,bell,filter,reverb,dly,comp,vibrato,master].forEach(n=>n&&n.dispose&&n.dispose()));
+    master = safe(()=> new Tone.Gain(Tone.dbToGain(+$('#volume').value)).toDestination());
+
+    filter = safe(()=> new Tone.Filter({type:'lowpass', frequency:+$('#cutoff').value, Q:+$('#q').value}));
+    reverb = safe(()=> new Tone.Freeverb({roomSize:0.8, dampening:3000, wet:+$('#reverb').value}));
+    dly    = safe(()=> new Tone.FeedbackDelay({delayTime:0.25, feedback:0.28, wet:+$('#delay').value}));
+    comp   = safe(()=> new Tone.Compressor({threshold:-14, ratio:3, attack:0.003, release:0.25}));
+    vibrato= safe(()=> new Tone.Vibrato({frequency:5, depth:0, wet:1}).start());
 
     const chain = src => src.connect(vibrato).connect(filter).connect(reverb).connect(dly).connect(comp).connect(master);
 
     const env = { attack:+$('#attack').value/1000, decay:+$('#decay').value/1000, sustain:+$('#sustain').value, release:+$('#release').value/1000 };
 
-    if (preset==='piano-lite'){
-      poly = new Tone.PolySynth(Tone.AMSynth,{volume:-6, oscillator:{type:'triangle'}, envelope:env, modulation:{type:'sine'}, modulationEnvelope:{attack:0.01, decay:0.2, sustain:0.3, release:env.release}});
-      chain(poly);
-    } else if (preset==='grand-pad'){
-      poly = new Tone.PolySynth(Tone.Synth,{volume:-10, oscillator:{type:'sawtooth'}, envelope:{...env, attack:Math.max(env.attack,0.2), release:Math.max(env.release,1.2)}});
-      chain(poly);
-    } else if (preset==='saw-lead'){
-      poly = new Tone.PolySynth(Tone.Synth,{volume:-8, oscillator:{type:'sawtooth'}, envelope:{...env, sustain:0.7}});
-      chain(poly);
-    } else if (preset==='square-lead'){
-      poly = new Tone.PolySynth(Tone.Synth,{volume:-8, oscillator:{type:'square'}, envelope:{...env, sustain:0.5}});
-      chain(poly);
-    } else if (preset==='strings'){
-      poly = new Tone.PolySynth(Tone.Synth,{volume:-9, oscillator:{type:'triangle'}, envelope:{attack:0.3, decay:0.2, sustain:0.8, release:1.5}});
-      chain(poly);
-    } else if (preset==='organ'){
-      poly = new Tone.PolySynth(Tone.Synth,{volume:-8, oscillator:{type:'square'}, envelope:{attack:0.01, decay:0.02, sustain:1, release:0.1}});
-      chain(poly);
-    } else if (preset==='bass-mono'){
-      mono = new Tone.MonoSynth({volume:-6, oscillator:{type:'square'}, envelope:{attack:0.01, decay:0.18, sustain:0.2, release:0.15},
-        filter:{Q:1,type:'lowpass',rolloff:-24}, filterEnvelope:{attack:0.005,decay:0.2,sustain:0.2,release:0.1, baseFrequency:+$('#cutoff').value, octaves:2.5}});
-      chain(mono);
-    } else if (preset==='ep-bell'){
-      bell = new Tone.FMSynth({volume:-8, modulationIndex:12, harmonicity:2.5, oscillator:{type:'sine'}, envelope:env, modulationEnvelope:{attack:0.01, decay:0.3, sustain:0.2, release:env.release}});
-      poly = new Tone.PolySynth(bell); chain(poly);
-    } else if (preset==='pluck'){
-      mono = new Tone.PluckSynth({attackNoise:1.2, dampening:3200, resonance:0.9}).connect(reverb).connect(dly).connect(comp).connect(master);
-    }
+    safe(()=>{
+      if (preset==='piano-lite'){
+        poly = new Tone.PolySynth(Tone.AMSynth,{volume:-6, oscillator:{type:'triangle'}, envelope:env, modulation:{type:'sine'}, modulationEnvelope:{attack:0.01, decay:0.2, sustain:0.3, release:env.release}});
+        chain(poly);
+      } else if (preset==='grand-pad'){
+        poly = new Tone.PolySynth(Tone.Synth,{volume:-10, oscillator:{type:'sawtooth'}, envelope:{...env, attack:Math.max(env.attack,0.2), release:Math.max(env.release,1.2)}});
+        chain(poly);
+      } else if (preset==='saw-lead'){
+        poly = new Tone.PolySynth(Tone.Synth,{volume:-8, oscillator:{type:'sawtooth'}, envelope:{...env, sustain:0.7}}); chain(poly);
+      } else if (preset==='square-lead'){
+        poly = new Tone.PolySynth(Tone.Synth,{volume:-8, oscillator:{type:'square'}, envelope:{...env, sustain:0.5}}); chain(poly);
+      } else if (preset==='strings'){
+        poly = new Tone.PolySynth(Tone.Synth,{volume:-9, oscillator:{type:'triangle'}, envelope:{attack:0.3, decay:0.2, sustain:0.8, release:1.5}}); chain(poly);
+      } else if (preset==='organ'){
+        poly = new Tone.PolySynth(Tone.Synth,{volume:-8, oscillator:{type:'square'}, envelope:{attack:0.01, decay:0.02, sustain:1, release:0.1}}); chain(poly);
+      } else if (preset==='bass-mono'){
+        mono = new Tone.MonoSynth({volume:-6, oscillator:{type:'square'}, envelope:{attack:0.01, decay:0.18, sustain:0.2, release:0.15},
+          filter:{Q:1,type:'lowpass',rolloff:-24}, filterEnvelope:{attack:0.005,decay:0.2,sustain:0.2,release:0.1, baseFrequency:+$('#cutoff').value, octaves:2.5}});
+        chain(mono);
+      } else if (preset==='ep-bell'){
+        bell = new Tone.FMSynth({volume:-8, modulationIndex:12, harmonicity:2.5, oscillator:{type:'sine'}, envelope:env, modulationEnvelope:{attack:0.01, decay:0.3, sustain:0.2, release:env.release}});
+        poly = new Tone.PolySynth(bell); chain(poly);
+      } else if (preset==='pluck'){
+        mono = new Tone.PluckSynth({attackNoise:1.2, dampening:3200, resonance:0.9}).connect(reverb).connect(dly).connect(comp).connect(master);
+      }
+    });
 
-    // rebuild drums
+    // drums
     if (drum){ for(const k of Object.values(drum)){k.dispose&&k.dispose();} }
-    drum = {
+    drum = safe(()=>({
       kick: new Tone.MembraneSynth({volume:-4}),
       snare:new Tone.NoiseSynth({volume:-8, noise:{type:'white'}, envelope:{attack:0.001,decay:0.18,sustain:0}}),
       hhc:  new Tone.NoiseSynth({volume:-14,noise:{type:'white'}, envelope:{attack:0.001,decay:0.06,sustain:0}}),
@@ -304,13 +366,11 @@
       tomh: new Tone.MembraneSynth({volume:-8,pitchDecay:0.01}),
       clap: new Tone.NoiseSynth({volume:-10,noise:{type:'pink'}, envelope:{attack:0.001,decay:0.12,sustain:0}}),
       crash:new Tone.MetalSynth({volume:-16,resonance:300,modulationIndex:8})
-    };
-    for (const k of Object.values(drum)) k.connect(reverb).connect(dly).connect(comp).connect(master);
+    })) || {};
+    for (const k of Object.values(drum)) try{k.connect(reverb).connect(dly).connect(comp).connect(master);}catch(_){}
   }
 
   function currentPoly(){ return poly||null; }
-
-  // True detune for bend/vibrato — hit the actual oscillators
   function setVoiceDetune(voice, cents){
     try{ if (voice.oscillator?.detune) voice.oscillator.detune.value = cents; }catch(_){}
     try{ if (voice.modulation?.detune) voice.modulation.detune.value = cents; }catch(_){}
@@ -322,14 +382,9 @@
     if (mono) setVoiceDetune(mono,cents);
     if (bell) setVoiceDetune(bell,cents);
   }
-
-  // Live envelope + FX updates (affect new notes; FX are live)
   function updateEnvelopes(){
     const a=+$('#attack').value/1000, d=+$('#decay').value/1000, s=+$('#sustain').value, r=+$('#release').value/1000;
-    if (poly) poly.voices.forEach(v=>{
-      if (v.envelope){ v.envelope.attack=a; v.envelope.decay=d; v.envelope.sustain=s; v.envelope.release=r; }
-      if (v.modulationEnvelope){ v.modulationEnvelope.release = r; }
-    });
+    if (poly) poly.voices.forEach(v=>{ if (v.envelope){ v.envelope.attack=a; v.envelope.decay=d; v.envelope.sustain=s; v.envelope.release=r; } if (v.modulationEnvelope){ v.modulationEnvelope.release=r; }});
     if (mono?.envelope){ mono.envelope.attack=a; mono.envelope.decay=d; mono.envelope.sustain=s; mono.envelope.release=r; }
     if (bell?.envelope){ bell.envelope.attack=a; bell.envelope.decay=d; bell.envelope.sustain=s; bell.envelope.release=r; }
   }
@@ -351,9 +406,12 @@
     if (pi!==-1){ triggerPad(state.padMap[pi].type, v); flashPad(pi); lcdShow('PAD', `m${midi} v${vel}`); return; }
     if ($('#preset').value==='drum-only') return;
 
-    const time = Tone.now();
-    if (currentPoly()) currentPoly().triggerAttack(Tone.Frequency(midi,'midi'), time, Math.max(0.1,v));
-    else if (mono) mono.triggerAttack(Tone.Frequency(midi,'midi'), time, Math.max(0.1,v));
+    const P = currentPoly();
+    const time = (window.Tone?Tone.now():0);
+    try{
+      if (P) P.triggerAttack(Tone.Frequency(midi,'midi'), time, Math.max(0.1,v));
+      else if (mono) mono.triggerAttack(Tone.Frequency(midi,'midi'), time, Math.max(0.1,v));
+    }catch(_){}
     state.held.add(midi); flashKey(midi,true);
     lcdShow('NOTE', `m${midi} v${vel}`);
   }
@@ -361,17 +419,19 @@
     midi = effectiveMidi(midi);
     if (!state.held.has(midi)){ flashKey(midi,false); return; }
     if (state.sustain) return;
-    if (currentPoly()) currentPoly().triggerRelease(Tone.Frequency(midi,'midi'), Tone.now());
-    else if (mono) mono.triggerRelease(Tone.now());
+    try{
+      if (currentPoly()) currentPoly().triggerRelease(Tone.Frequency(midi,'midi'), Tone.now());
+      else if (mono) mono.triggerRelease(Tone.now());
+    }catch(_){}
     state.held.delete(midi); flashKey(midi,false);
   }
   function allOff(){
-    if (currentPoly()) currentPoly().releaseAll();
-    if (mono) mono.triggerRelease();
+    try{ if (currentPoly()) currentPoly().releaseAll(); if (mono) mono.triggerRelease(); }catch(_){}
     state.held.clear(); $$('.white,.black,.pad').forEach(el=>el.classList.remove('active'));
   }
   function triggerPad(type, v){
-    const now=Tone.now();
+    if (!drum) return;
+    const now=(window.Tone?Tone.now():0);
     ({kick:()=>drum.kick.triggerAttackRelease('C1',0.22,now,v),
       snare:()=>drum.snare.triggerAttackRelease(0.12,now,v),
       hhc:()=>drum.hhc.triggerAttackRelease(0.05,now,v*0.9),
@@ -383,121 +443,15 @@
     }[type]||(()=>{}))();
   }
 
-  // ---------- Keys UI ----------
-  const kb = $('#kb');
-  function buildKeys(){
-    kb.innerHTML=''; kb.style.height='200px';
-    const WHITE=[0,2,4,5,7,9,11], BLACK={1:1,3:1,6:1,8:1,10:1};
-    for (let i=0;i<25;i++){
-      const n=state.baseMidi+i, s=n%12;
-      if (WHITE.includes(s)){
-        const w=document.createElement('div'); w.className='white'; w.dataset.midi=n; kb.appendChild(w);
-        const next=(s+1)%12;
-        if (BLACK[next]){ const b=document.createElement('div'); b.className='black'; b.dataset.midi=n+1; w.appendChild(b); }
-      }
-    }
-  }
-  function midiVisible(m){ return m>=state.baseMidi-1 && m<state.baseMidi+32; }
-  function keyEl(m){ return kb.querySelector(`[data-midi="${m}"]`); }
-  function flashKey(m,on){ if(!midiVisible(m)) return; const el=keyEl(m); if(!el) return; el.classList.toggle('active', !!on); }
-  kb.addEventListener('mousedown',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; const m=+t.dataset.midi; noteOn(m,110); const up=()=>{ noteOff(m); window.removeEventListener('mouseup',up); }; window.addEventListener('mouseup',up); });
-  kb.addEventListener('touchstart',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; noteOn(+t.dataset.midi,110); },{passive:true});
-  kb.addEventListener('touchend',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; noteOff(+t.dataset.midi); });
-
-  // Computer keyboard (test)
+  // Computer keyboard
   const keyMapW='asdfghjkl;'.split(''); const keyMapB='wetyuop'.split('');
   const offW=[0,2,4,5,7,9,11,12,14,16]; const offB=[1,3,6,8,10,13,15];
   window.addEventListener('keydown',e=>{ if(e.repeat) return; const k=e.key.toLowerCase(); const iw=keyMapW.indexOf(k), ib=keyMapB.indexOf(k); let m=null; if(iw>-1) m=state.baseMidi+offW[iw]; else if(ib>-1) m=state.baseMidi+offB[ib]; if(m!=null) noteOn(m,110); });
   window.addEventListener('keyup',e=>{ const k=e.key.toLowerCase(); const iw=keyMapW.indexOf(k), ib=keyMapB.indexOf(k); let m=null; if(iw>-1) m=state.baseMidi+offW[iw]; else if(ib>-1) m=state.baseMidi+offB[ib]; if(m!=null) noteOff(m); });
 
-  // ---------- Knobs + Pads ----------
-  const knobs=$('#knobs'), pads=$('#pads'), padTools=$('#padTools');
-  function setDial(ccOrIdx, val01){
-    const idx = typeof ccOrIdx==='number' && ccOrIdx>=16 ? ccOrIdx-16 : ccOrIdx;
-    const dial=knobs.querySelector(`.dial[data-idx="${idx}"]`); if(!dial) return;
-    const deg=-135+val01*270; dial.style.transform=`rotate(${deg}deg)`;
-  }
-  function buildKnobs(){
-    knobs.innerHTML='';
-    for(let i=0;i<8;i++){
-      const cc=16+i;
-      const box=document.createElement('div'); box.className='knob';
-      const mapped = state.ccMap[cc] || '—';
-      box.innerHTML=`<div class="dial" data-idx="${i}"></div><label>K${i+1}</label><div class="mapto">${mapped}</div><div class="learn" data-learn-cc="${cc}">🎯 learn</div>`;
-      knobs.appendChild(box);
-      const v = (state.ccVals[cc]!==undefined) ? state.ccVals[cc]/127 : 0.5;
-      setDial(i, v);
-    }
-    knobs.onclick = (e)=>{
-      const cc=e.target.dataset.learnCc; if(!cc) return;
-      state.learnParam={param: state.ccMap[cc] || 'cutoff', ccTarget:+cc};
-      $$('.learn').forEach(l=>l.classList.remove('active')); e.target.classList.add('active');
-      say(`Learning: move a control to map to K${(+cc-15)} (CC${cc}).`,'warn');
-    };
-  }
-  function buildPads(){
-    pads.innerHTML='';
-    for(let i=0;i<8;i++){
-      const p=document.createElement('div'); p.className='pad'; p.dataset.index=i; p.innerHTML=`<small>${state.padMap[i].name}</small>`;
-      p.onmousedown=()=>triggerPad(state.padMap[i].type,1);
-      p.ontouchstart=()=>triggerPad(state.padMap[i].type,1);
-      pads.appendChild(p);
-    }
-  }
-  function buildPadTools(){
-    padTools.innerHTML='';
-    for(let i=0;i<8;i++){
-      const c=document.createElement('div'); c.className='cell';
-      c.innerHTML=`<span>Pad ${i+1} <span class="badge">MIDI ${state.padMap[i].midi}</span></span><button class="learn" data-learn-pad="${i}">🎯 learn</button>`;
-      padTools.appendChild(c);
-    }
-    padTools.onclick = (e)=>{
-      const idx=e.target.dataset.learnPad; if(idx==null) return;
-      state.learnPadIndex=+idx; say(`Pad ${+idx+1}: hit a hardware pad to bind.`,'warn');
-    };
-  }
-  function flashPad(i){ const el=pads.querySelector(`.pad[data-index="${i}"]`); if(!el) return; el.classList.add('active'); setTimeout(()=>el.classList.remove('active'),120); }
-
-  function buildPadMapList(){
-    const root=$('#padMap'); root.innerHTML='';
-    state.padMap.forEach((p,i)=>{
-      const row=document.createElement('div'); row.className='maprow';
-      row.innerHTML=`<div>${p.name}</div><div class="badge">MIDI ${p.midi}</div><button class="learn" data-learn-pad="${i}">🎯 learn</button>`;
-      root.appendChild(row);
-    });
-    root.onclick=(e)=>{ const idx=e.target.dataset.learnPad; if(idx==null) return; state.learnPadIndex=+idx; say(`Pad ${+idx+1}: hit a hardware pad to bind.`,'warn'); };
-  }
-
-  // ---------- Mappings Hub ----------
-  function renderMappings(){
-    const root=$('#mapList'); root.innerHTML='';
-    const rows=[['play','Play'],['stop','Stop'],['loop','Loop'],['sustain','Sustain'],['mod','Mod'],['bend','Bend (PB/CC)'],['octaveUp','Octave +'],['octaveDown','Octave –'],['transposeUp','Transpose +'],['transposeDown','Transpose –']];
-    rows.forEach(([k,label])=>{
-      const a=state.actions[k]; const tag=a.type==='cc'?`CC ${a.id}`:a.type==='note'?`Note ${a.id}`:a.type==='pb'?'Pitch Bend':'—';
-      const row=document.createElement('div'); row.className='maprow';
-      row.innerHTML=`<div>${label}</div><div class="badge">${tag}</div><button class="learn" data-learn-action="${k}">🎯 learn</button>`;
-      root.appendChild(row);
-    });
-    root.onclick=(e)=>{ const act=e.target.dataset.learnAction; if(!act) return; state.learnAction=act; say(`Learning ${act}: send a control (CC/Note), or move pitch wheel for Bend.`,'warn'); };
-  }
-  function triggerAction(k){
-    if (k==='play') $('#play').click();
-    else if (k==='stop') $('#stop').click();
-    else if (k==='loop') $('#loop').click();
-    else if (k==='octaveUp') { state.octave = clamp(state.octave+1,-3,3); updateTZ(); }
-    else if (k==='octaveDown') { state.octave = clamp(state.octave-1,-3,3); updateTZ(); }
-    else if (k==='transposeUp') { state.transpose = clamp(state.transpose+1,-6,6); updateTZ(); }
-    else if (k==='transposeDown') { state.transpose = clamp(state.transpose-1,-6,6); updateTZ(); }
-    saveAll();
-  }
-
-  // ---------- LCD / controls ----------
+  // ---------- UI hooks ----------
   function lcdShow(line1,line2){ $('#lcd').innerHTML = `<small>ZONE 1 • CH ${state.ch}</small>${line1}${line2 ? ' — '+line2 : ''}`; }
-  function hookSlider(id, fmt, on){
-    const el=$('#'+id), lab=$('#'+id+'Val');
-    const apply=()=>{ lab.textContent=fmt(+el.value); on(+el.value); };
-    el.addEventListener('input',apply); apply();
-  }
+  function hookSlider(id, fmt, on){ const el=$('#'+id), lab=$('#'+id+'Val'); const apply=()=>{ lab.textContent=fmt(+el.value); on(+el.value); }; el.addEventListener('input',apply); apply(); }
   hookSlider('volume',v=>`${v}dB`,v=>{ if(master) master.gain.value = Tone.dbToGain(v); });
   hookSlider('attack',fmtMs,()=>{ updateEnvelopes(); });
   hookSlider('decay', fmtMs,()=>{ updateEnvelopes(); });
@@ -507,41 +461,63 @@
   hookSlider('q',v=>v.toFixed(1),v=>{ if(filter) filter.Q.value=v; });
   hookSlider('reverb',v=>v.toFixed(2),v=>{ if(reverb) reverb.wet.value=v; });
   hookSlider('delay', v=>v.toFixed(2),v=>{ if(dly) dly.wet.value=v; });
-  hookSlider('tempo', v=>String(v), v=>{ Tone.Transport.bpm.value=v; });
+  hookSlider('tempo', v=>String(v), v=>{ if (window.Tone) Tone.Transport.bpm.value=v; });
   hookSlider('bendRange', v=>String(v), v=>{ state.bendRange=v; });
   $('#preset').onchange=()=>buildGraph($('#preset').value);
   $('#panic').onclick=allOff;
 
-  // parameter Learn buttons
-  $$('.learn[data-learn]').forEach(btn=>{
-    btn.onclick=()=>{ state.learnParam={param:btn.dataset.learn}; btn.classList.add('active'); say(`Learning: move a control to map to ${btn.dataset.learn}.`,'warn'); };
+  // Learn chips
+  $$('.chip.map[data-learn]').forEach(btn=>{
+    btn.onclick=()=>{ state.learnParam={param:btn.dataset.learn}; say(`Learning: move a control to map to ${btn.dataset.learn}.`,'warn'); };
   });
 
   // base note selector
   (function(){
-    const sel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m} (${Tone.Frequency(m,'midi').toNote()})`; sel.appendChild(o); }
+    const sel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m} (${window.Tone?Tone.Frequency(m,'midi').toNote():m})`; sel.appendChild(o); }
     sel.value=String(state.baseMidi);
     sel.onchange=()=>{ state.baseMidi=parseInt(sel.value,10); localStorage.setItem('axiomBaseMidi',String(state.baseMidi)); buildKeys(); };
   })();
 
-  // transpose/octave
+  // transpose / octave
   const updateTZ = ()=>lcdShow('Tune', `Oct ${state.octave>=0?'+':''}${state.octave} • Tr ${state.transpose>=0?'+':''}${state.transpose}`);
   $('#oUp').onclick = ()=>{ state.octave = clamp(state.octave+1,-3,3); updateTZ(); saveAll(); };
   $('#oDown').onclick= ()=>{ state.octave = clamp(state.octave-1,-3,3); updateTZ(); saveAll(); };
   $('#tUp').onclick = ()=>{ state.transpose = clamp(state.transpose+1,-6,6); updateTZ(); saveAll(); };
   $('#tDown').onclick= ()=>{ state.transpose = clamp(state.transpose-1,-6,6); updateTZ(); saveAll(); };
 
-  // transport + metronome
-  Tone.Transport.bpm.value = +$('#tempo').value;
-  let click = new Tone.Synth({oscillator:{type:'square'}, envelope:{attack:0.001,decay:0.02,sustain:0,release:0.02}}).toDestination();
-  let step=0; const loop = new Tone.Loop(time => { const down=step%4===0; click.triggerAttackRelease(down ? "A5" : "E5", 0.04, time, down?0.6:0.25); step=(step+1)%16; }, "16n");
-  $('#play').onclick=()=>{ if(Tone.Transport.state!=='started'){ loop.start(0); Tone.Transport.start(); $('#play').classList.add('live'); lcdShow('Play'); } };
-  $('#stop').onclick=()=>{ loop.stop(); Tone.Transport.stop(); $('#play').classList.remove('live'); lcdShow('Stop'); };
+  // transport + click
+  if (window.Tone){ Tone.Transport.bpm.value = +$('#tempo').value; }
+  let click = (window.Tone)? new Tone.Synth({oscillator:{type:'square'}, envelope:{attack:0.001,decay:0.02,sustain:0,release:0.02}}).toDestination() : null;
+  let step=0; const loop = (window.Tone)? new Tone.Loop(time => { const down=step%4===0; click.triggerAttackRelease(down ? "A5" : "E5", 0.04, time, down?0.6:0.25); step=(step+1)%16; }, "16n") : null;
+  $('#play').onclick=()=>{ if(!window.Tone) return; if(Tone.Transport.state!=='started'){ loop.start(0); Tone.Transport.start(); $('#play').classList.add('live'); lcdShow('Play'); } };
+  $('#stop').onclick=()=>{ if(!window.Tone) return; loop.stop(); Tone.Transport.stop(); $('#play').classList.remove('live'); lcdShow('Stop'); };
   let loopOn=false; $('#loop').onclick=()=>{ loopOn=!loopOn; $('#loop').classList.toggle('live',loopOn); lcdShow('Loop', loopOn?'On':'Off'); };
 
-  // ---------- Build visuals ----------
+  // ---------- Build audio graph (guarded) ----------
   buildGraph('piano-lite');
-  buildKeys(); buildKnobs(); buildPads(); buildPadTools(); buildPadMapList(); renderMappings();
+
+  // ---------- Mappings Hub & Pad list ----------
+  function buildPadMapList(){
+    const root=$('#padMap'); root.innerHTML='';
+    state.padMap.forEach((p,i)=>{
+      const row=document.createElement('div'); row.className='maprow';
+      row.innerHTML=`<div>${p.name}</div><div class="badge">MIDI ${p.midi}</div><span class="chip map" data-learn-pad="${i}"><span class="dot"></span> MAP</span>`;
+      root.appendChild(row);
+    });
+    root.onclick=(e)=>{ const idx=e.target.closest('.map')?.dataset.learnPad; if(idx==null) return; state.learnPadIndex=+idx; say(`Pad ${+idx+1}: hit a hardware pad to bind.`,'warn'); };
+  }
+  function renderMappings(){
+    const root=$('#mapList'); root.innerHTML='';
+    const rows=[['play','Play'],['stop','Stop'],['loop','Loop'],['sustain','Sustain'],['mod','Mod'],['bend','Bend (PB/CC)'],['octaveUp','Octave +'],['octaveDown','Octave –'],['transposeUp','Transpose +'],['transposeDown','Transpose –']];
+    rows.forEach(([k,label])=>{
+      const a=state.actions[k]; const tag=a.type==='cc'?`CC ${a.id}`:a.type==='note'?`Note ${a.id}`:a.type==='pb'?'Pitch Bend':'—';
+      const row=document.createElement('div'); row.className='maprow';
+      row.innerHTML=`<div>${label}</div><div class="badge">${tag}</div><span class="chip map" data-learn-action="${k}"><span class="dot"></span> MAP</span>`;
+      root.appendChild(row);
+    });
+    root.onclick=(e)=>{ const act=e.target.closest('.map')?.dataset.learnAction; if(!act) return; state.learnAction=act; say(`Learning ${act}: send a control (CC/Note), or move pitch wheel for Bend.`,'warn'); };
+  }
+  renderMappings(); buildPadMapList();
 
   // ---------- MIDI ----------
   const midiSel=$('#midiIn'); let inputs=[];
@@ -565,47 +541,38 @@
     log(`0x${s.toString(16)} ch${ch} d1=${d1} d2=${d2}`);
     if (cmd===0x90 && d2>0){ noteOn(d1,d2); lcdShow('Note', `m${d1} v${d2}`); return; }
     if ((cmd===0x90 && d2===0) || cmd===0x80){ noteOff(d1); return; }
-    if (cmd===0xE0){ // pitch bend (learn bend)
-      if (state.learnAction==='bend'){ state.actions.bend={type:'pb',id:null}; saveAll(); renderMappings(); say('Mapped Bend to Pitch Bend.','ok'); state.learnAction=null; }
-      const bend = ((d2<<7)|d1) - 8192; const cents = (bend/8192) * state.bendRange; applyDetune(cents); lcdShow('Bend', Math.round(cents)+'¢'); return;
-    }
-    if (cmd===0xD0){ /* channel aftertouch ignored for now */ return; }
+    if (cmd===0xE0){ if (state.learnAction==='bend'){ state.actions.bend={type:'pb',id:null}; saveAll(); renderMappings(); say('Mapped Bend to Pitch Bend.','ok'); state.learnAction=null; }
+      const bend = ((d2<<7)|d1) - 8192; const cents = (bend/8192) * state.bendRange; applyDetune(cents); lcdShow('Bend', Math.round(cents)+'¢'); return; }
     if (cmd===0xB0){ handleCC(d1,d2); return; }
   }
 
   function handleCC(cc,val){
-    // Learn targets
-    if (state.learnParam){ state.ccMap[cc]=state.learnParam.param; saveAll(); say(`Mapped CC${cc} → ${state.learnParam.param}.`,'ok'); state.learnParam=null; $$('.learn').forEach(l=>l.classList.remove('active')); buildKnobs(); }
+    // learn targets
+    if (state.learnParam){ state.ccMap[cc]=state.learnParam.param; saveAll(); say(`Mapped CC${cc} → ${state.learnParam.param}.`,'ok'); state.learnParam=null; buildKnobs(); renderMappings(); }
     else if (state.learnAction){ state.actions[state.learnAction]={type:'cc', id:cc}; saveAll(); renderMappings(); say(`Mapped ${state.learnAction} to CC${cc}.`,'ok'); state.learnAction=null; }
 
-    // Action-bound CCs
+    // action CCs
     for(const [k,a] of Object.entries(state.actions)){
       if (a.type==='cc' && a.id===cc){
         if (k==='sustain'){ state.sustain = val>=64; lcdShow('Sustain', state.sustain?'On':'Off'); saveAll(); return; }
-        if (k==='mod'){ state.modDepth = val/127; if (vibrato) vibrato.depth = state.modDepth; lcdShow('Mod', val); saveAll(); return; }
+        if (k==='mod'){ state.modDepth = val/127; try{ if (vibrato) vibrato.depth = state.modDepth; }catch(_){ } lcdShow('Mod', val); saveAll(); return; }
         if (k==='bend'){ const v01=val/127; const cents=(v01-0.5)*2*state.bendRange; applyDetune(cents); lcdShow('Bend(CC)', Math.round(cents)+'¢'); return; }
         if (k==='play' || k==='stop' || k==='loop'){ if (val>0){ triggerAction(k); return; } }
       }
     }
 
-    // Endless encoders (relative-64) support:
-    // If we've never seen this CC and it's near 64, assume relative and start at 64.
+    // relative-64 detect & apply
     if (state.ccVals[cc]===undefined && val>=60 && val<=68){ state.ccMode[cc]='rel'; state.ccVals[cc]=64; }
     let v = state.ccVals[cc] ?? 64;
     if (state.ccMode[cc]==='rel') v = clamp(v + (val-64)*2, 0, 127);
-    else {
-      // auto-detect relative if it hovers around 64
-      if (val>=60 && val<=68 && Math.abs(val-64)<=4){ state.ccMode[cc]='rel'; v = clamp(v + (val-64)*2, 0, 127); }
-      else v = val; // absolute
-    }
+    else { if (val>=60 && val<=68 && Math.abs(val-64)<=4){ state.ccMode[cc]='rel'; v = clamp(v + (val-64)*2, 0, 127); } else v = val; }
     state.ccVals[cc]=v; saveAll();
     const value01 = v/127;
     setDial(cc, value01);
 
-    // Apply to parameter
     const map=state.ccMap[cc]; if(!map){ lcdShow('CC', `${cc}=${v}`); return; }
     switch(map){
-      case 'volume': if(master){ master.gain.value = Tone.dbToGain(-36 + value01*42); $('#volume').value = Math.round(-36 + value01*42); $('#volumeVal').textContent = $('#volume').value+'dB'; } break;
+      case 'volume': if(master){ const dB=-36 + value01*42; master.gain.value = Tone.dbToGain(dB); $('#volume').value = Math.round(dB); $('#volumeVal').textContent = Math.round(dB)+'dB'; } break;
       case 'cutoff': if(filter){ const f=150+value01*(12000-150); filter.frequency.value=f; $('#cutoff').value=Math.round(f); $('#cutoffVal').textContent=fmtHz(f); } break;
       case 'q': if(filter){ const q=0.2+value01*(18-0.2); filter.Q.value=q; $('#q').value=q.toFixed(1); $('#qVal').textContent=$('#q').value; } break;
       case 'attack': $('#attack').value=Math.round(value01*2000); $('#attack').dispatchEvent(new Event('input')); break;
@@ -618,20 +585,21 @@
     lcdShow('CC', `${cc}=${v} → ${map}`);
   }
 
-  // ---------- Buttons ----------
+  // ---------- Connect buttons ----------
   $('#startBtn').onclick=async()=>{ try{ await Tone.start(); say('Audio started. Now Connect MIDI (or use Test Tone).','ok'); }catch(e){ say('Audio failed: '+e.message,'bad'); } };
-  $('#testBtn').onclick=async()=>{ try{ await Tone.start(); const s=new Tone.Synth().toDestination(); s.triggerAttackRelease('A4',0.15); say('Heard a beep? Audio path OK.','ok'); }catch(e){ say('Test failed: '+e.message,'bad'); } };
+  $('#testBtn').onclick=async()=>{ try{ await Tone.start(); const s=new Tone.Synth().toDestination(); s.triggerAttackRelease('A4',0.15); say('Heard a beep? Audio OK.','ok'); }catch(e){ say('Test failed: '+e.message,'bad'); } };
   $('#midiBtn').onclick=async()=>{
     try{
-      if(!('requestMIDIAccess' in navigator)){ say('Web MIDI not supported. Use Chrome/Edge.','bad'); return; }
+      if(!('requestMIDIAccess' in navigator)){ say('WebMIDI not supported. Use Chrome/Edge.', 'bad'); return; }
+      if (location.protocol!=='https:' && location.hostname!=='localhost'){ say('WebMIDI needs HTTPS (or localhost). Open via GitHub Pages/https.', 'bad'); return; }
       state.midi = await navigator.requestMIDIAccess({sysex:false});
       state.midi.onstatechange=()=>refreshInputs(); refreshInputs();
-      if(!state.midi.inputs.size){ say('No MIDI devices detected. Plug in your Axiom 25 and try again.','warn'); }
-      else say('MIDI access granted. Select/Play.','ok');
+      if(!state.midi.inputs.size){ say('No MIDI devices found yet. Plug in Axiom 25, then click Connect MIDI again.', 'warn'); }
+      else say('MIDI access granted. Select a device or start playing.', 'ok');
     }catch(e){ say('MIDI access failed: '+e.message,'bad'); }
   };
 
-  // export/import JSON
+  // Export/Import
   $('#exportBtn').onclick=()=>{
     const obj={ccMap:state.ccMap, ccVals:state.ccVals, padMap:state.padMap, actions:state.actions, baseMidi:state.baseMidi, transpose:state.transpose, octave:state.octave};
     const txt=JSON.stringify(obj,null,2);
@@ -656,10 +624,20 @@
     }catch(e){ say('Import failed: '+e.message,'bad'); }
   };
 
-  // init
-  buildGraph('piano-lite');
-  renderMappings(); buildPadMapList();
+  // Pad map/mappings lists once more
+  function triggerAction(k){
+    if (k==='play') $('#play').click();
+    else if (k==='stop') $('#stop').click();
+    else if (k==='loop') $('#loop').click();
+    else if (k==='octaveUp') { state.octave = clamp(state.octave+1,-3,3); updateTZ(); }
+    else if (k==='octaveDown') { state.octave = clamp(state.octave-1,-3,3); updateTZ(); }
+    else if (k==='transposeUp') { state.transpose = clamp(state.transpose+1,-6,6); updateTZ(); }
+    else if (k==='transposeDown') { state.transpose = clamp(state.transpose-1,-6,6); updateTZ(); }
+    saveAll();
+  }
+  buildPadMapList(); renderMappings();
 
+  // final: initial graph already built
 })();
 </script>
 </body>
