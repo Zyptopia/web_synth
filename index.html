@@ -9,81 +9,89 @@
 <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
 <style>
   :root{
-    --bg:#0d1016; --top:#171c27; --panel:#1b2230; --panel2:#222a3a; --rim:#2b3448;
-    --text:#e7edf8; --muted:#9aa3b2; --accent:#6ee7ff; --accent2:#a78bfa; --ok:#34d399; --bad:#ff6b6b; --warn:#f59e0b;
-    --lcd1:#0cf; --lcd2:#058;
-    --pad:#101827; --pad-lit:#10b981; --key:#f6f7fb; --key-lit:#ffe082;
+    --bg:#0d1016; --panel:#192131; --panel2:#212a3b; --rim:#2b3448;
+    --text:#e7edf8; --muted:#9aa3b2; --accent:#6ee7ff; --accent2:#a78bfa;
+    --ok:#34d399; --bad:#ff6b6b; --warn:#f59e0b;
+    --lcd1:#0cf; --lcd2:#058; --pad:#101827; --pad-lit:#10b981;
+    --key:#f6f7fb; --key-lit:#ffe082;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,Segoe UI,Roboto,Arial}
-  .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,Segoe UI,Roboto,Arial;overflow:hidden}
+  .wrap{height:100vh;display:flex;flex-direction:column;gap:12px;padding:16px}
   .topbar{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center}
   .title{font-weight:700;font-size:20px}
-  button,select,input[type="range"],input[type="number"]{background:var(--panel);color:var(--text);border:1px solid var(--rim);border-radius:10px;padding:10px 12px}
+  button,select,input[type="range"],input[type="number"],textarea{background:var(--panel);color:var(--text);border:1px solid var(--rim);border-radius:10px;padding:10px 12px}
   button:hover{background:var(--panel2);cursor:pointer}
   .pill{border-radius:999px}
-  .status{margin:10px 0 16px;color:var(--muted)}
+  .status{color:var(--muted)}
   .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
-  .grid{display:grid;gap:16px}
-  @media(min-width:1000px){.grid-2{grid-template-columns:1.35fr .65fr}}
 
-  /* --- Device shell --- */
-  .device{background:linear-gradient(180deg,#2a3447 0%,#1a2130 55%,#141a26 100%); border:1px solid #111520; border-radius:22px; padding:18px; box-shadow:0 20px 60px #0006 inset, 0 18px 50px #0008;}
-  .face{display:grid;grid-template-columns:270px 1fr 220px; gap:16px}
+  /* LAYOUT: device (flex-1) + footer row (fixed) */
+  .device{flex:1 1 auto;min-height:0;background:linear-gradient(180deg,#2a3447 0%,#1a2130 55%,#141a26 100%);
+    border:1px solid #111520;border-radius:22px;padding:16px;display:grid;grid-template-columns:300px 1fr 260px;gap:16px}
+  .footer{flex:0 0 280px;display:grid;grid-template-columns:1.3fr .7fr;gap:16px;min-height:0}
 
-  .leftcol{display:grid;grid-template-rows:auto auto 1fr;gap:12px}
   .lcd{background:radial-gradient(100% 140% at 50% 0%, var(--lcd1) 0%, var(--lcd2) 80%); border:2px solid #0af4; border-radius:10px; padding:10px 12px; color:#00131e; font:700 20px "Share Tech Mono",monospace; text-shadow:0 0 3px #aff;}
   .lcd small{display:block; font:600 11px Inter,system-ui; color:#012635; letter-spacing:.04em; margin-bottom:2px}
 
-  .rockers{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .rocker{display:grid;grid-template-columns:1fr 1fr; gap:6px}
-  .rocker button{padding:10px 10px}
-
-  .wheels{display:flex; gap:18px; margin-top:6px}
-  .wheel{width:54px;height:86px;background:linear-gradient(180deg,#121826,#0a0e16); border:1px solid var(--rim); border-radius:12px; position:relative; overflow:hidden}
+  /* left column */
+  .left{display:grid;grid-template-rows:auto auto auto 1fr;gap:10px;min-height:0}
+  .row{display:flex;gap:6px;align-items:center}
+  .rocker{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .wheels{display:flex; gap:18px}
+  .wheel{width:54px;height:86px;background:linear-gradient(180deg,#121826,#0a0e16); border:1px solid var(--rim); border-radius:12px; position:relative}
   .wheel::after{content:""; position:absolute; left:50%; width:4px; height:74%; top:12%; transform:translateX(-50%); background:linear-gradient(180deg,#2a3550,#0e1420);}
   .wheel .val{position:absolute; left:50%; bottom:4px; transform:translateX(-50%); font:600 11px Inter; color:var(--muted)}
-
-  .transport{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:6px}
-  .tbtn{padding:9px 0; border-radius:8px; text-align:center; user-select:none}
+  .transport{display:grid; grid-template-columns:repeat(3,1fr); gap:6px}
+  .tbtn{padding:9px 0; border-radius:8px; text-align:center}
   .tbtn.live{background:#0a1614;border-color:#0d3; color:#0d8}
   .tbtn.play.live{box-shadow:0 0 0 2px #0f05 inset, 0 0 18px #00ff90aa}
 
-  /* center column */
-  .keys-wrap{background:linear-gradient(180deg,#0c1018,#0b0f16); border:1px solid var(--rim); border-radius:16px; padding:12px}
-  .kb-row{position:relative;height:190px; display:flex; gap:2px; padding:10px; border-radius:12px; background:#0b0f16;}
-  .white{position:relative; flex:1; background:var(--key); border:1px solid #dfe5f6; border-radius:4px; height:100%}
+  /* center keys */
+  .keysWrap{min-height:0;background:linear-gradient(180deg,#0c1018,#0b0f16); border:1px solid var(--rim); border-radius:16px; padding:12px; display:grid; grid-template-rows:1fr auto auto; gap:6px}
+  .kb{position:relative;height:100%; display:flex; gap:2px; padding:10px; border-radius:12px; background:#0b0f16;}
+  .white{position:relative; flex:1; background:var(--key); border:1px solid #dfe5f6; border-radius:4px}
   .white.active{background:var(--key-lit); box-shadow:inset 0 0 0 2px #f59e0b80, 0 0 16px #f59e0b55}
   .black{position:absolute; width:60%; height:64%; right:-30%; top:0; background:linear-gradient(180deg,#1c2130,#0b0f16); border:1px solid #0e1422; border-radius:4px 4px 10px 10px; z-index:2}
   .black.active{background:#4338ca; box-shadow:inset 0 0 0 2px #a78bfa99, 0 0 14px #a78bfa88}
-  .legend{margin-top:8px; display:flex; justify-content:space-between; color:var(--muted); font-size:12px}
+  .legend{display:flex; justify-content:space-between; color:var(--muted); font-size:12px}
 
-  /* right column: knobs + pads */
-  .knob-matrix{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
+  /* right: knobs + pads */
+  .right{display:grid;grid-template-rows:auto 1fr;gap:10px;min-height:0}
+  .knobs{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
   .knob{background:#0c111a; border:1px solid var(--rim); border-radius:12px; padding:10px; text-align:center}
   .dial{width:44px;height:44px; margin:0 auto 6px; border-radius:50%; background:radial-gradient(80% 70% at 50% 30%,#2d3548,#161c28); border:1px solid #2b3448; transform:rotate(0deg); position:relative}
   .dial::after{content:""; position:absolute; width:2px; height:14px; top:6px; left:50%; transform:translateX(-50%); background:var(--accent)}
   .knob label{display:block; font-size:11px; color:var(--muted)}
-  .knob .mapto{font-size:11px;color:#9cc;margin-top:2px}
-  .learn{font-size:11px; margin-top:4px; color:#9cc; cursor:pointer}
+  .mapto{font-size:11px;color:#9cc;margin-top:2px}
+  .learn{font-size:11px;color:#9cc; cursor:pointer}
   .learn.active{color:#fff; text-decoration:underline}
 
-  .pads{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:10px}
+  .padsWrap{min-height:0;background:#0b0f16;border:1px solid var(--rim);border-radius:12px;padding:10px;display:grid;grid-template-rows:auto 1fr}
+  .pads{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
   .pad{height:64px; border-radius:10px; background:var(--pad); border:1px solid #263143; box-shadow:inset 0 0 0 3px #0a0f18; position:relative}
   .pad.active{box-shadow:inset 0 0 0 3px var(--pad-lit), 0 0 18px #10b98166}
   .pad small{position:absolute; left:6px; top:6px; color:var(--muted); font-size:11px}
-  .pad .learn{position:absolute; right:6px; bottom:6px}
+  .padTools{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px}
+  .padTools .cell{display:flex;justify-content:space-between;align-items:center;font-size:12px}
 
-  .card{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--rim); border-radius:16px; padding:14px}
-  .card h3{margin:0 0 10px; color:var(--muted); font-size:13px; font-weight:600}
-  .controls{display:grid; gap:10px; grid-template-columns:repeat(2,minmax(0,1fr))}
-  @media(min-width:900px){.controls{grid-template-columns:repeat(4,minmax(0,1fr))}}
-  .control{display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:8px}
+  /* cards */
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--rim); border-radius:16px; padding:12px; min-height:0}
+  .card h3{margin:0 0 8px; color:var(--muted); font:600 13px/1 Inter}
+
+  .controls{display:grid; gap:8px; grid-template-columns:repeat(4,minmax(0,1fr))}
+  .control{display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:6px}
   .control label{font-size:12px; color:var(--muted)}
   .val{min-width:3ch; text-align:right; color:var(--accent)}
-  .log{height:130px; overflow:auto; background:#0b0f16; border:1px solid var(--rim); border-radius:10px; padding:8px; font:12px ui-monospace,Consolas,monospace; white-space:pre-wrap}
-  .maprow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;margin-bottom:8px}
+
+  .log{height:160px; overflow:auto; background:#0b0f16; border:1px solid var(--rim); border-radius:10px; padding:8px; font:12px ui-monospace,Consolas,monospace; white-space:pre-wrap}
+
+  .maprow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;margin-bottom:6px}
   .badge{padding:2px 8px;border:1px solid var(--rim);border-radius:999px;background:#0b0f16;color:#9ec}
+
+  .flexcol{display:flex;flex-direction:column;gap:8px;min-height:0}
+  .grow{flex:1 1 auto;min-height:0}
+  .paste{height:100px;resize:vertical}
 </style>
 </head>
 <body>
@@ -96,71 +104,64 @@
   </div>
   <div id="status" class="status">Use <b>Chrome/Edge</b> over <b>HTTPS</b>. Start Audio → Test Tone → Connect MIDI.</div>
 
-  <!-- DEVICE -->
+  <!-- DEVICE (fills screen area) -->
   <div class="device">
-    <div class="face">
-      <!-- Left -->
-      <div class="leftcol">
-        <div class="lcd" id="lcd"><small>ZONE 1 • CH 1</small>Ready</div>
+    <!-- left -->
+    <div class="left">
+      <div class="lcd" id="lcd"><small>ZONE 1 • CH 1</small>Ready</div>
 
-        <div class="rockers">
-          <div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Transpose</div>
-            <div class="rocker">
-              <button id="tDown">–</button>
-              <button id="tUp">+</button>
-            </div>
-          </div>
-          <div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Octave</div>
-            <div class="rocker">
-              <button id="oDown">–</button>
-              <button id="oUp">+</button>
-            </div>
-          </div>
+      <div class="row">
+        <div>
+          <div class="status" style="font-size:12px;margin-bottom:4px">Transpose</div>
+          <div class="rocker"><button id="tDown">–</button><button id="tUp">+</button></div>
         </div>
-
-        <div class="wheels">
-          <div class="wheel"><div class="val">Pitch</div></div>
-          <div class="wheel"><div class="val">Mod</div></div>
-        </div>
-
-        <div class="transport">
-          <div class="tbtn play" id="play">▶</div>
-          <div class="tbtn" id="stop">⏹</div>
-          <div class="tbtn" id="loop">🔁</div>
+        <div style="margin-left:10px">
+          <div class="status" style="font-size:12px;margin-bottom:4px">Octave</div>
+          <div class="rocker"><button id="oDown">–</button><button id="oUp">+</button></div>
         </div>
       </div>
 
-      <!-- Center: keys -->
-      <div>
-        <div class="keys-wrap">
-          <div id="kb" class="kb-row"></div>
-          <div class="legend">
-            <span>Base note:
-              <select id="baseNote"></select>
-            </span>
-            <span>Device:
-              <select id="midiIn"></select>
-            </span>
-          </div>
-          <div class="legend" style="margin-top:6px">
-            Click keys to play. Computer keys work (ASDF… & WETYU…).
-          </div>
-        </div>
+      <div class="wheels">
+        <div class="wheel"><div class="val">Pitch</div></div>
+        <div class="wheel"><div class="val">Mod</div></div>
       </div>
 
-      <!-- Right: knobs & pads -->
-      <div>
-        <div class="knob-matrix" id="knobs"></div>
+      <div class="transport">
+        <div class="tbtn play" id="play">▶</div>
+        <div class="tbtn" id="stop">⏹</div>
+        <div class="tbtn" id="loop">🔁</div>
+      </div>
+    </div>
+
+    <!-- center -->
+    <div class="keysWrap">
+      <div id="kb" class="kb"></div>
+      <div class="legend">
+        <span>Base:
+          <select id="baseNote"></select>
+        </span>
+        <span>Device:
+          <select id="midiIn"></select>
+        </span>
+      </div>
+      <div class="legend">Click keys to play. Computer keys work (ASDF… & WETYU…).</div>
+    </div>
+
+    <!-- right -->
+    <div class="right">
+      <div class="knobs" id="knobs"></div>
+
+      <div class="padsWrap">
         <div class="pads" id="pads"></div>
+        <!-- learn buttons under pads (no overlay) -->
+        <div class="padTools" id="padTools"></div>
       </div>
     </div>
   </div>
 
-  <!-- Controls + Monitor + Mappings + Pad map -->
-  <div class="grid grid-2" style="margin-top:16px">
-    <div class="card">
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="card flexcol">
       <h3>Instrument</h3>
       <div class="controls">
         <div class="control"><label>Preset</label>
@@ -184,31 +185,36 @@
         <div class="control"><label>Reverb Mix <span class="learn" data-learn="reverb">🎯</span></label><input id="reverb" type="range" min="0" max="1" step="0.01" value="0.2"><div id="reverbVal" class="val">0.20</div></div>
         <div class="control"><label>Delay Mix <span class="learn" data-learn="delay">🎯</span></label><input id="delay" type="range" min="0" max="1" step="0.01" value="0.12"><div id="delayVal" class="val">0.12</div></div>
 
-        <div class="control"><label>Tempo (transport)</label><input id="tempo" type="range" min="40" max="200" step="1" value="110"><div id="tempoVal" class="val">110</div></div>
+        <div class="control"><label>Tempo</label><input id="tempo" type="range" min="40" max="200" step="1" value="110"><div id="tempoVal" class="val">110</div></div>
         <div class="control"><label>Bend Range (± cents)</label><input id="bendRange" type="range" min="50" max="400" step="10" value="200"><div id="bendRangeVal" class="val">200</div></div>
+      </div>
+
+      <div class="grow"></div>
+
+      <div class="card">
+        <h3>Mappings Hub (click 🎯 then move a control / hit a pad)</h3>
+        <div id="mapList"></div>
+        <div class="row" style="margin-top:6px">
+          <button id="exportBtn">⬇️ Export JSON</button>
+          <button id="importBtn">⬆️ Import JSON</button>
+        </div>
       </div>
     </div>
 
-    <div class="grid">
+    <div class="flexcol">
       <div class="card">
         <h3>MIDI Monitor</h3>
         <div id="log" class="log"></div>
       </div>
 
       <div class="card">
-        <h3>Mappings (click 🎯 then move a control / hit a pad)</h3>
-        <div id="mapList">
-          <!-- rows injected -->
-        </div>
+        <h3>Pad Mapping</h3>
+        <div id="padMap"></div>
       </div>
 
       <div class="card">
-        <h3>Pad Mapping (notes → pad sounds) — now with Learn</h3>
-        <div id="padMap" class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px"></div>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button id="saveMap">💾 Save</button>
-          <button id="resetMap">↺ Reset</button>
-        </div>
+        <h3>Paste box (dump your actions/notes/logs here)</h3>
+        <textarea id="pastebox" class="paste" placeholder="Paste anything you want me to read (actions you want, MIDI monitor lines, etc.). It’s just a notepad—content stays in your browser."></textarea>
       </div>
     </div>
   </div>
@@ -224,7 +230,7 @@
   const fmtHz = v=>v>=1000 ? (v/1000).toFixed(1)+'k' : Math.round(v);
   const clamp = (v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 
-  // -------- State
+  // ---------- State ----------
   const state = {
     midi:null, input:null, ch:1,
     transpose:0, octave:0,
@@ -232,9 +238,9 @@
     baseMidi: parseInt(localStorage.getItem('axiomBaseMidi')||'48',10),
     ccMap: JSON.parse(localStorage.getItem('axiomCCMap')||'null') || {16:'cutoff',17:'q',18:'attack',19:'decay',20:'sustain',21:'release',22:'reverb',23:'delay'},
     ccVals: JSON.parse(localStorage.getItem('axiomCCVals')||'null') || {},  // CC -> 0..127
-    ccMode: {}, // detect relative-64 mode per CC
-    learnParam:null,    // for parameter mapping (🎯 near sliders)
-    learnAction:null,   // for action mapping (Mappings panel)
+    ccMode: {}, // 'rel' when detected
+    learnParam:null,    // for param learn
+    learnAction:null,   // for Mappings Hub
     learnPadIndex:null, // for pad learn
     padMap: JSON.parse(localStorage.getItem('axiomPadMap')||'null') || [
       {midi:36,name:'Kick', type:'kick'},{midi:38,name:'Snare',type:'snare'},
@@ -250,10 +256,14 @@
     },
     bendCents:0, bendRange:200, modDepth:0, atAmount:0
   };
-  const saveCCVals = () => localStorage.setItem('axiomCCVals', JSON.stringify(state.ccVals));
-  const saveActions = () => localStorage.setItem('axiomActions', JSON.stringify(state.actions));
+  const save = () => {
+    localStorage.setItem('axiomCCMap', JSON.stringify(state.ccMap));
+    localStorage.setItem('axiomCCVals', JSON.stringify(state.ccVals));
+    localStorage.setItem('axiomPadMap', JSON.stringify(state.padMap));
+    localStorage.setItem('axiomActions', JSON.stringify(state.actions));
+  };
 
-  // -------- Tone graph
+  // ---------- Tone Graph ----------
   let poly=null, bass=null, bell=null, filter=null, verb=null, dly=null, comp=null, drum=null, lfo=null;
 
   function buildGraph(preset){
@@ -263,8 +273,8 @@
     dly    = new Tone.FeedbackDelay({delayTime:0.25, feedback:0.28, wet:+$('#delay').value});
     comp   = new Tone.Compressor({threshold:-14, ratio:3, attack:0.003, release:0.25});
 
-    const env={attack:+$('#attack').value/1000, decay:+$('#decay').value/1000, sustain:+$('#sustain').value, release:+$('#release').value/1000};
     const chain = node => node.connect(filter).connect(verb).connect(dly).connect(comp).toDestination();
+    const env = { attack:+$('#attack').value/1000, decay:+$('#decay').value/1000, sustain:+$('#sustain').value, release:+$('#release').value/1000 };
 
     if (preset==='piano-lite'){
       poly = new Tone.PolySynth(Tone.AMSynth,{volume:-6, oscillator:{type:'triangle'}, envelope:env, modulation:{type:'sine'}, modulationEnvelope:{attack:0.01, decay:0.2, sustain:0.3, release:env.release}});
@@ -273,17 +283,20 @@
       poly = new Tone.PolySynth(Tone.Synth,{volume:-10, oscillator:{type:'sawtooth'}, envelope:{...env, attack:Math.max(env.attack,0.2), release:Math.max(env.release,1.2)}});
       chain(poly);
     } else if (preset==='bass-mono'){
-      bass = new Tone.MonoSynth({volume:-6, oscillator:{type:'square'}, envelope:{attack:0.01, decay:0.18, sustain:0.2, release:0.15}, filter:{Q:1,type:'lowpass',rolloff:-24}, filterEnvelope:{attack:0.005,decay:0.2,sustain:0.2,release:0.1, baseFrequency:+$('#cutoff').value, octaves:2.5}});
+      bass = new Tone.MonoSynth({volume:-6, oscillator:{type:'square'}, envelope:{attack:0.01, decay:0.18, sustain:0.2, release:0.15},
+        filter:{Q:1,type:'lowpass',rolloff:-24}, filterEnvelope:{attack:0.005,decay:0.2,sustain:0.2,release:0.1, baseFrequency:+$('#cutoff').value, octaves:2.5}});
       bass.connect(filter).connect(dly).connect(comp).toDestination();
     } else if (preset==='ep-bell'){
       bell = new Tone.FMSynth({volume:-8, modulationIndex:12, harmonicity:2.5, oscillator:{type:'sine'}, envelope:env, modulationEnvelope:{attack:0.01, decay:0.3, sustain:0.2, release:env.release}});
       poly = new Tone.PolySynth(bell); chain(poly);
-    } // drum-only => no melodic chain
+    } // drum-only: no melodic chain
 
+    // Vibrato (mod wheel)
     if (lfo) lfo.dispose();
     lfo = new Tone.LFO({type:'sine', frequency:5, min:0, max:1}).start();
     lfo.callback = v => applyDetune(state.bendCents + v*state.modDepth*100);
 
+    // Drums
     if (drum){ for(const k of Object.values(drum)){k.dispose&&k.dispose();} }
     drum = {
       kick: new Tone.MembraneSynth({volume:-4}),
@@ -307,59 +320,56 @@
     if (bell) setDet(bell);
   }
 
-  function effectiveMidi(m){ return m + state.transpose + state.octave*12; }
+  // Live envelope updates (affects *new* notes)
+  function updateEnvelopes(){
+    const a=+$('#attack').value/1000, d=+$('#decay').value/1000, s=+$('#sustain').value, r=+$('#release').value/1000;
+    if (poly) poly.voices.forEach(v=>{
+      if (v.envelope){ v.envelope.attack=a; v.envelope.decay=d; v.envelope.sustain=s; v.envelope.release=r; }
+      if (v.modulationEnvelope){ v.modulationEnvelope.release = r; }
+    });
+    if (bass && bass.envelope){ bass.envelope.attack=a; bass.envelope.decay=d; bass.envelope.sustain=s; bass.envelope.release=r; }
+    if (bell && bell.envelope){ bell.envelope.attack=a; bell.envelope.decay=d; bell.envelope.sustain=s; bell.envelope.release=r; }
+  }
 
-  // -------- Notes
+  // ---------- Notes ----------
+  function effectiveMidi(m){ return m + state.transpose + state.octave*12; }
   function noteOn(midi, vel=100){
-    // check action learns bound to Note
-    if (state.learnPadIndex!==null){ // learning pad note
+    // learning pad note?
+    if (state.learnPadIndex!==null){
       state.padMap[state.learnPadIndex].midi = midi;
-      buildPads(); buildPadEditor();
-      state.learnPadIndex = null;
-      say('Pad mapped to MIDI '+midi, 'ok');
+      save(); buildPads(); buildPadTools(); buildPadMapList();
+      state.learnPadIndex=null;
+      say('Pad mapped to MIDI '+midi,'ok');
       return;
     }
-    if (state.learnAction){ // learning actions
-      state.actions[state.learnAction] = {type:'note', id:midi};
-      saveActions(); renderMappings();
-      say(`Mapped ${state.learnAction} to Note ${midi}.`, 'ok');
-      state.learnAction=null; return;
-    }
+    if (state.learnAction){ state.actions[state.learnAction] = {type:'note', id:midi}; save(); renderMappings(); say(`Mapped ${state.learnAction} to Note ${midi}.`,'ok'); state.learnAction=null; return; }
+
+    // action-by-note?
+    for (const [k,a] of Object.entries(state.actions)){ if (a.type==='note' && a.id===midi){ triggerAction(k); return; } }
 
     const v = vel/127;
     midi = effectiveMidi(midi);
-
-    // If a Note is mapped to an action, trigger and exit
-    for (const [k,a] of Object.entries(state.actions)){
-      if (a.type==='note' && a.id===midi){
-        triggerAction(k);
-        return;
-      }
-    }
-
     const pi = state.padMap.findIndex(p=>p.midi===midi);
     if (pi!==-1){ triggerPad(state.padMap[pi].type, v); flashPad(pi); lcdShow('PAD', `m${midi} v${vel}`); return; }
     if ($('#preset').value==='drum-only') return;
 
-    if (currentPoly()){
-      currentPoly().triggerAttack(Tone.Frequency(midi,'midi'), Tone.now(), Math.max(0.1, v));
-    } else if (bass){
-      bass.triggerAttack(Tone.Frequency(midi,'midi'), Tone.now(), Math.max(0.1, v));
-    }
+    const P = currentPoly();
+    if (P){ P.triggerAttack(Tone.Frequency(midi,'midi'), Tone.now(), Math.max(0.1,v)); }
+    else if (bass){ bass.triggerAttack(Tone.Frequency(midi,'midi'), Tone.now(), Math.max(0.1,v)); }
     state.held.add(midi); flashKey(midi,true);
-    lcdShow('NOTE ON', `m${midi} v${vel}`);
+    lcdShow('NOTE', `m${midi} v${vel}`);
   }
   function noteOff(midi){
     midi = effectiveMidi(midi);
     if (!state.held.has(midi)){ flashKey(midi,false); return; }
     if (state.sustain) return;
-    if (currentPoly()) currentPoly().triggerRelease(Tone.Frequency(midi,'midi'), Tone.now());
+    const P = currentPoly();
+    if (P) P.triggerRelease(Tone.Frequency(midi,'midi'), Tone.now());
     else if (bass) bass.triggerRelease(Tone.now());
     state.held.delete(midi); flashKey(midi,false);
-    lcdShow('NOTE OFF', `m${midi}`);
   }
   function allOff(){
-    if (currentPoly()) currentPoly().releaseAll();
+    const P = currentPoly(); if (P) P.releaseAll();
     if (bass) bass.triggerRelease();
     state.held.clear(); $$('.white,.black,.pad').forEach(el=>el.classList.remove('active'));
   }
@@ -376,7 +386,7 @@
     }[type]||(()=>{}))();
   }
 
-  // -------- Keys UI
+  // ---------- Keys UI ----------
   const kb = $('#kb');
   function buildKeys(){
     kb.innerHTML='';
@@ -393,22 +403,18 @@
   function midiVisible(m){ return m>=state.baseMidi-1 && m<state.baseMidi+32; }
   function keyEl(m){ return kb.querySelector(`[data-midi="${m}"]`); }
   function flashKey(m,on){ if(!midiVisible(m)) return; const el=keyEl(m); if(!el) return; el.classList.toggle('active', !!on); }
-  kb.addEventListener('mousedown',e=>{
-    const t=e.target.closest('[data-midi]'); if(!t) return; const m=+t.dataset.midi; noteOn(m,110);
-    const up=()=>{ noteOff(m); window.removeEventListener('mouseup',up); };
-    window.addEventListener('mouseup',up);
-  });
+  kb.addEventListener('mousedown',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; const m=+t.dataset.midi; noteOn(m,110); const up=()=>{ noteOff(m); window.removeEventListener('mouseup',up); }; window.addEventListener('mouseup',up); });
   kb.addEventListener('touchstart',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; noteOn(+t.dataset.midi,110); },{passive:true});
   kb.addEventListener('touchend',e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; noteOff(+t.dataset.midi); });
 
-  // Computer keyboard (for testing)
+  // Computer keyboard (test)
   const keyMapW='asdfghjkl;'.split(''); const keyMapB='wetyuop'.split('');
   const offW=[0,2,4,5,7,9,11,12,14,16]; const offB=[1,3,6,8,10,13,15];
   window.addEventListener('keydown',e=>{ if(e.repeat) return; const k=e.key.toLowerCase(); const iw=keyMapW.indexOf(k), ib=keyMapB.indexOf(k); let m=null; if(iw>-1) m=state.baseMidi+offW[iw]; else if(ib>-1) m=state.baseMidi+offB[ib]; if(m!=null) noteOn(m,110); });
   window.addEventListener('keyup',e=>{ const k=e.key.toLowerCase(); const iw=keyMapW.indexOf(k), ib=keyMapB.indexOf(k); let m=null; if(iw>-1) m=state.baseMidi+offW[iw]; else if(ib>-1) m=state.baseMidi+offB[ib]; if(m!=null) noteOff(m); });
 
-  // -------- Knobs & Pads UI
-  const knobs=$('#knobs'), pads=$('#pads');
+  // ---------- Knobs + Pads ----------
+  const knobs=$('#knobs'), pads=$('#pads'), padTools=$('#padTools');
   function setDial(ccOrIdx, val01){
     const idx = typeof ccOrIdx==='number' && ccOrIdx>=16 ? ccOrIdx-16 : ccOrIdx;
     const dial=knobs.querySelector(`.dial[data-idx="${idx}"]`); if(!dial) return;
@@ -422,147 +428,61 @@
       const mapped = state.ccMap[cc] || '—';
       box.innerHTML=`<div class="dial" data-idx="${i}"></div><label>K${i+1}</label><div class="mapto">${mapped}</div><div class="learn" data-learn-cc="${cc}">🎯 learn</div>`;
       knobs.appendChild(box);
-      // restore dial angle based on saved value:
       const v = (state.ccVals[cc]!==undefined) ? state.ccVals[cc]/127 : 0.5;
       setDial(i, v);
     }
-    knobs.addEventListener('click',e=>{
+    knobs.onclick = (e)=>{
       const cc=e.target.dataset.learnCc; if(!cc) return;
-      state.learnParam = {param: state.ccMap[cc] || 'cutoff', ccTarget: +cc};
-      $$('.learn').forEach(l=>l.classList.remove('active'));
-      e.target.classList.add('active');
+      state.learnParam={param: state.ccMap[cc] || 'cutoff', ccTarget:+cc};
+      $$('.learn').forEach(l=>l.classList.remove('active')); e.target.classList.add('active');
       say(`Learning: move a control to map to K${(+cc-15)} (CC${cc}).`,'warn');
-    });
+    };
   }
   function buildPads(){
     pads.innerHTML='';
     for(let i=0;i<8;i++){
-      const p=document.createElement('div'); p.className='pad'; p.dataset.index=i; p.innerHTML=`<small>${state.padMap[i].name}</small><div class="learn" data-learn-pad="${i}">🎯 learn</div>`;
+      const p=document.createElement('div'); p.className='pad'; p.dataset.index=i; p.innerHTML=`<small>${state.padMap[i].name}</small>`;
       p.onmousedown=()=>triggerPad(state.padMap[i].type,1);
       p.ontouchstart=()=>triggerPad(state.padMap[i].type,1);
       pads.appendChild(p);
     }
-    pads.addEventListener('click',e=>{
+  }
+  function buildPadTools(){
+    padTools.innerHTML='';
+    for(let i=0;i<8;i++){
+      const c=document.createElement('div'); c.className='cell';
+      c.innerHTML=`<span>Pad ${i+1} <span class="badge">MIDI ${state.padMap[i].midi}</span></span><button class="learn" data-learn-pad="${i}">🎯 learn</button>`;
+      padTools.appendChild(c);
+    }
+    padTools.onclick = (e)=>{
       const idx=e.target.dataset.learnPad; if(idx==null) return;
-      state.learnPadIndex = +idx;
-      say(`Pad ${+idx+1}: hit a hardware pad (NoteOn) to bind.`, 'warn');
-    });
+      state.learnPadIndex=+idx; say(`Pad ${+idx+1}: hit a hardware pad to bind.`,'warn');
+    };
   }
   function flashPad(i){ const el=pads.querySelector(`.pad[data-index="${i}"]`); if(!el) return; el.classList.add('active'); setTimeout(()=>el.classList.remove('active'),120); }
 
-  // -------- Pad editor
-  const PAD_TYPES=[{id:'kick',label:'Kick'},{id:'snare',label:'Snare'},{id:'hhc',label:'Hi-Hat (Closed)'},{id:'hho',label:'Hi-Hat (Open)'},{id:'toml',label:'Tom (Low)'},{id:'tomh',label:'Tom (High)'},{id:'clap',label:'Clap'},{id:'crash',label:'Crash'}];
-  function buildPadEditor(){
+  // Right column Pad Mapping (list)
+  function buildPadMapList(){
     const root=$('#padMap'); root.innerHTML='';
     state.padMap.forEach((p,i)=>{
-      const wrap=document.createElement('div'); wrap.className='card';
-      wrap.innerHTML=`
-        <div style="display:grid;gap:8px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><b>Pad ${i+1}</b> <span class="badge">MIDI ${p.midi}</span></div>
-            <button class="learn" data-learn-pad="${i}">🎯 learn</button>
-          </div>
-          <label>Sound:
-            <select data-index="${i}" data-kind="type">
-              ${PAD_TYPES.map(t=>`<option value="${t.id}" ${p.type===t.id?'selected':''}>${t.label}</option>`).join('')}
-            </select>
-          </label>
-          <label>Label:
-            <input type="text" value="${p.name}" data-index="${i}" data-kind="name" style="width:100%;padding:8px;border-radius:8px;background:#0b0f16;border:1px solid #263143;color:#e7edf8">
-          </label>
-        </div>`;
-      root.appendChild(wrap);
-    });
-    root.oninput=e=>{
-      const idx=+e.target.dataset.index, kind=e.target.dataset.kind;
-      if(!Number.isInteger(idx)||!kind) return;
-      if(kind==='type') state.padMap[idx].type = e.target.value;
-      if(kind==='name') state.padMap[idx].name = e.target.value;
-      buildPads();
-    };
-    root.addEventListener('click',e=>{
-      const idx=e.target.dataset.learnPad; if(idx==null) return;
-      state.learnPadIndex=+idx;
-      say(`Pad ${+idx+1}: hit a hardware pad to bind.`, 'warn');
-    });
-  }
-  $('#saveMap').onclick=()=>{ localStorage.setItem('axiomPadMap',JSON.stringify(state.padMap)); say('Saved pad mapping.','ok'); };
-  $('#resetMap').onclick=()=>{ localStorage.removeItem('axiomPadMap'); location.reload(); };
-
-  // -------- LCD
-  function lcdShow(line1,line2){ $('#lcd').innerHTML = `<small>ZONE 1 • CH ${state.ch}</small>${line1}${line2 ? ' — '+line2 : ''}`; }
-
-  // -------- Sliders + param learn
-  function hookSlider(id, fmt, on){
-    const el=$('#'+id), lab=$('#'+id+'Val');
-    const apply=()=>{ lab.textContent=fmt(+el.value); on(+el.value); };
-    el.addEventListener('input',apply); apply();
-  }
-  function rebuild(){ buildGraph($('#preset').value); }
-  hookSlider('attack',fmtMs,()=>rebuild());
-  hookSlider('decay', fmtMs,()=>rebuild());
-  hookSlider('sustain',v=>v.toFixed(2),()=>rebuild());
-  hookSlider('release',fmtMs,()=>rebuild());
-  hookSlider('cutoff',fmtHz,v=>{ if(filter) filter.frequency.value=v; });
-  hookSlider('q',v=>v.toFixed(1),v=>{ if(filter) filter.Q.value=v; });
-  hookSlider('reverb',v=>v.toFixed(2),v=>{ if(verb) verb.wet.value=v; });
-  hookSlider('delay', v=>v.toFixed(2),v=>{ if(dly) dly.wet.value=v; });
-  hookSlider('tempo', v=>String(v), v=>{ Tone.Transport.bpm.value=v; });
-  hookSlider('bendRange', v=>String(v), v=>{ state.bendRange=v; });
-  $('#preset').onchange=rebuild;
-  $('#panic').onclick=allOff;
-
-  // parameter Learn buttons
-  $$('.learn[data-learn]').forEach(btn=>{
-    btn.onclick=()=>{ state.learnParam={param:btn.dataset.learn}; btn.classList.add('active'); say(`Learning: move a control to map to ${btn.dataset.learn}.`,'warn'); };
-  });
-
-  // Base note
-  (function(){
-    const sel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m} (${Tone.Frequency(m,'midi').toNote()})`; sel.appendChild(o); }
-    sel.value=String(state.baseMidi);
-    sel.onchange=()=>{ state.baseMidi=parseInt(sel.value,10); localStorage.setItem('axiomBaseMidi',String(state.baseMidi)); buildKeys(); };
-  })();
-
-  // Octave/Transpose buttons
-  const updateTZ = ()=>{ lcdShow('Tune', `Oct ${state.octave>=0?'+':''}${state.octave} • Tr ${state.transpose>=0?'+':''}${state.transpose}`); };
-  $('#oUp').onclick = ()=>{ state.octave = clamp(state.octave+1,-3,3); updateTZ(); };
-  $('#oDown').onclick= ()=>{ state.octave = clamp(state.octave-1,-3,3); updateTZ(); };
-  $('#tUp').onclick = ()=>{ state.transpose = clamp(state.transpose+1,-6,6); updateTZ(); };
-  $('#tDown').onclick= ()=>{ state.transpose = clamp(state.transpose-1,-6,6); updateTZ(); };
-
-  // Transport & metronome
-  Tone.Transport.bpm.value = +$('#tempo').value;
-  let click = new Tone.Synth({oscillator:{type:'square'}, envelope:{attack:0.001,decay:0.02,sustain:0,release:0.02}}).toDestination();
-  let step=0; const loop = new Tone.Loop(time => { const down=step%4===0; click.triggerAttackRelease(down ? "A5" : "E5", 0.04, time, down?0.6:0.25); step=(step+1)%16; }, "16n");
-  $('#play').onclick=()=>{ if(Tone.Transport.state!=='started'){ loop.start(0); Tone.Transport.start(); $('#play').classList.add('live'); lcdShow('Play'); } };
-  $('#stop').onclick=()=>{ loop.stop(); Tone.Transport.stop(); $('#play').classList.remove('live'); lcdShow('Stop'); };
-  let loopOn=false; $('#loop').onclick=()=>{ loopOn=!loopOn; $('#loop').classList.toggle('live',loopOn); lcdShow('Loop', loopOn?'On':'Off'); };
-
-  // Build visuals initial
-  buildKeys(); buildKnobs(); buildPads(); buildPadEditor(); buildGraph('piano-lite'); renderMappings();
-
-  // -------- Mappings panel
-  function renderMappings(){
-    const root=$('#mapList'); root.innerHTML='';
-    const rows = [
-      ['play','Play'],['stop','Stop'],['loop','Loop'],
-      ['sustain','Sustain'],['mod','Mod'],['bend','Bend (PB/CC)'],
-      ['octaveUp','Octave +'],['octaveDown','Octave –'],
-      ['transposeUp','Transpose +'],['transposeDown','Transpose –']
-    ];
-    rows.forEach(([k,label])=>{
-      const a=state.actions[k];
-      const tag = a.type==='cc'?`CC ${a.id}`: a.type==='note'?`Note ${a.id}`: a.type==='pb'?'Pitch Bend':'—';
       const row=document.createElement('div'); row.className='maprow';
-      row.innerHTML = `<div>${label}</div><div class="badge">${tag}</div><button class="learn" data-learn-action="${k}">🎯 learn</button>`;
+      row.innerHTML=`<div>${p.name}</div><div class="badge">MIDI ${p.midi}</div><button class="learn" data-learn-pad="${i}">🎯 learn</button>`;
       root.appendChild(row);
     });
-    root.addEventListener('click', e=>{
-      const act=e.target.dataset.learnAction; if(!act) return;
-      state.learnAction = act;
-      say(`Learning: send a ${act} control (CC or Note; bend wheel for Bend).`,'warn');
-    }, {once:true});
+    root.onclick=(e)=>{ const idx=e.target.dataset.learnPad; if(idx==null) return; state.learnPadIndex=+idx; say(`Pad ${+idx+1}: hit a hardware pad to bind.`,'warn'); };
+  }
+
+  // ---------- Mappings Hub ----------
+  function renderMappings(){
+    const root=$('#mapList'); root.innerHTML='';
+    const rows=[['play','Play'],['stop','Stop'],['loop','Loop'],['sustain','Sustain'],['mod','Mod'],['bend','Bend (PB/CC)'],['octaveUp','Octave +'],['octaveDown','Octave –'],['transposeUp','Transpose +'],['transposeDown','Transpose –']];
+    rows.forEach(([k,label])=>{
+      const a=state.actions[k]; const tag=a.type==='cc'?`CC ${a.id}`:a.type==='note'?`Note ${a.id}`:a.type==='pb'?'Pitch Bend':'—';
+      const row=document.createElement('div'); row.className='maprow';
+      row.innerHTML=`<div>${label}</div><div class="badge">${tag}</div><button class="learn" data-learn-action="${k}">🎯 learn</button>`;
+      root.appendChild(row);
+    });
+    root.onclick=(e)=>{ const act=e.target.dataset.learnAction; if(!act) return; state.learnAction=act; say(`Learning ${act}: send a control (CC/Note), or move pitch wheel for Bend.`,'warn'); };
   }
   function triggerAction(k){
     if (k==='play') $('#play').click();
@@ -572,9 +492,56 @@
     else if (k==='octaveDown') { state.octave = clamp(state.octave-1,-3,3); updateTZ(); }
     else if (k==='transposeUp') { state.transpose = clamp(state.transpose+1,-6,6); updateTZ(); }
     else if (k==='transposeDown') { state.transpose = clamp(state.transpose-1,-6,6); updateTZ(); }
+    save();
   }
 
-  // -------- MIDI
+  // ---------- LCD / controls ----------
+  function lcdShow(line1,line2){ $('#lcd').innerHTML = `<small>ZONE 1 • CH ${state.ch}</small>${line1}${line2 ? ' — '+line2 : ''}`; }
+  function hookSlider(id, fmt, on){
+    const el=$('#'+id), lab=$('#'+id+'Val');
+    const apply=()=>{ lab.textContent=fmt(+el.value); on(+el.value); };
+    el.addEventListener('input',apply); apply();
+  }
+  hookSlider('attack',fmtMs,()=>{ updateEnvelopes(); });
+  hookSlider('decay', fmtMs,()=>{ updateEnvelopes(); });
+  hookSlider('sustain',v=>v.toFixed(2),()=>{ updateEnvelopes(); });
+  hookSlider('release',fmtMs,()=>{ updateEnvelopes(); });
+  hookSlider('cutoff',fmtHz,v=>{ if(filter) filter.frequency.value=v; });
+  hookSlider('q',v=>v.toFixed(1),v=>{ if(filter) filter.Q.value=v; });
+  hookSlider('reverb',v=>v.toFixed(2),v=>{ if(verb) verb.wet.value=v; });
+  hookSlider('delay', v=>v.toFixed(2),v=>{ if(dly) dly.wet.value=v; });
+  hookSlider('tempo', v=>String(v), v=>{ Tone.Transport.bpm.value=v; });
+  hookSlider('bendRange', v=>String(v), v=>{ state.bendRange=v; });
+  $('#preset').onchange=()=>buildGraph($('#preset').value);
+  $('#panic').onclick=allOff;
+
+  // base note selector
+  (function(){
+    const sel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m} (${Tone.Frequency(m,'midi').toNote()})`; sel.appendChild(o); }
+    sel.value=String(state.baseMidi);
+    sel.onchange=()=>{ state.baseMidi=parseInt(sel.value,10); localStorage.setItem('axiomBaseMidi',String(state.baseMidi)); buildKeys(); };
+  })();
+
+  // transpose/octave
+  const updateTZ = ()=>lcdShow('Tune', `Oct ${state.octave>=0?'+':''}${state.octave} • Tr ${state.transpose>=0?'+':''}${state.transpose}`);
+  $('#oUp').onclick = ()=>{ state.octave = clamp(state.octave+1,-3,3); updateTZ(); save(); };
+  $('#oDown').onclick= ()=>{ state.octave = clamp(state.octave-1,-3,3); updateTZ(); save(); };
+  $('#tUp').onclick = ()=>{ state.transpose = clamp(state.transpose+1,-6,6); updateTZ(); save(); };
+  $('#tDown').onclick= ()=>{ state.transpose = clamp(state.transpose-1,-6,6); updateTZ(); save(); };
+
+  // transport + metronome
+  Tone.Transport.bpm.value = +$('#tempo').value;
+  let click = new Tone.Synth({oscillator:{type:'square'}, envelope:{attack:0.001,decay:0.02,sustain:0,release:0.02}}).toDestination();
+  let step=0; const loop = new Tone.Loop(time => { const down=step%4===0; click.triggerAttackRelease(down ? "A5" : "E5", 0.04, time, down?0.6:0.25); step=(step+1)%16; }, "16n");
+  $('#play').onclick=()=>{ if(Tone.Transport.state!=='started'){ loop.start(0); Tone.Transport.start(); $('#play').classList.add('live'); lcdShow('Play'); } };
+  $('#stop').onclick=()=>{ loop.stop(); Tone.Transport.stop(); $('#play').classList.remove('live'); lcdShow('Stop'); };
+  let loopOn=false; $('#loop').onclick=()=>{ loopOn=!loopOn; $('#loop').classList.toggle('live',loopOn); lcdShow('Loop', loopOn?'On':'Off'); };
+
+  // ---------- Build visuals ----------
+  buildGraph('piano-lite');
+  buildKeys(); buildKnobs(); buildPads(); buildPadTools(); buildPadMapList(); renderMappings();
+
+  // ---------- MIDI ----------
   const midiSel=$('#midiIn'); let inputs=[];
   function refreshInputs(){
     midiSel.innerHTML=''; inputs=[];
@@ -596,62 +563,44 @@
     log(`0x${s.toString(16)} ch${ch} d1=${d1} d2=${d2}`);
     if (cmd===0x90 && d2>0){ noteOn(d1,d2); lcdShow('Note', `m${d1} v${d2}`); return; }
     if ((cmd===0x90 && d2===0) || cmd===0x80){ noteOff(d1); return; }
-    if (cmd===0xE0){ // pitch bend (also learn Bend)
-      if (state.learnAction==='bend'){ state.actions.bend={type:'pb',id:null}; saveActions(); renderMappings(); say('Mapped Bend to Pitch Bend.','ok'); state.learnAction=null; }
+    if (cmd===0xE0){ // pitch bend (learn bend)
+      if (state.learnAction==='bend'){ state.actions.bend={type:'pb',id:null}; save(); renderMappings(); say('Mapped Bend to Pitch Bend.','ok'); state.learnAction=null; }
       const bend = ((d2<<7)|d1) - 8192; const cents = (bend/8192) * state.bendRange; applyDetune(cents); lcdShow('Bend', Math.round(cents)+'¢'); return;
     }
-    if (cmd===0xD0){ // channel pressure → filter open
+    if (cmd===0xD0){ // channel pressure → filter
       state.atAmount = d1/127; if (filter){ const base=+$('#cutoff').value; filter.frequency.value = base*(1+state.atAmount*0.5); } lcdShow('Aftertouch', d1); return;
     }
     if (cmd===0xB0){ handleCC(d1,d2); return; }
   }
 
   function handleCC(cc,val){
-    // While learning…
-    if (state.learnParam){
-      // bind this CC to the selected parameter
-      state.ccMap[cc] = state.learnParam.param;
-      localStorage.setItem('axiomCCMap', JSON.stringify(state.ccMap));
-      say(`Mapped CC${cc} → ${state.learnParam.param}.`, 'ok');
-      state.learnParam=null; $$('.learn').forEach(l=>l.classList.remove('active'));
-      buildKnobs(); // refresh labels
-    } else if (state.learnAction){
-      state.actions[state.learnAction] = {type:'cc', id:cc};
-      saveActions(); renderMappings();
-      say(`Mapped ${state.learnAction} to CC${cc}.`,'ok');
-      state.learnAction=null;
-    }
+    // Learning first
+    if (state.learnParam){ state.ccMap[cc]=state.learnParam.param; save(); say(`Mapped CC${cc} → ${state.learnParam.param}.`,'ok'); state.learnParam=null; $$('.learn').forEach(l=>l.classList.remove('active')); buildKnobs(); }
+    else if (state.learnAction){ state.actions[state.learnAction]={type:'cc', id:cc}; save(); renderMappings(); say(`Mapped ${state.learnAction} to CC${cc}.`,'ok'); state.learnAction=null; }
 
-    // Check if this CC is bound to any action (play/stop/loop/sustain/mod/bend, octave/transpose if set to CC)
+    // Action-bound CCs
     for(const [k,a] of Object.entries(state.actions)){
       if (a.type==='cc' && a.id===cc){
-        if (k==='sustain'){ state.sustain = val>=64; lcdShow('Sustain', state.sustain?'On':'Off'); return; }
-        if (k==='mod'){ state.modDepth = val/127; lcdShow('Mod', val); return; }
-        if (k==='bend'){ const value01=val/127; const cents=(value01-0.5)*2*state.bendRange; applyDetune(cents); lcdShow('Bend(CC)', Math.round(cents)+'¢'); return; }
-        // momentary actions when value > 0
-        if (val>0) { triggerAction(k); return; }
+        if (k==='sustain'){ state.sustain = val>=64; lcdShow('Sustain', state.sustain?'On':'Off'); save(); return; }
+        if (k==='mod'){ state.modDepth = val/127; lcdShow('Mod', val); save(); return; }
+        if (k==='bend'){ const v01=val/127; const cents=(v01-0.5)*2*state.bendRange; applyDetune(cents); lcdShow('Bend(CC)', Math.round(cents)+'¢'); return; }
+        if (val>0){ triggerAction(k); return; }
       }
     }
 
-    // Normal knob routing (with absolute or relative-64 support)
+    // Knob routing with absolute/relative-64 support
     let v;
-    if (state.ccMode[cc]==='rel'){
-      const delta = val-64; v = clamp((state.ccVals[cc] ?? 64) + delta*2, 0, 127);
-    } else {
-      // detect relative quickly
-      if (val>=61 && val<=67 && state.ccVals[cc]!==undefined && Math.abs(val-64)<=3){
-        state.ccMode[cc]='rel';
-        const delta = val-64; v = clamp(state.ccVals[cc] + delta*2, 0, 127);
-      } else {
-        v = val; // absolute
-      }
+    if (state.ccMode[cc]==='rel'){ v = clamp((state.ccVals[cc] ?? 64) + (val-64)*2, 0, 127); }
+    else {
+      if (val>=61 && val<=67 && state.ccVals[cc]!==undefined && Math.abs(val-64)<=3){ state.ccMode[cc]='rel'; v = clamp(state.ccVals[cc] + (val-64)*2, 0, 127); }
+      else v = val;
     }
-    state.ccVals[cc]=v; saveCCVals();
+    state.ccVals[cc]=v; save();
     const value01 = v/127;
     setDial(cc, value01);
 
-    const map = state.ccMap[cc];
-    if (!map){ lcdShow('CC', `${cc}=${v}`); return; }
+    // Apply
+    const map=state.ccMap[cc]; if(!map){ lcdShow('CC', `${cc}=${v}`); return; }
     switch(map){
       case 'cutoff': if(filter){ const f=200+value01*(10000-200); filter.frequency.value=f; $('#cutoff').value=Math.round(f); $('#cutoffVal').textContent=fmtHz(f); } break;
       case 'q': if(filter){ const q=0.2+value01*(18-0.2); filter.Q.value=q; $('#q').value=q.toFixed(1); $('#qVal').textContent=$('#q').value; } break;
@@ -665,7 +614,7 @@
     lcdShow('CC', `${cc}=${v} → ${map}`);
   }
 
-  // -------- Buttons
+  // ---------- Buttons ----------
   $('#startBtn').onclick=async()=>{ try{ await Tone.start(); say('Audio started. Now Connect MIDI (or use Test Tone).','ok'); }catch(e){ say('Audio failed: '+e.message,'bad'); } };
   $('#testBtn').onclick=async()=>{ try{ await Tone.start(); const s=new Tone.Synth().toDestination(); s.triggerAttackRelease('A4',0.15); say('Heard a beep? Audio path OK.','ok'); }catch(e){ say('Test failed: '+e.message,'bad'); } };
   $('#midiBtn').onclick=async()=>{
@@ -676,6 +625,33 @@
       if(!state.midi.inputs.size){ say('No MIDI devices detected. Plug in your Axiom 25 and try again.','warn'); }
       else say('MIDI access granted. Select/Play.','ok');
     }catch(e){ say('MIDI access failed: '+e.message,'bad'); }
+  };
+
+  // export/import JSON
+  $('#exportBtn').onclick=()=>{
+    const obj={ccMap:state.ccMap, ccVals:state.ccVals, padMap:state.padMap, actions:state.actions, baseMidi:state.baseMidi, transpose:state.transpose, octave:state.octave};
+    const txt=JSON.stringify(obj,null,2);
+    navigator.clipboard?.writeText(txt);
+    say('Config copied to clipboard.','ok');
+    const pb=$('#pastebox'); pb.value = (pb.value?pb.value+'\\n':'')+txt;
+  };
+  $('#importBtn').onclick=()=>{
+    const txt=prompt('Paste exported JSON');
+    if(!txt) return;
+    try{
+      const obj=JSON.parse(txt);
+      if(obj.ccMap) state.ccMap=obj.ccMap;
+      if(obj.ccVals) state.ccVals=obj.ccVals;
+      if(obj.padMap) state.padMap=obj.padMap;
+      if(obj.actions) state.actions=obj.actions;
+      if(obj.baseMidi) state.baseMidi=obj.baseMidi;
+      if(typeof obj.transpose==='number') state.transpose=obj.transpose;
+      if(typeof obj.octave==='number') state.octave=obj.octave;
+      save();
+      // rebuild UI based on import
+      buildKnobs(); buildPads(); buildPadTools(); buildPadMapList(); renderMappings(); buildKeys();
+      say('Config imported.','ok');
+    }catch(e){ say('Import failed: '+e.message,'bad'); }
   };
 
 })();
