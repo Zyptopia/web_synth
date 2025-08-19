@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Axiom 25 – Web MIDI Synth</title>
+<!-- Tone.js (ESM build served as classic script for wider compatibility) -->
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+<style>
+  :root {
+    --bg: #0e0f12;
+    --panel: #16181d;
+    --panel-2: #1d2026;
+    --text: #e8eaf0;
+    --muted: #9aa3b2;
+    --accent: #6ee7ff;
+    --accent-2: #a78bfa;
+    --danger: #ff6b6b;
+    --ok: #34d399;
+    --key: #f6f7fb;
+    --key-black: #1c1e24;
+    --key-active: #fef08a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+  .wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  .topbar { display: grid; gap: 12px; grid-template-columns: 1fr auto auto; align-items: center; }
+  .title { font-size: 20px; font-weight: 700; opacity: 0.95; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button, select, input[type="range"] { background: var(--panel); color: var(--text); border: 1px solid #2a2f39; border-radius: 8px; padding: 10px 12px; }
+  button:hover { background: var(--panel-2); cursor: pointer; }
+  .pill { padding: 8px 10px; border-radius: 999px; }
+  .grid { display: grid; gap: 16px; }
+  .card { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid #232833; border-radius: 14px; padding: 16px; }
+  .card h3 { margin: 0 0 10px; font-size: 15px; color: var(--muted); font-weight: 600; letter-spacing: .2px; }
+  .controls { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .control { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; }
+  .control label { color: var(--muted); font-size: 12px; }
+  .control .val { min-width: 3ch; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .flex { display: flex; gap: 16px; flex-wrap: wrap; }
+  .kb { position: relative; padding: 14px; border-radius: 16px; background: radial-gradient(1000px 280px at 50% -240px, #2b2f3a55, transparent 60%), var(--panel); border: 1px solid #232833; }
+  .kb-keys { position: relative; height: 170px; display: flex; gap: 2px; padding: 10px; border-radius: 12px; background: #0d0f13; }
+  .white { position: relative; flex: 1 1 auto; background: var(--key); border-radius: 4px; border: 1px solid #dfe3ef; height: 100%; transition: transform .02s; }
+  .white.active { background: var(--key-active); box-shadow: inset 0 0 0 2px #f59e0b80, 0 0 16px #f59e0b40; transform: translateY(1px); }
+  .black { position: absolute; width: 60%; height: 64%; right: -30%; top: 0; background: linear-gradient(180deg, #13151a, #010205); border: 1px solid #101219; border-radius: 4px 4px 10px 10px; z-index: 2; }
+  .black.active { background: #4338ca; box-shadow: inset 0 0 0 2px #a78bfa90, 0 0 12px #a78bfa80; }
+  .legend { margin-top: 8px; color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; }
+  .knobs, .pads { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; }
+  .knob { background: #0d0f13; border: 1px solid #232833; border-radius: 12px; padding: 12px 8px; text-align: center; }
+  .knob .dial { width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 6px; position: relative; background: radial-gradient(80% 80% at 50% 35%, #2d323e, #191c23); border: 1px solid #2b3240; }
+  .knob .dial::after { content: ""; position: absolute; left: 50%; top: 6px; width: 2px; height: 14px; background: var(--accent); transform-origin: bottom center; transform: translateX(-50%) rotate(0deg); border-radius: 2px; }
+  .knob.active .dial::after { background: var(--ok); }
+  .knob label { display: block; font-size: 11px; color: var(--muted); }
+  .pad { height: 64px; border-radius: 10px; background: #1a1e27; border: 1px solid #262c37; box-shadow: inset 0 0 0 3px #0c0f14; position: relative; }
+  .pad.active { box-shadow: inset 0 0 0 3px #10b981, 0 0 16px #10b98166; }
+  .pad small { position: absolute; right: 6px; bottom: 4px; color: var(--muted); font-size: 11px; }
+  .mapgrid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+  .mutetip { color: var(--muted); font-size: 12px; }
+  .foot { margin-top: 18px; color: var(--muted); font-size: 12px; }
+  .error { color: var(--danger); }
+  .ok { color: var(--ok); }
+  @media (min-width: 900px) {
+    .controls { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .grid-2 { grid-template-columns: 1.1fr .9fr; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title">Axiom 25 – Web MIDI Synth</div>
+      <button id="startBtn" class="pill">▶ Start Audio</button>
+      <button id="midiBtn" class="pill">🎹 Connect MIDI</button>
+    </div>
+
+    <div id="status" class="foot mutetip" style="margin:10px 0 18px;">
+      Tip: Click <b>Start Audio</b> then <b>Connect MIDI</b>. Use Chrome/Edge for best Web MIDI support.
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Keyboard & Visualizer</h3>
+        <div class="kb">
+          <div id="kbKeys" class="kb-keys"></div>
+          <div class="legend">
+            <span>Base note:
+              <select id="baseNote"></select>
+            </span>
+            <span>Device:
+              <select id="midiIn"></select>
+            </span>
+          </div>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h3>Knobs</h3>
+          <div id="knobs" class="knobs"></div>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h3>Pads</h3>
+          <div id="pads" class="pads"></div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Instrument</h3>
+          <div class="row">
+            <label>Preset:
+              <select id="preset">
+                <option value="piano-lite">Concert Piano (synth)</option>
+                <option value="grand-pad">Warm Pad</option>
+                <option value="bass-mono">Bass</option>
+                <option value="ep-bell">EP/Bell</option>
+                <option value="drum-only">Drum Pads Only</option>
+              </select>
+            </label>
+            <button id="panic" title="Stop all sounds">🛑 Panic</button>
+          </div>
+          <div class="controls" style="margin-top:12px">
+            <div class="control">
+              <label for="attack">Attack</label>
+              <input id="attack" type="range" min="0" max="2000" step="10" value="20">
+              <div class="val" id="attackVal">20ms</div>
+            </div>
+            <div class="control">
+              <label for="decay">Decay</label>
+              <input id="decay" type="range" min="0" max="3000" step="10" value="200">
+              <div class="val" id="decayVal">200ms</div>
+            </div>
+            <div class="control">
+              <label for="sustain">Sustain</label>
+              <input id="sustain" type="range" min="0" max="1" step="0.01" value="0.6">
+              <div class="val" id="sustainVal">0.60</div>
+            </div>
+            <div class="control">
+              <label for="release">Release</label>
+              <input id="release" type="range" min="10" max="6000" step="10" value="400">
+              <div class="val" id="releaseVal">400ms</div>
+            </div>
+            <div class="control">
+              <label for="cutoff">Filter Cutoff</label>
+              <input id="cutoff" type="range" min="200" max="10000" step="1" value="4500">
+              <div class="val" id="cutoffVal">4.5k</div>
+            </div>
+            <div class="control">
+              <label for="q">Resonance (Q)</label>
+              <input id="q" type="range" min="0.2" max="18" step="0.1" value="0.8">
+              <div class="val" id="qVal">0.8</div>
+            </div>
+            <div class="control">
+              <label for="reverb">Reverb Mix</label>
+              <input id="reverb" type="range" min="0" max="1" step="0.01" value="0.2">
+              <div class="val" id="reverbVal">0.20</div>
+            </div>
+            <div class="control">
+              <label for="delay">Delay Mix</label>
+              <input id="delay" type="range" min="0" max="1" step="0.01" value="0.12">
+              <div class="val" id="delayVal">0.12</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Pad Mapping (saved locally)</h3>
+          <div class="mapgrid" id="padMap"></div>
+          <div class="row" style="margin-top:10px">
+            <button id="saveMap">💾 Save Mapping</button>
+            <button id="resetMap">↺ Reset Mapping</button>
+          </div>
+          <div class="foot mutetip" style="margin-top:10px">
+            Default pad MIDI notes: 36, 38, 42, 46, 41, 43, 39, 49 (Kick, Snare, CH, OH, LT, HT, Clap, Crash).
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot" style="margin-top:18px">
+      <b>Samples later?</b> This build uses synths. To add a real piano later, drop a few WAV/MP3 notes into <code>/samples/piano/</code> (e.g. C3, F3, A#3, D4, F#4, A#4), and we’ll wire a Sampler preset in a follow-up.
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ---------- Utilities ----------
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+  const fmtMs = v => `${Math.round(v)}ms`;
+  const fmtHz = v => v >= 1000 ? `${(v/1000).toFixed(1)}k` : `${Math.round(v)}`;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  const state = {
+    midi: null,
+    input: null,
+    sustain: false,
+    heldNotes: new Map(), // midi -> Tone trigger time
+    baseMidi: parseInt(localStorage.getItem("axiom25BaseMidi") || "48", 10), // C3
+    padMap: null, // loaded from storage or default
+    ccKnobMap: { // default map for Axiom-style 8 knobs (CC16..23)
+      // cc -> param
+      16: "cutoff",
+      17: "q",
+      18: "attack",
+      19: "decay",
+      20: "sustain",
+      21: "release",
+      22: "reverb",
+      23: "delay",
+    }
+  };
+
+  const defaultPadMap = [
+    { midi:36, name:"Kick",  type:"kick"  },
+    { midi:38, name:"Snare", type:"snare" },
+    { midi:42, name:"CH",    type:"hhc"   },
+    { midi:46, name:"OH",    type:"hho"   },
+    { midi:41, name:"LT",    type:"toml"  },
+    { midi:43, name:"HT",    type:"tomh"  },
+    { midi:39, name:"Clap",  type:"clap"  },
+    { midi:49, name:"Crash", type:"crash" },
+  ];
+  state.padMap = JSON.parse(localStorage.getItem("axiom25PadMap") || "null") || defaultPadMap.slice();
+
+  // ---------- Tone graph ----------
+  let synth = null, poly = null, bass = null, pad = null, bell = null;
+  let filter = null, verb = null, delay = null, comp = null, drum = null;
+
+  function buildGraph(preset){
+    // Dispose previous
+    [synth, poly, bass, pad, bell, filter, verb, delay, comp].forEach(n => n && n.dispose && n.dispose());
+    // Shared FX
+    filter = new Tone.Filter({ type:"lowpass", frequency: +$('#cutoff').value, Q: +$('#q').value });
+    verb = new Tone.Reverb({ decay: 2.4, preDelay: 0.02, wet: +$('#reverb').value });
+    delay = new Tone.FeedbackDelay({ delayTime: 0.25, feedback: 0.28, wet: +$('#delay').value });
+    comp = new Tone.Compressor({ threshold: -14, ratio: 3, attack: 0.003, release: 0.25 });
+
+    const amp = Tone.getDestination();
+    const chainTo = (...nodes) => {
+      let head = nodes[0];
+      for (let i=1;i<nodes.length;i++) head = head.connect(nodes[i]);
+      head.connect(amp);
+    };
+
+    const env = { attack: +$('#attack').value/1000, decay: +$('#decay').value/1000, sustain: +$('#sustain').value, release: +$('#release').value/1000 };
+
+    if (preset === 'piano-lite') {
+      poly = new Tone.PolySynth(Tone.AMSynth, {
+        volume: -6,
+        oscillator: { type: "triangle" },
+        envelope: env,
+        modulation: { type: "sine" },
+        modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.3, release: env.release }
+      });
+      chainTo(poly, filter, verb, delay, comp);
+    } else if (preset === 'grand-pad') {
+      poly = new Tone.PolySynth(Tone.Synth, {
+        volume: -10,
+        oscillator: { type: "sawtooth" },
+        envelope: { ...env, attack: Math.max(env.attack, 0.2), release: Math.max(env.release, 1.2) }
+      });
+      chainTo(poly, filter, verb, delay, comp);
+    } else if (preset === 'bass-mono') {
+      bass = new Tone.MonoSynth({
+        volume: -6,
+        oscillator: { type:"square" },
+        envelope: { attack: Math.min(env.attack, 0.01), decay: 0.18, sustain: 0.2, release: 0.15 },
+        filter: { Q: 1, type: "lowpass", rolloff: -24 },
+        filterEnvelope: { attack: 0.005, decay: 0.2, sustain: 0.2, release: 0.1, baseFrequency: +$('#cutoff').value, octaves: 2.5 }
+      });
+      chainTo(bass, filter, delay, comp);
+    } else if (preset === 'ep-bell') {
+      bell = new Tone.FMSynth({
+        volume: -8,
+        modulationIndex: 12,
+        harmonicity: 2.5,
+        oscillator: { type: "sine" },
+        envelope: env,
+        modulationEnvelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: env.release }
+      });
+      poly = new Tone.PolySynth(bell);
+      chainTo(poly, filter, verb, delay, comp);
+    } else if (preset === 'drum-only') {
+      // keys disabled — pads only
+      chainTo(new Tone.Gain(0), comp);
+    }
+
+    // Drums (synthesized)
+    if (drum) drum.dispose();
+    drum = {
+      kick: new Tone.MembraneSynth({ volume: -4 }),
+      snare: new Tone.NoiseSynth({ volume: -8, noise: { type: "white" }, envelope: { attack: 0.001, decay: 0.18, sustain: 0 } }),
+      hhc: new Tone.NoiseSynth({ volume: -14, noise: { type: "white" }, envelope: { attack: 0.001, decay: 0.06, sustain: 0 } }),
+      hho: new Tone.NoiseSynth({ volume: -14, noise: { type: "white" }, envelope: { attack: 0.001, decay: 0.3, sustain: 0 } }),
+      toml: new Tone.MembraneSynth({ volume: -8, pitchDecay: 0.02 }),
+      tomh: new Tone.MembraneSynth({ volume: -8, pitchDecay: 0.01 }),
+      clap: new Tone.NoiseSynth({ volume: -10, noise: { type: "pink" }, envelope: { attack: 0.001, decay: 0.12, sustain: 0 } }),
+      crash: new Tone.MetalSynth({ volume: -16, resonance: 300, modulationIndex: 8 })
+    };
+    for (const k of Object.values(drum)) k.connect(verb).connect(delay).connect(comp).toDestination();
+  }
+
+  function currentPoly() {
+    return poly || null;
+  }
+
+  function noteOn(midi, vel=100){
+    const freq = Tone.Frequency(midi, "midi");
+    const v = vel / 127;
+    const preset = $('#preset').value;
+
+    // Pad map first
+    const padIndex = state.padMap.findIndex(p => p.midi === midi);
+    if (padIndex !== -1) {
+      triggerPad(state.padMap[padIndex].type, v);
+      flashPad(padIndex);
+      return;
+    }
+
+    if (preset === 'drum-only') return;
+
+    // Keys
+    const p = currentPoly();
+    if (p) {
+      const time = Tone.now();
+      p.triggerAttack(freq, time, clamp(0.1 + v*0.9, 0, 1));
+      state.heldNotes.set(midi, time);
+    } else if (bass) {
+      bass.triggerAttack(freq, Tone.now(), clamp(0.1 + v*0.9, 0, 1));
+      state.heldNotes.set(midi, Tone.now());
+    }
+
+    flashKey(midi, true);
+  }
+
+  function noteOff(midi){
+    const held = state.heldNotes.get(midi);
+    if (!held) { flashKey(midi, false); return; }
+    if (state.sustain) { // keep held; will be released on pedal up
+      return;
+    }
+    const freq = Tone.Frequency(midi, "midi");
+    const p = currentPoly();
+    if (p) p.triggerRelease(freq, Tone.now());
+    else if (bass) bass.triggerRelease(Tone.now());
+    state.heldNotes.delete(midi);
+
+    flashKey(midi, false);
+  }
+
+  function allOff(){
+    const p = currentPoly();
+    if (p) p.releaseAll();
+    if (bass) bass.triggerRelease();
+    state.heldNotes.clear();
+    $$(".white, .black, .pad").forEach(el => el.classList.remove("active"));
+  }
+
+  function triggerPad(type, v){
+    const now = Tone.now();
+    switch(type){
+      case "kick": drum.kick.triggerAttackRelease("C1", 0.22, now, v); break;
+      case "snare": drum.snare.triggerAttackRelease(0.12, now, v); break;
+      case "hhc": drum.hhc.triggerAttackRelease(0.05, now, v*0.9); break;
+      case "hho": drum.hho.triggerAttackRelease(0.28, now, v*0.9); break;
+      case "toml": drum.toml.triggerAttackRelease("F2", 0.18, now, v); break;
+      case "tomh": drum.tomh.triggerAttackRelease("A2", 0.16, now, v); break;
+      case "clap": drum.clap.triggerAttackRelease(0.1, now, v); break;
+      case "crash": drum.crash.triggerAttackRelease(0.6, now, v*0.8); break;
+    }
+  }
+
+  // ---------- UI: keyboard ----------
+  const kbRoot = $('#kbKeys');
+  const WHITE_PATTERN = [0,2,4,5,7,9,11]; // semis in octave
+  const BLACK_OFFSETS = { 1: true, 3: true, 6: true, 8: true, 10: true };
+
+  function buildKeys(){
+    kbRoot.innerHTML = "";
+    const base = state.baseMidi; // inclusive
+    let whites = [];
+    for (let i = 0; i < 25; i++){
+      const n = base + i;
+      const semi = n % 12;
+      const isWhite = WHITE_PATTERN.includes(semi);
+      if (isWhite){
+        const w = document.createElement('div');
+        w.className = "white";
+        w.dataset.midi = n;
+        kbRoot.appendChild(w);
+        whites.push({el:w, midi:n});
+        // black?
+        const nextSemi = (semi + 1) % 12;
+        if (BLACK_OFFSETS[nextSemi]){
+          const b = document.createElement('div');
+          b.className = "black";
+          b.dataset.midi = n+1;
+          w.appendChild(b);
+        }
+      } else {
+        // If pattern mismatch (shouldn’t happen with the sequence we build), skip
+      }
+    }
+  }
+
+  function midiInRange(midi){
+    return midi >= state.baseMidi && midi < state.baseMidi + 32; // allow a little over
+  }
+
+  function domForMidi(midi){
+    return kbRoot.querySelector(`[data-midi="${midi}"]`);
+  }
+
+  function flashKey(midi, on){
+    if (!midiInRange(midi)) return;
+    const el = domForMidi(midi);
+    if (!el) return;
+    const cls = (el.classList.contains("black") ? "black" : "white");
+    if (on) el.classList.add("active"); else el.classList.remove("active");
+  }
+
+  // ---------- UI: knobs & pads ----------
+  const knobsRoot = $('#knobs'), padsRoot = $('#pads');
+  function buildKnobs(){
+    knobsRoot.innerHTML = "";
+    for (let i=0;i<8;i++){
+      const box = document.createElement('div');
+      box.className = "knob";
+      box.innerHTML = `<div class="dial" data-idx="${i}"></div><label>K${i+1}</label>`;
+      knobsRoot.appendChild(box);
+    }
+  }
+  function buildPads(){
+    padsRoot.innerHTML = "";
+    for (let i=0;i<8;i++){
+      const p = document.createElement('div');
+      p.className = "pad";
+      p.dataset.index = i;
+      const tag = document.createElement('small');
+      tag.textContent = `${state.padMap[i].name}`;
+      p.appendChild(tag);
+      padsRoot.appendChild(p);
+    }
+  }
+  function flashPad(i){
+    const el = padsRoot.querySelector(`.pad[data-index="${i}"]`);
+    if (!el) return;
+    el.classList.add("active");
+    setTimeout(()=>el.classList.remove("active"), 120);
+  }
+  function setKnobDial(cc, value01){
+    // map CC number to one of 8 default knobs (16..23)
+    const idx = cc - 16;
+    if (idx < 0 || idx > 7) return;
+    const dial = knobsRoot.querySelector(`.dial[data-idx="${idx}"]`);
+    if (!dial) return;
+    const deg = -135 + value01 * 270; // nice arc
+    dial.parentElement.classList.add('active');
+    dial.style.setProperty('--rot', deg + 'deg');
+    dial.style.transform = `rotate(${deg}deg)`;
+    // pointer is :after – we rotate dial element itself to avoid extra CSS vars
+    setTimeout(()=>dial.parentElement.classList.remove('active'), 80);
+  }
+
+  // ---------- Pad mapping editor ----------
+  const padMapRoot = $('#padMap');
+  const PAD_TYPES = [
+    { id:"kick",  label:"Kick"  },
+    { id:"snare", label:"Snare" },
+    { id:"hhc",   label:"Hi-Hat (Closed)" },
+    { id:"hho",   label:"Hi-Hat (Open)" },
+    { id:"toml",  label:"Tom (Low)" },
+    { id:"tomh",  label:"Tom (High)" },
+    { id:"clap",  label:"Clap" },
+    { id:"crash", label:"Crash" },
+  ];
+  function buildPadEditor(){
+    padMapRoot.innerHTML = "";
+    state.padMap.forEach((p, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = "card";
+      wrap.innerHTML = `
+        <div style="display:grid;gap:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div><b>Pad ${i+1}</b> &nbsp;<span class="mutetip">(MIDI ${p.midi})</span></div>
+            <input type="number" min="0" max="127" value="${p.midi}" data-index="${i}" data-kind="midi" style="width:76px;padding:6px;border-radius:8px;background:#0d0f13;border:1px solid #232833;color:#e8eaf0;">
+          </div>
+          <label>Sound:
+            <select data-index="${i}" data-kind="type">
+              ${PAD_TYPES.map(t => `<option value="${t.id}" ${p.type===t.id?'selected':''}>${t.label}</option>`).join('')}
+            </select>
+          </label>
+          <label>Label:
+            <input type="text" value="${p.name}" data-index="${i}" data-kind="name" style="width:100%;padding:8px;border-radius:8px;background:#0d0f13;border:1px solid #232833;color:#e8eaf0;">
+          </label>
+        </div>
+      `;
+      padMapRoot.appendChild(wrap);
+    });
+
+    padMapRoot.oninput = (e) => {
+      const idx = +e.target.dataset.index;
+      const kind = e.target.dataset.kind;
+      if (Number.isInteger(idx) && kind){
+        if (kind === 'midi') state.padMap[idx].midi = clamp(parseInt(e.target.value||0,10), 0, 127);
+        if (kind === 'type') state.padMap[idx].type = e.target.value;
+        if (kind === 'name') state.padMap[idx].name = e.target.value;
+        buildPads(); // refresh labels live
+      }
+    };
+  }
+  $('#saveMap').onclick = () => {
+    localStorage.setItem("axiom25PadMap", JSON.stringify(state.padMap));
+    $('#status').innerHTML = `<span class="ok">Saved pad mapping.</span>`;
+  };
+  $('#resetMap').onclick = () => {
+    state.padMap = defaultPadMap.slice();
+    localStorage.setItem("axiom25PadMap", JSON.stringify(state.padMap));
+    buildPads(); buildPadEditor();
+    $('#status').textContent = "Pad mapping reset to defaults.";
+  };
+
+  // ---------- Controls wiring ----------
+  function hookSlider(id, fmt, on){
+    const el = $('#'+id), lab = $('#'+id+'Val');
+    const apply = () => {
+      lab.textContent = fmt(+el.value);
+      on(+el.value);
+    };
+    el.addEventListener('input', apply);
+    apply();
+  }
+
+  function rebuild() { buildGraph($('#preset').value); }
+
+  hookSlider('attack', fmtMs, v => { rebuild(); });
+  hookSlider('decay', fmtMs, v => { rebuild(); });
+  hookSlider('sustain', v => v.toFixed(2), v => { rebuild(); });
+  hookSlider('release', fmtMs, v => { rebuild(); });
+  hookSlider('cutoff', fmtHz, v => { if (filter) filter.frequency.value = v; $('#cutoffVal').textContent = fmtHz(v); });
+  hookSlider('q', v => v.toFixed(1), v => { if (filter) filter.Q.value = v; });
+  hookSlider('reverb', v => v.toFixed(2), v => { if (verb) verb.wet.value = v; });
+  hookSlider('delay', v => v.toFixed(2), v => { if (delay) delay.wet.value = v; });
+
+  $('#preset').onchange = rebuild;
+  $('#panic').onclick = allOff;
+
+  // Base note selector
+  const baseSel = $('#baseNote');
+  (function fillBase(){
+    // Common: C2..C5
+    for (let m=36;m<=72;m+=1){
+      const o = document.createElement('option');
+      o.value = m;
+      o.textContent = `MIDI ${m} (${Tone.Frequency(m,"midi").toNote()})`;
+      baseSel.appendChild(o);
+    }
+    baseSel.value = String(state.baseMidi);
+    baseSel.onchange = () => {
+      state.baseMidi = parseInt(baseSel.value, 10);
+      localStorage.setItem("axiom25BaseMidi", String(state.baseMidi));
+      buildKeys();
+    };
+  })();
+
+  // Build visuals initially
+  buildKeys();
+  buildKnobs();
+  buildPads();
+  buildPadEditor();
+  buildGraph('piano-lite');
+
+  // ---------- MIDI ----------
+  const midiInSel = $('#midiIn');
+  let midiInputs = [];
+  function refreshMidiInputs(){
+    midiInSel.innerHTML = "";
+    midiInputs = [];
+    if (!state.midi) return;
+    for (const input of state.midi.inputs.values()){
+      midiInputs.push(input);
+      const o = document.createElement('option');
+      o.value = input.id;
+      o.textContent = `${input.name} (${input.manufacturer||'MIDI'})`;
+      midiInSel.appendChild(o);
+    }
+    if (midiInputs.length){
+      setInput(midiInputs[0]);
+      midiInSel.value = midiInputs[0].id;
+    }
+  }
+  midiInSel.onchange = () => {
+    const found = midiInputs.find(i=>i.id===midiInSel.value);
+    if (found) setInput(found);
+  };
+
+  function setInput(input){
+    if (state.input) state.input.onmidimessage = null;
+    state.input = input;
+    if (!input) return;
+    input.onmidimessage = onMIDIMessage;
+    $('#status').innerHTML = `Connected to <b>${input.name}</b>.`;
+  }
+
+  function onMIDIMessage(ev){
+    const [status, data1, data2] = ev.data;
+    const cmd = status & 0xF0;
+    const channel = status & 0x0F;
+    if (cmd === 0x90 && data2 > 0){ // note on
+      noteOn(data1, data2);
+    } else if ((cmd === 0x90 && data2 === 0) || cmd === 0x80){ // note off
+      noteOff(data1);
+    } else if (cmd === 0xB0){ // CC
+      handleCC(data1, data2);
+    } else if (cmd === 0xE0){ // pitch bend (optional)
+      // data1=LSB, data2=MSB
+    }
+  }
+
+  function handleCC(cc, val){
+    // Sustain pedal
+    if (cc === 64){ // 0..63 off, 64..127 on
+      const on = val >= 64;
+      state.sustain = on;
+      if (!on) { // pedal up -> release all non-held keys
+        const toRelease = Array.from(state.heldNotes.keys());
+        toRelease.forEach(m => { noteOff(m); });
+      }
+      return;
+    }
+
+    const value01 = val/127;
+    setKnobDial(cc, value01);
+
+    const map = state.ccKnobMap[cc];
+    if (!map) return;
+    switch(map){
+      case "cutoff": if (filter) filter.frequency.value = 200 + value01 * (10000-200); $('#cutoff').value = Math.round(filter.frequency.value); $('#cutoffVal').textContent = fmtHz(+$('#cutoff').value); break;
+      case "q": if (filter) filter.Q.value = 0.2 + value01 * (18-0.2); $('#q').value = filter.Q.value.toFixed(1); $('#qVal').textContent = $('#q').value; break;
+      case "attack": $('#attack').value = Math.round(value01*2000); $('#attack').dispatchEvent(new Event('input')); break;
+      case "decay": $('#decay').value = Math.round(value01*3000); $('#decay').dispatchEvent(new Event('input')); break;
+      case "sustain": $('#sustain').value = value01.toFixed(2); $('#sustain').dispatchEvent(new Event('input')); break;
+      case "release": $('#release').value = Math.round(10 + value01*5990); $('#release').dispatchEvent(new Event('input')); break;
+      case "reverb": $('#reverb').value = value01.toFixed(2); $('#reverb').dispatchEvent(new Event('input')); break;
+      case "delay": $('#delay').value = value01.toFixed(2); $('#delay').dispatchEvent(new Event('input')); break;
+    }
+  }
+
+  // ---------- Buttons ----------
+  $('#startBtn').onclick = async () => {
+    try {
+      await Tone.start();
+      $('#status').innerHTML = `<span class="ok">Audio started.</span> Choose “Connect MIDI”.`;
+    } catch (e) {
+      $('#status').innerHTML = `<span class="error">Failed to start audio: ${e.message}</span>`;
+    }
+  };
+  $('#midiBtn').onclick = async () => {
+    try {
+      if (!navigator.requestMIDIAccess){ $('#status').innerHTML = `<span class="error">Web MIDI not supported in this browser.</span>`; return; }
+      state.midi = await navigator.requestMIDIAccess({ sysex:false });
+      state.midi.onstatechange = refreshMidiInputs;
+      refreshMidiInputs();
+      if (!midiInputs.length){
+        $('#status').innerHTML = `No MIDI devices detected. Plug in your Axiom 25 and try again.`;
+      }
+    } catch(e) {
+      $('#status').innerHTML = `<span class="error">MIDI access failed: ${e.message}</span>`;
+    }
+  };
+})();
+</script>
+</body>
+</html>
