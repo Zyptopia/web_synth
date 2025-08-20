@@ -2,54 +2,54 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Axiom 25 – Stable Baseline (v13)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Axiom 25 — Rock-Solid Web MIDI (v14)</title>
 <style>
-:root{--bg:#0c0f16;--p1:#151c2b;--p2:#1d2536;--rim:#2a3245;--hi:#67e8f9;--hi2:#a78bfa;--ok:#34d399;--bad:#ef4444;--w:#f59e0b;--txt:#e7edf8;--mut:#9aa3b2;--key:#f6f7fb;--keyL:#ffe082;--pad:#0f1728;--padL:#10b981}
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,Segoe UI,Roboto,Inter,Arial}
-.wrap{min-height:100vh;display:flex;flex-direction:column;gap:14px;padding:14px}
-.top{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center}
-.title{font-weight:700;font-size:18px}
-button,select,input[type=range],textarea{background:var(--p1);color:var(--txt);border:1px solid var(--rim);border-radius:10px;padding:10px 12px}
+:root{--bg:#0b0f16;--p1:#121826;--p2:#1a2334;--rim:#273249;--hi:#67e8f9;--hi2:#a78bfa;--ok:#22c55e;--bad:#ef4444;--w:#f59e0b;--txt:#e7edf8;--mut:#9aa3b2;--key:#f6f7fb;--keyL:#ffe082;--pad:#0f1728;--padL:#10b981}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,Segoe UI,Roboto,Inter,Arial;height:100%}
+.wrap{min-height:100vh;display:grid;grid-template-rows:auto auto 1fr auto;gap:14px;padding:14px;overflow:hidden}
+.top{display:grid;grid-template-columns:1fr auto auto auto auto;gap:8px;align-items:center}
+.title{font-weight:800;font-size:18px}
+button,select,input[type=range]{background:var(--p1);color:var(--txt);border:1px solid var(--rim);border-radius:12px;padding:10px 12px}
 button:hover{background:var(--p2);cursor:pointer}.pill{border-radius:999px}
 .status{color:var(--mut)}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--w)}
 .card{background:linear-gradient(180deg,var(--p1),var(--p2));border:1px solid var(--rim);border-radius:16px;padding:12px}
 .diag{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
 .di{background:#0b1323;border:1px solid var(--rim);border-radius:10px;padding:8px;font-size:12px;color:var(--mut)}.di b{display:block;color:#cfe6ff;margin-bottom:3px}
-.device{display:grid;grid-template-columns:300px 1fr 320px;gap:12px}
+.device{display:grid;grid-template-columns:300px 1fr 320px;gap:12px;min-height:0}
 @media(max-width:1200px){.device{grid-template-columns:1fr}}
-.lcd{background:radial-gradient(100% 140% at 50% 0%,#0cf 0%,#036 85%);border:2px solid #0bf;border-radius:10px;padding:8px 12px;color:#00131e;font:700 18px ui-monospace,Consolas;text-shadow:0 0 3px #aff}
-.lcd small{display:block;font:600 11px system-ui;color:#013145;letter-spacing:.04em;margin-bottom:2px}
-.left{display:grid;grid-template-rows:auto auto auto 1fr;gap:8px}
+.lcd{background:radial-gradient(100% 140% at 50% 0%,#0cf 0%,#036 85%);border:2px solid #0bf;border-radius:10px;padding:8px 12px;color:#00131e;font:800 18px ui-monospace,Consolas;text-shadow:0 0 3px #aff}
+.lcd small{display:block;font:700 11px system-ui;color:#013145;letter-spacing:.04em;margin-bottom:2px}
+.left{display:grid;grid-template-rows:auto auto auto 1fr;gap:8px;min-height:0}
 .row{display:flex;gap:8px;align-items:center}.rocker{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.wheels{display:flex;gap:14px}.wheel{width:52px;height:84px;background:linear-gradient(180deg,#121826,#0a0e16);border:1px solid var(--rim);border-radius:12px;position:relative}.wheel::after{content:"";position:absolute;left:50%;width:3px;height:72%;top:14%;transform:translateX(-50%);background:linear-gradient(180deg,#2a3550,#0e1420)}.wlabel{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);font:600 11px system-ui;color:var(--mut)}
+.wheels{display:flex;gap:14px}.wheel{width:52px;height:84px;background:linear-gradient(180deg,#121826,#0a0e16);border:1px solid var(--rim);border-radius:12px;position:relative}.wheel::after{content:"";position:absolute;left:50%;width:3px;height:72%;top:14%;transform:translateX(-50%);background:linear-gradient(180deg,#2a3550,#0e1420)}.wlabel{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);font:700 11px system-ui;color:var(--mut)}
 .transport{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.tbtn{padding:8px 0;border-radius:8px;text-align:center}
-.keysWrap{background:linear-gradient(180deg,#0c1018,#0b0f16);border:1px solid var(--rim);border-radius:16px;padding:10px;display:grid;grid-template-rows:200px auto auto;gap:6px}
-.kb{position:relative;display:flex;gap:2px;padding:8px;border-radius:12px;background:#0b0f16}
+.keysWrap{background:linear-gradient(180deg,#0c1018,#0b0f16);border:1px solid var(--rim);border-radius:16px;padding:10px;display:grid;grid-template-rows:minmax(160px,200px) auto auto;gap:6px;min-height:0}
+.kb{position:relative;display:flex;gap:2px;padding:8px;border-radius:12px;background:#0b0f16;min-height:0;overflow:hidden}
 .white{position:relative;flex:1;background:var(--key);border:1px solid #dfe5f6;border-radius:4px;user-select:none}.white.active{background:var(--keyL);box-shadow:inset 0 0 0 2px #f59e0b80,0 0 16px #f59e0b55}
 .black{position:absolute;width:60%;height:64%;right:-30%;top:0;background:linear-gradient(180deg,#1c2130,#0b0f16);border:1px solid #0e1422;border-radius:4px 4px 10px 10px;z-index:2;user-select:none}.black.active{background:#4338ca;box-shadow:inset 0 0 0 2px #a78bfa99,0 0 14px #a78bfa88}
 .legend{display:flex;justify-content:space-between;color:var(--mut);font-size:12px}
-.right{display:grid;grid-template-rows:auto auto;gap:8px}
+.right{display:grid;grid-template-rows:auto auto;gap:8px;min-height:0}
 .knobs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.knob{background:#0c111a;border:1px solid var(--rim);border-radius:12px;padding:10px;text-align:center}
 .dial{width:42px;height:42px;margin:0 auto 6px;border-radius:50%;background:radial-gradient(80% 70% at 50% 30%,#2d3548,#161c28);border:1px solid #2b3448;transform:rotate(0deg);position:relative}.dial::after{content:"";position:absolute;width:2px;height:13px;top:6px;left:50%;transform:translateX(-50%);background:var(--hi)}
 .knob label{display:block;font-size:11px;color:var(--mut)}.mapto{font-size:11px;color:#9cc;margin-top:2px}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid #223047;border-radius:999px;background:#0b0f16;color:#9ec;font-size:11px}.chip .dot{width:6px;height:6px;border-radius:999px;background:linear-gradient(0deg,#6ee7ff,#a78bfa)}
 .padsWrap{background:#0b0f16;border:1px solid var(--rim);border-radius:12px;padding:10px}
 .pads{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .pad{height:64px;border-radius:10px;background:var(--pad);border:1px solid #263143;box-shadow:inset 0 0 0 3px #0a0f18;position:relative}.pad.active{box-shadow:inset 0 0 0 3px var(--padL),0 0 18px #10b98166}.pad small{position:absolute;left:6px;top:6px;color:var(--mut);font-size:11px}
 .controls{display:grid;gap:8px;grid-template-columns:repeat(4,minmax(0,1fr))}.control{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:6px}.control label{font-size:12px;color:var(--mut)}.val{min-width:3ch;text-align:right;color:var(--hi)}
-.log{height:180px;overflow:auto;background:#0b0f16;border:1px solid var(--rim);border-radius:10px;padding:8px;font:12px ui-monospace,Consolas,monospace;white-space:pre-wrap}
-.badge{padding:2px 8px;border:1px solid var(--rim);border-radius:999px;background:#0b0f16;color:#9ec}
-.paste{height:110px;resize:vertical}
+.log{height:160px;overflow:auto;background:#0b0f16;border:1px solid var(--rim);border-radius:10px;padding:8px;font:12px ui-monospace,Consolas,monospace;white-space:pre-wrap}
+.footer{color:#7b8699;font-size:12px;opacity:.9}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top">
-    <div class="title">Axiom 25 – Web MIDI (Stable)</div>
+    <div class="title">Axiom 25 — Web MIDI (Rock‑Solid)</div>
     <button id="startBtn" class="pill">▶ Start Audio</button>
     <button id="testBtn" class="pill">♪ Test Tone</button>
     <button id="midiBtn" class="pill">🎹 Connect MIDI</button>
+    <button id="resetBtn" class="pill">↺ Reset</button>
   </div>
   <div id="status" class="status">Engine idle. Click Start Audio.</div>
 
@@ -86,13 +86,11 @@ button:hover{background:var(--p2);cursor:pointer}.pill{border-radius:999px}
 
     <div class="right">
       <div class="knobs" id="knobs"></div>
-      <div class="padsWrap">
-        <div class="pads" id="pads"></div>
-      </div>
+      <div class="padsWrap"><div class="pads" id="pads"></div></div>
     </div>
   </div>
 
-  <div class="card" style="margin-top:10px;display:grid;grid-template-columns:1.3fr .7fr;gap:10px">
+  <div class="card" style="display:grid;grid-template-columns:1.3fr .7fr;gap:10px">
     <div>
       <h3 style="margin:0 0 8px">Instrument</h3>
       <div class="controls">
@@ -124,10 +122,13 @@ button:hover{background:var(--p2);cursor:pointer}.pill{border-radius:999px}
       <div id="log" class="log"></div>
     </div>
   </div>
+
+  <div class="footer">If something fails, copy the Diagnostics row + first 10 lines of MIDI Monitor and paste to me.</div>
 </div>
 
 <script>
 (function(){
+  'use strict';
   const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
   const log=(...a)=>{const L=$('#log'); if(!L) return; L.textContent+=a.join(' ')+'
 '; L.scrollTop=L.scrollHeight};
@@ -135,38 +136,41 @@ button:hover{background:var(--p2);cursor:pointer}.pill{border-radius:999px}
   const fmtMs=v=>`${Math.round(v)}ms`, fmtHz=v=>v>=1000?(v/1000).toFixed(1)+'k':Math.round(v), clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
   const midiToFreq=m=>440*Math.pow(2,(m-69)/12);
 
-  // Diagnostics
+  // --- Diagnostics ---
   window.__lastErr='—';
-  function diag(){const cells=[
-    ['Secure',String(window.isSecureContext)],
-    ['Host',location.hostname||'(file)'],
-    ['Protocol',location.protocol],
-    ['Engine',window.Eng?Eng.mode:'—'],
-    ['AudioState',Eng?.ctx?.state||'—'],
-    ['WebMIDI',('requestMIDIAccess'in navigator)?'yes':'no'],
-    ['Buttons','yes'],
-    ['LastErr',window.__lastErr]
-  ]; $('#diag').innerHTML=cells.map(([k,v])=>`<div class=di><b>${k}</b>${v}</div>`).join('') }
+  function diag(extra={}){
+    const cells=[
+      ['Secure', String(window.isSecureContext)],
+      ['Host', location.hostname||'(file)'],
+      ['Protocol', location.protocol],
+      ['Engine', window.Eng?Eng.mode:'—'],
+      ['AudioState', Eng?.ctx?.state||'—'],
+      ['WebMIDI', ('requestMIDIAccess'in navigator)?'yes':'no'],
+      ['Buttons','yes'],
+      ['LastErr', window.__lastErr]
+    ];
+    for(const [k,v] of Object.entries(extra)) cells.push([k,v]);
+    $('#diag').innerHTML=cells.map(([k,v])=>`<div class=di><b>${k}</b>${v}</div>`).join('');
+  }
 
-  // --- WebAudio Synth (simple, robust) ---
+  // --- WebAudio Synth (simple & robust) ---
   const dB=g=>Math.pow(10,g/20);
   function makeIR(ctx,seconds=1.8,decay=2.2){const rate=ctx.sampleRate,len=rate*seconds,buf=ctx.createBuffer(2,len,rate);for(let c=0;c<2;c++){const ch=buf.getChannelData(c);for(let i=0;i<len;i++){ch[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay)} }return buf}
   function now(ctx){return ctx.currentTime}
 
-  window.Eng={mode:'wa',ctx:null,comp:null,master:null,filter:null,rev:null,revGain:null,del:null,delGain:null,fb:null,
+  window.Eng={mode:'webaudio',ctx:null,comp:null,master:null,filter:null,rev:null,revGain:null,del:null,delGain:null,fb:null,
     env:{a:0.02,d:0.2,s:0.6,r:0.4}, cutoff:4500, q:0.8, volume:-6, bend:0, bendRange:200, modDepth:0,
     voices:new Map(), sustain:false, sustained:new Set(), preset:'piano',
     init(){ if(this.ctx) return; const AC=window.AudioContext||window.webkitAudioContext; try{this.ctx=new AC()}catch(e){window.__lastErr=e.message; diag(); throw e}
-      this.comp=this.ctx.createDynamicsCompressor(); this.comp.threshold.value=-16; this.comp.ratio.value=3; this.comp.attack.value=0.003; this.comp.release.value=0.25;
-      this.master=this.ctx.createGain(); this.master.gain.value=dB(this.volume);
-      this.comp.connect(this.master).connect(this.ctx.destination);
-      this.filter=this.ctx.createBiquadFilter(); this.filter.type='lowpass'; this.filter.frequency.value=this.cutoff; this.filter.Q.value=this.q;
-      const dry=this.ctx.createGain(); dry.gain.value=1; this.filter.connect(dry).connect(this.comp);
-      this.rev=this.ctx.createConvolver(); this.rev.buffer=makeIR(this.ctx); this.revGain=this.ctx.createGain(); this.revGain.gain.value=0.25; this.filter.connect(this.rev); this.rev.connect(this.revGain).connect(this.comp);
-      this.del=this.ctx.createDelay(1.0); this.del.delayTime.value=0.25; this.fb=this.ctx.createGain(); this.fb.gain.value=0.28; this.delGain=this.ctx.createGain(); this.delGain.gain.value=0.12; this.filter.connect(this.del); this.del.connect(this.fb).connect(this.del); this.del.connect(this.delGain).connect(this.comp);
-      this.ctx.onstatechange=diag;
+      const ctx=this.ctx; this.comp=ctx.createDynamicsCompressor(); this.comp.threshold.value=-16; this.comp.ratio.value=3; this.comp.attack.value=0.003; this.comp.release.value=0.25;
+      this.master=ctx.createGain(); this.master.gain.value=dB(this.volume); this.comp.connect(this.master).connect(ctx.destination);
+      this.filter=ctx.createBiquadFilter(); this.filter.type='lowpass'; this.filter.frequency.value=this.cutoff; this.filter.Q.value=this.q;
+      const dry=ctx.createGain(); dry.gain.value=1; this.filter.connect(dry).connect(this.comp);
+      this.rev=ctx.createConvolver(); this.rev.buffer=makeIR(ctx); this.revGain=ctx.createGain(); this.revGain.gain.value=0.25; this.filter.connect(this.rev); this.rev.connect(this.revGain).connect(this.comp);
+      this.del=ctx.createDelay(1.0); this.del.delayTime.value=0.25; this.fb=ctx.createGain(); this.fb.gain.value=0.28; this.delGain=ctx.createGain(); this.delGain.gain.value=0.12; this.filter.connect(this.del); this.del.connect(this.fb).connect(this.del); this.del.connect(this.delGain).connect(this.comp);
+      ctx.onstatechange=()=>diag();
     },
-    async start(){ this.init(); await this.ctx.resume(); if(this.ctx.state!=='running'){await this.ctx.resume()} return this.ctx.state==='running' },
+    async start(){ this.init(); try{ await this.ctx.resume(); if(this.ctx.state!=='running'){await this.ctx.resume()} return this.ctx.state==='running' }catch(e){window.__lastErr=e.message; diag(); throw e}},
     setEnv(a,d,s,r){Object.assign(this.env,{a:a/1000,d:d/1000,s,r:r/1000});}, setCutoff(v){this.cutoff=v; if(this.filter) this.filter.frequency.value=v}, setQ(v){this.q=v; if(this.filter) this.filter.Q.value=v}, setVolume(db){this.volume=db; if(this.master) this.master.gain.value=dB(db)}, setReverb(w){if(this.revGain) this.revGain.gain.value=w}, setDelay(w){if(this.delGain) this.delGain.gain.value=w}, setBendRange(c){this.bendRange=c}, setModDepth(x){this.modDepth=x}, setSustain(on){this.sustain=on; if(!on){ for(const m of Array.from(this.sustained)){ this._releaseNow(m) } this.sustained.clear() } }, setPreset(p){this.preset=p},
     _voiceFor(midi,vel){const ctx=this.ctx,t=now(ctx); const g=ctx.createGain(); g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(Math.max(0.1,vel), t+this.env.a); g.gain.linearRampToValueAtTime(Math.max(0.001,this.env.s), t+this.env.a+this.env.d);
       const osc=ctx.createOscillator(); let type='sine'; if(this.preset==='saw'||this.preset==='pad') type='sawtooth'; else if(this.preset==='square'||this.preset==='bass') type='square'; else if(this.preset==='piano') type='triangle'; osc.type=type; osc.frequency.value=midiToFreq(midi); osc.detune.value=this.bend; const lfo=ctx.createOscillator(); lfo.frequency.value=5; const lfoGain=ctx.createGain(); lfoGain.gain.value=this.modDepth*50; lfo.connect(lfoGain).connect(osc.detune); lfo.start(); osc.connect(g).connect(this.filter); osc.start(); return {osc,g,lfo,lfoGain} },
@@ -176,37 +180,36 @@ button:hover{background:var(--p2);cursor:pointer}.pill{border-radius:999px}
     releaseAll(){ for(const m of Array.from(this.voices.keys())) this._releaseNow(m) },
     bendTo(cents){ this.bend=cents; for(const v of this.voices.values()){ try{v.osc.detune.value=cents}catch(_){ } } },
     _drum(midi,vel){const ctx=this.ctx; const t=now(ctx); const mkNoise=(dur)=>{const len=ctx.sampleRate*dur,buf=ctx.createBuffer(1,len,ctx.sampleRate),ch=buf.getChannelData(0);for(let i=0;i<len;i++){ch[i]=(Math.random()*2-1)}const src=ctx.createBufferSource();src.buffer=buf;return src}; const out=this.comp; if(midi===36){const o=ctx.createOscillator(), g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(40,t+0.12); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.9*vel,t+0.005); g.gain.exponentialRampToValueAtTime(0.0001,t+0.25); o.connect(g).connect(out); o.start(t); o.stop(t+0.3)} else if(midi===38){const n=mkNoise(0.2); const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; const g=ctx.createGain(); g.gain.value=0.5*vel; n.connect(bp).connect(g).connect(out); n.start(t); n.stop(t+0.2)} else if(midi===42||midi===46){const n=mkNoise(midi===42?0.06:0.25); const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=6000; const g=ctx.createGain(); g.gain.value=(midi===42?0.35:0.3)*vel; n.connect(hp).connect(g).connect(out); n.start(t); n.stop(t+(midi===42?0.06:0.28))} else if(midi===39){const n=mkNoise(0.12); const g=ctx.createGain(); g.gain.value=0.5*vel; n.connect(g).connect(out); n.start(t); n.stop(t+0.12)} },
-    test(){ this.init(); const o=this.ctx.createOscillator(), g=this.ctx.createGain(); g.gain.value=0.12; o.frequency.value=880; o.connect(g).connect(this.ctx.destination); o.start(); setTimeout(()=>{try{o.stop()}catch(_){ }},150) }
+    test(){ this.init(); const o=this.ctx.createOscillator(), g=this.ctx.createGain(); g.gain.value=0.12; o.frequency.value=880; o.connect(g).connect(this.ctx.destination); o.start(); setTimeout(()=>{try{o.stop()}catch(_){ }},160) }
   };
 
-  // --- State
-  const state={midi:null,input:null,ch:1,transpose:0,octave:0,held:new Set(), base:60, bendRange:200};
+  // --- State ---
+  const state={midi:null,input:null,ch:1,transpose:0,octave:0,held:new Set(), base:60};
 
-  // --- UI build: keys
+  // --- Build keys ---
   const kb=$('#kb'); function buildKeys(){ kb.innerHTML=''; const W=[0,2,4,5,7,9,11], B={1:1,3:1,6:1,8:1,10:1}; for(let i=0;i<25;i++){ const n=state.base+i, s=n%12; if(W.includes(s)){ const w=document.createElement('div'); w.className='white'; w.dataset.midi=n; kb.appendChild(w); const next=(s+1)%12; if(B[next]){ const b=document.createElement('div'); b.className='black'; b.dataset.midi=n+1; w.appendChild(b);} } } }
   buildKeys();
   function midiVisible(m){return m>=state.base-1&&m<state.base+32} function keyEl(m){return kb.querySelector(`[data-midi="${m}"]`)} function flashKey(m,on){if(!midiVisible(m))return; const el=keyEl(m); if(!el)return; el.classList.toggle('active',!!on)}
+  kb.addEventListener('mousedown', async e=>{const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); const m=+t.dataset.midi; playOn(m,110); const up=()=>{playOff(m); window.removeEventListener('mouseup',up)}; window.addEventListener('mouseup',up)});
+  kb.addEventListener('touchstart', async e=>{const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); playOn(+t.dataset.midi,110)},{passive:true});
+  kb.addEventListener('touchend', e=>{const t=e.target.closest('[data-midi]'); if(!t) return; playOff(+t.dataset.midi)});
 
-  kb.addEventListener('mousedown',async e=>{const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); const m=+t.dataset.midi; playOn(m,110); const up=()=>{playOff(m); window.removeEventListener('mouseup',up)}; window.addEventListener('mouseup',up)});
-  kb.addEventListener('touchstart',async e=>{const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); playOn(+t.dataset.midi,110)},{passive:true});
-  kb.addEventListener('touchend',e=>{const t=e.target.closest('[data-midi]'); if(!t) return; playOff(+t.dataset.midi)});
-
-  // --- Computer keys
+  // --- Computer keys ---
   const keyW='asdfghjkl;'.split(''), keyB='wetyuop'.split(''), offW=[0,2,4,5,7,9,11,12,14,16], offB=[1,3,6,8,10,13,15];
-  window.addEventListener('keydown',async e=>{if(e.repeat) return; const k=e.key.toLowerCase(); const iw=keyW.indexOf(k), ib=keyB.indexOf(k); let m=null; if(iw>-1)m=state.base+offW[iw]; else if(ib>-1)m=state.base+offB[ib]; if(m!=null){await Eng.start(); playOn(m,110)}});
-  window.addEventListener('keyup',e=>{const k=e.key.toLowerCase(); const iw=keyW.indexOf(k), ib=keyB.indexOf(k); let m=null; if(iw>-1)m=state.base+offW[iw]; else if(ib>-1)m=state.base+offB[ib]; if(m!=null)playOff(m)});
+  window.addEventListener('keydown', async e=>{if(e.repeat) return; const k=e.key.toLowerCase(); const iw=keyW.indexOf(k), ib=keyB.indexOf(k); let m=null; if(iw>-1)m=state.base+offW[iw]; else if(ib>-1)m=state.base+offB[ib]; if(m!=null){await Eng.start(); playOn(m,110)}});
+  window.addEventListener('keyup', e=>{const k=e.key.toLowerCase(); const iw=keyW.indexOf(k), ib=keyB.indexOf(k); let m=null; if(iw>-1)m=state.base+offW[iw]; else if(ib>-1)m=state.base+offB[ib]; if(m!=null) playOff(m)});
 
-  // --- Notes
+  // --- Notes ---
   function eff(m){return m+state.transpose+state.octave*12}
   function playOn(m,vel=100){ const mv=eff(m); if($('#preset').value==='drum'){Eng.setPreset('drum'); Eng.noteOn(mv,vel/127); flashKey(mv,true); lcd('PAD',`m${mv} v${vel}`); return} Eng.setPreset($('#preset').value); Eng.noteOn(mv,vel/127); state.held.add(mv); flashKey(mv,true); lcd('NOTE',`m${mv} v${vel}`) }
   function playOff(m){ const mv=eff(m); if(!state.held.has(mv)){flashKey(mv,false); return} if(Eng.sustain){flashKey(mv,false); return} Eng.noteOff(mv); state.held.delete(mv); flashKey(mv,false) }
   function allOff(){ Eng.releaseAll(); state.held.clear(); $$('.white,.black,.pad').forEach(el=>el.classList.remove('active')) }
 
-  // --- Pads (click to audition)
+  // --- Pads ---
   const padLayout=[{m:36,n:'Kick'},{m:38,n:'Snare'},{m:42,n:'CH'},{m:46,n:'OH'},{m:39,n:'Clap'},{m:41,n:'LT'},{m:43,n:'HT'},{m:49,n:'Crash'}];
   const pads=$('#pads'); pads.innerHTML=''; padLayout.forEach((p,i)=>{const d=document.createElement('div'); d.className='pad'; d.innerHTML=`<small>${p.n}</small>`; d.addEventListener('mousedown',async()=>{await Eng.start(); Eng.setPreset('drum'); Eng.noteOn(p.m,0.9); d.classList.add('active'); setTimeout(()=>d.classList.remove('active'),120)}); pads.appendChild(d)});
 
-  // --- Params → engine
+  // --- Params → engine ---
   function hook(id,fmt,on){const el=$('#'+id), lab=$('#'+id+'Val'); const apply=()=>{const v=+el.value; lab.textContent=fmt(v); on(v)}; el.addEventListener('input',apply); apply()}
   hook('volume',v=>`${v}dB`,v=>Eng.setVolume(v));
   hook('attack',fmtMs,v=>Eng.setEnv(v,+$('#decay').value,+$('#sustain').value,+$('#release').value));
@@ -221,35 +224,44 @@ button:hover{background:var(--p2);cursor:pointer}.pill{border-radius:999px}
   $('#preset').addEventListener('change',()=>Eng.setPreset($('#preset').value));
   $('#panic').addEventListener('click',allOff);
 
-  // --- Transpose / Octave
+  // --- Transpose / Octave ---
   function updLCD(){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>Tr ${state.transpose} / Oct ${state.octave}` }
   $('#tDown').addEventListener('click',()=>{state.transpose=clamp(state.transpose-1,-6,6); updLCD()});
   $('#tUp').addEventListener('click',()=>{state.transpose=clamp(state.transpose+1,-6,6); updLCD()});
   $('#oDown').addEventListener('click',()=>{state.octave=clamp(state.octave-1,-3,3); updLCD()});
   $('#oUp').addEventListener('click',()=>{state.octave=clamp(state.octave+1,-3,3); updLCD()});
 
-  // --- Base note picker
+  // --- Base note picker ---
   const baseSel=$('#baseNote'); for(let m=36;m<=72;m++){const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m}`; baseSel.appendChild(o)} baseSel.value=String(state.base); baseSel.addEventListener('change',()=>{state.base=parseInt(baseSel.value,10); buildKeys()});
 
-  // --- MIDI
+  // --- MIDI ---
   const midiSel=$('#midiIn'); let inputs=[];
-  function refreshInputs(){ midiSel.innerHTML=''; inputs=[]; if(!state.midi) return; for(const input of state.midi.inputs.values()){ inputs.push(input); const o=document.createElement('option'); o.value=input.id; o.textContent=input.name; midiSel.appendChild(o) } if(inputs.length){ const ax=inputs.find(i=>/axiom/i.test(i.name))||inputs[0]; setInput(ax); midiSel.value=ax.id } }
+  function refreshInputs(){ midiSel.innerHTML=''; inputs=[]; if(!state.midi) return; for(const input of state.midi.inputs.values()){ inputs.push(input); const o=document.createElement('option'); o.value=input.id; o.textContent=input.name; midiSel.appendChild(o) } if(inputs.length){ const ax=inputs.find(i=>/axiom/i.test(i.name))||inputs[0]; setInput(ax); midiSel.value=ax.id } diag({MIDIInputs:inputs.length}) }
   function setInput(input){ if(state.input) state.input.onmidimessage=null; state.input=input; input.onmidimessage=onMsg; say(`Connected to <b>${input.name}</b>.`,'ok') }
-  function onMsg(ev){ const [s,d1,d2]=ev.data, cmd=s&0xF0, ch=(s&0x0F)+1; state.ch=ch; log(`0x${s.toString(16)} ch${ch} d1=${d1} d2=${d2}`); if(cmd===0x90&&d2>0){ playOn(d1,d2); return } if((cmd===0x90&&d2===0)||cmd===0x80){ playOff(d1); return } if(cmd===0xE0){ const bend=((d2<<7)|d1)-8192; const cents=(bend/8192)*Eng.bendRange; Eng.bendTo(cents); return } if(cmd===0xB0){ handleCC(d1,d2); return } }
-  function handleCC(cc,val){ if(cc===64){ Eng.setSustain(val>=64); lcd('Sustain',val>=64?'On':'Off'); return } if(cc===1){ Eng.setModDepth(val/127); lcd('Mod',val); return } // Axiom knobs K1..K8 usually CC16..23
+  function onMsg(ev){ const [s,d1,d2]=ev.data, cmd=s&0xF0, ch=(s&0x0F)+1; state.ch=ch; log(`0x${s.toString(16)} ch${ch} d1=${d1} d2=${d2}`);
+    if(cmd===0x90&&d2>0){ playOn(d1,d2); return }
+    if((cmd===0x90&&d2===0)||cmd===0x80){ playOff(d1); return }
+    if(cmd===0xE0){ const bend=((d2<<7)|d1)-8192; const cents=(bend/8192)*Eng.bendRange; Eng.bendTo(cents); return }
+    if(cmd===0xB0){ handleCC(d1,d2); return }
+  }
+  function handleCC(cc,val){ // Axiom classics
+    if(cc===64){ Eng.setSustain(val>=64); lcd('Sustain',val>=64?'On':'Off'); return }
+    if(cc===1){ Eng.setModDepth(val/127); lcd('Mod',val); return }
     const x=val/127; switch(cc){ case 16: Eng.setCutoff(150+x*(12000-150)); $('#cutoff').value=Math.round(150+x*(12000-150)); $('#cutoffVal').textContent=fmtHz(+$('#cutoff').value); break; case 17: const q=0.2+x*(18-0.2); Eng.setQ(q); $('#q').value=q.toFixed(1); $('#qVal').textContent=$('#q').value; break; case 18: $('#attack').value=Math.round(x*2000); $('#attack').dispatchEvent(new Event('input')); break; case 19: $('#decay').value=Math.round(x*3000); $('#decay').dispatchEvent(new Event('input')); break; case 20: $('#sustain').value=x.toFixed(2); $('#sustain').dispatchEvent(new Event('input')); break; case 21: $('#release').value=Math.round(10+x*5990); $('#release').dispatchEvent(new Event('input')); break; case 22: $('#reverb').value=x.toFixed(2); $('#reverb').dispatchEvent(new Event('input')); break; case 23: $('#delay').value=x.toFixed(2); $('#delay').dispatchEvent(new Event('input')); break; default: /* ignore */ }
   }
 
-  // --- Buttons
+  // --- Buttons ---
   $('#startBtn').addEventListener('click', async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test(); } else { say('Audio context not running. Click again.','warn') } diag() } catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } });
   $('#testBtn').addEventListener('click', async()=>{ try{ await Eng.start(); Eng.test(); say('Test beep sent.','ok'); diag() } catch(e){ window.__lastErr=e.message; say('Test failed: '+e.message,'bad'); diag() } });
   $('#midiBtn').addEventListener('click', async()=>{ try{ if(!('requestMIDIAccess' in navigator)){ say('WebMIDI not supported (use Chrome/Edge).','bad'); return } const okHost=window.isSecureContext||['localhost','127.0.0.1','::1'].includes(location.hostname); if(!okHost){ say('WebMIDI needs HTTPS or localhost.','bad'); return } state.midi=await navigator.requestMIDIAccess({sysex:false}); state.midi.onstatechange=refreshInputs; refreshInputs(); if(!state.midi.inputs.size) say('No MIDI inputs detected. Plug your Axiom, then click Connect again.','warn'); else say('MIDI ready. Select device or play.','ok'); diag() } catch(e){ window.__lastErr=e.message; say('MIDI access failed: '+e.message,'bad'); diag() } });
+  $('#resetBtn').addEventListener('click',()=>{ try{ localStorage.clear(); location.reload() }catch(_){ location.reload() } });
 
   function lcd(a,b){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>${a}${b?' — '+b:''}` }
 
   // Init
   say('Ready. Click Start Audio → Test Tone → Connect MIDI.','ok');
   diag();
+  window.addEventListener('error',e=>{window.__lastErr=e.message; diag()});
 })();
 </script>
 </body>
