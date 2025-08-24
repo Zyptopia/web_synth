@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Axiom 25 — Web MIDI (CSP‑safe)</title>
 <!-- Strict CSP: NO inline JS. All JS must be in app.js on same origin. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https:;" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Share+Tech+Mono&display=swap">
 <style>
@@ -49,6 +48,8 @@ html[data-js-ready="1"] .nojs{display:none}
 </style>
 </head>
 <body>
+<script>document.body.insertAdjacentText('afterbegin','JS IS RUNNING ✅');</script>
+
 <div class="wrap">
 <div class="top">
 <div class="title">Axiom 25 — Web MIDI (CSP‑safe)</div>
