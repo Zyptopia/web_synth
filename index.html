@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Axiom 25 — WebMIDI (v17)</title>
+  <title>Axiom 25 — WebMIDI (v18)</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
@@ -79,6 +78,43 @@
       <div>
         <h3 style="margin:0 0 8px">MIDI Monitor</h3>
         <div id="log" class="log"></div>
+      </div>
+    </div>
+
+    <div class="card twoCols">
+      <div>
+        <h3 style="margin:0 0 8px">Mappings</h3>
+        <div id="mapUI">
+          <div class="mapSection">
+            <div class="mapTitle">Knob / CC → Parameter</div>
+            <table class="mapTable" id="ccTable"></table>
+            <div class="mapActions">
+              <button id="ccLearnBtn" class="pill">🎯 Learn CC…</button>
+              <select id="ccLearnParam"></select>
+              <button id="ccReset" title="Reset to Axiom K1..K8 (16..23)">↺ Defaults</button>
+            </div>
+          </div>
+          <div class="mapSection">
+            <div class="mapTitle">Pad → Drum Note</div>
+            <table class="mapTable" id="padTable"></table>
+            <div class="mapActions">
+              <button id="padLearnBtn" class="pill">🥁 Learn Pad…</button>
+              <select id="padIndex"></select>
+              <button id="padReset">↺ Defaults</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin:0 0 8px">Config</h3>
+        <div style="display:grid; gap:8px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="exportBtn">Export</button>
+            <button id="importBtn">Import…</button>
+            <button id="clearBtn">Clear LocalStorage</button>
+          </div>
+          <textarea id="pastebox" class="log" style="height:180px" placeholder="JSON export/import appears here…"></textarea>
+        </div>
       </div>
     </div>
   </div>
