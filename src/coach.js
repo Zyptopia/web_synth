@@ -154,7 +154,6 @@ applyHints(root){
 
   if (!this.chordHints || root == null) return;
 
-  // compare by pitch class
   const isMinor = (this.scaleType.includes('minor') || this.scaleType === 'dorian');
   const rootPC  =  root % 12;
   const thirdPC = (root + (isMinor ? 3 : 4)) % 12;
@@ -162,11 +161,10 @@ applyHints(root){
 
   for (const el of kb.querySelectorAll('[data-midi]')) {
     const pc = (+el.dataset.midi) % 12;
-    if (pc === rootPC || pc === thirdPC || pc === fifthPC) {
-      el.classList.add('hint');
-    }
+    if (pc === rootPC || pc === thirdPC || pc === fifthPC) el.classList.add('hint');
   }
 }
+
 
   // -------- Velocity curve ---------
   shapeVel(vel){ const x=vel/127; if(this.velCurve==='soft') return Math.round(127*Math.pow(x,0.7)); if(this.velCurve==='hard') return Math.round(127*Math.pow(x,1.7)); return vel }

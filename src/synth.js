@@ -1,5 +1,6 @@
 // SynthEngine — keyboard + drum engine
-// v8: SAFE setters before audio start, reapply-on-build, keys/drums submix, fixed drum routing
+// v8.1: SAFE setters, reapply-on-build, keys/drums submix, fixed drum routing,
+//       correct per-note pitch, cleaned syntax
 
 export class SynthEngine{
   constructor(){
@@ -100,22 +101,43 @@ export class SynthEngine{
   test(){ if(!this.ctx) return; const ctx=this.ctx; const o=ctx.createOscillator(); const g=ctx.createGain(); o.type='sine'; o.frequency.value=880; g.gain.value=0.1; o.connect(g).connect(this.master); o.start(); o.stop(ctx.currentTime+0.15) }
 
   // ---- Synth voices ----
-  noteOn(midi, v=0.8){ if(!this.ctx) return; const ctx=this.ctx; const t=ctx.currentTime; const f=440*Math.pow(2,(midi-69)/12); const o=ctx.createOscillator(); o.type='sawtooth'; const lfo=ctx.createOscillator(); lfo.type='sine'; lfo.frequency.value=5; const lfg=ctx.createGain(); lfg.gain.value=0.002*f; lfo.connect(lfg).connect(o.frequency);
+  noteOn(midi, v=0.8){
+    if(!this.ctx) return;
+    const ctx=this.ctx; const t=ctx.currentTime; const f=440*Math.pow(2,(midi-69)/12);
+    const o=ctx.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(f, t); // per-note base pitch
+
+    const lfo=ctx.createOscillator(); lfo.type='sine'; lfo.frequency.value=5;
+    const lfg=ctx.createGain(); lfg.gain.value=0.002*f; lfo.connect(lfg).connect(o.frequency);
+
     const g=ctx.createGain(); g.gain.setValueAtTime(0, t); // ADSR
     g.gain.linearRampToValueAtTime(0.8*v, t+this.env.a);
     g.gain.linearRampToValueAtTime(this.env.s*0.8*v, t+this.env.a+this.env.d);
+
     o.connect(g).connect(this.filter);
     o.start(t); lfo.start(t);
     this.keyVoices.set(midi,{o,g,lfo});
   }
-  noteOff(midi){ if(!this.ctx) return; const v=this.keyVoices.get(midi); if(!v) return; const t=this.ctx.currentTime; v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(v.g.gain.value, t); v.g.gain.exponentialRampToValueAtTime(0.0001, t+this.env.r); v.o.stop(t+this.env.r+0.02); v.lfo?.stop(t+this.env.r+0.02); this.keyVoices.delete(midi); }
+
+  noteOff(midi){
+    if(!this.ctx) return;
+    const v=this.keyVoices.get(midi); if(!v) return; const t=this.ctx.currentTime;
+    v.g.gain.cancelScheduledValues(t);
+    v.g.gain.setValueAtTime(v.g.gain.value, t);
+    v.g.gain.exponentialRampToValueAtTime(0.0001, t+this.env.r);
+    v.o.stop(t+this.env.r+0.02);
+    if(v.lfo) v.lfo.stop(t+this.env.r+0.02);
+    this.keyVoices.delete(midi);
+  }
+
   releaseAll(){ for(const [m] of [...this.keyVoices]){ this.noteOff(m) } }
   bendTo(cents){ /* placeholder: vibrato already present */ }
   setSustain(on){ this.sustain=on }
 
   // ---- Drums ----
   setDrumKit(id){ if(this.kits?.[id]) this.currentKit=id }
-  triggerDrum(midi, vel01=0.9, padGain=1){ if(!this.ctx) return; const ctx=this.ctx; const v=Math.max(0.01, Math.min(1, vel01))*padGain; const now=()=>ctx.currentTime; const out=this.drumGain; const P=this.kits[this.currentKit];
+  triggerDrum(midi, vel01=0.9, padGain=1){
+    if(!this.ctx) return; const ctx=this.ctx; const v=Math.max(0.01, Math.min(1, vel01))*padGain; const now=()=>ctx.currentTime; const out=this.drumGain; const P=this.kits[this.currentKit];
     const hitGain=ctx.createGain(); hitGain.gain.value=0.9*v; hitGain.connect(out);
     const send=ctx.createGain(); send.gain.value=0.18*v; hitGain.connect(send).connect(this.rev);
 
@@ -148,7 +170,7 @@ export class SynthEngine{
   setPreset(id,p){ this.presetId=id; /* hook for preset system */ }
 
   // ---- small IR
-  makeSmallIR(ctx){ if(!ctx) return null; const len=ctx.sampleRate*1.2|0; const buf=ctx.createBuffer(2,len,ctx.sampleRate); for(let ch=0;ch<2;ch++){ const d=buf.getChannelData(ch); for(let i=0;i<len;i++){ const t=i/ctx.sampleRate; d[i]=(Math.random()*2-1)*Math.pow(1-t/1.2,3)*0.4 } } return buf }
+  makeSmallIR(ctx){ if(!ctx) return null; const len=(ctx.sampleRate*1.2)|0; const buf=ctx.createBuffer(2,len,ctx.sampleRate); for(let ch=0;ch<2;ch++){ const d=buf.getChannelData(ch); for(let i=0;i<len;i++){ const t=i/ctx.sampleRate; d[i]=(Math.random()*2-1)*Math.pow(1-t/1.2,3)*0.4 } } return buf }
 
   makeKits(){ return {
     standard:{ kick:80, snare:190, hatHP:8000, crash:4500, tomL:110, tomM:150, tomH:200 },
