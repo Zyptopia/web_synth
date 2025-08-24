@@ -13,7 +13,7 @@ function say(msg, tone=''){ const st=$('#status'); if(!st) return; st.className=
 
 // ---------------- UI Builders ----------------
 function buildKeyboard(state){
-  const kb=$('#kb'); kb.innerHTML='';
+  const kb=$('#kb'); if(!kb) return; kb.innerHTML='';
   const W=[0,2,4,5,7,9,11], B={1:1,3:1,6:1,8:1,10:1};
   for(let i=0;i<25;i++){
     const n=state.base+i, s=n%12; if(W.includes(s)){
@@ -25,11 +25,11 @@ function buildKeyboard(state){
 function flashKey(state,m,on){ const el=$(`#kb [data-midi="${m}"]`); if(!el) return; el.classList.toggle('active',!!on) }
 
 function buildPads(){
-  const root=$('#pads'); root.innerHTML='';
+  const root=$('#pads'); if(!root) return; root.innerHTML='';
   for(let i=0;i<8;i++){
     const d=document.createElement('div'); d.className='pad';
     d.innerHTML=`<small>Pad ${i+1}</small><button class="mapBtn" title="Map this pad">●</button>`;
-    d.onmousedown = async (e)=>{ if(e.target.classList.contains('mapBtn')) return; await handlePadHit(i, MapState.padNotes[i], 120); };
+    d.onmousedown=async(e)=>{ if(e.target.classList.contains('mapBtn')) return; await handlePadHit(i, MapState.padNotes[i], 120); };
     d.querySelector('.mapBtn').onclick=(e)=>{ e.stopPropagation(); startPadLearn(i, d.querySelector('.mapBtn')) };
     root.appendChild(d);
   }
@@ -79,7 +79,7 @@ const Eng = new SynthEngine();
 const MIDI = new MidiManager();
 window.Eng=Eng;
 
-// Coach (metronome, arp, scale, velocity)
+// Coach (metronome, arp, scale, velocity, composer)
 let COACH;
 
 const state={ base:60, held:new Set(), transpose:0, octave:0, ch:1, padMode:'drum', drumKit:'standard' };
@@ -94,27 +94,14 @@ function playOff(m){ if(window.COACH) window.COACH.noteOff(m); else rawNoteOff(m
 
 function allOff(){ Eng.releaseAll(); state.held.clear(); document.querySelectorAll('.white,.black,.pad').forEach(el=>el.classList.remove('active')) }
 
-async function handlePadHit(idx, midi, vel){
-  await Eng.start();           // important
-  if(state.padMode==='off') return;
-  const gain = (MapState.padGain?.[idx] ?? 1);
-  flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120);
-  if(state.padMode==='drum'){
-    Eng.setDrumKit(state.drumKit);
-    Eng.triggerDrum(midi, (vel||110)/127, gain);
-  } else {
-    playOn(midi, Math.round((vel||110)*gain));
-  }
-}
-
-
+async function handlePadHit(idx, midi, vel){ await Eng.start(); if(state.padMode==='off') return; const gain=(MapState.padGain?.[idx]??1); flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120); if(state.padMode==='drum'){ Eng.setDrumKit(state.drumKit); Eng.triggerDrum(midi, (vel||110)/127, gain); } else if(state.padMode==='instrument'){ playOn(midi, Math.round((vel||110)*gain)); } }
 
 function lcd(a,b){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>${a||''}${b?' — '+b:''}` }
 
 // ---------------- Controls ----------------
 function hookSlider(param,fmt,on){
-  const el=$('#'+param), lab=$('#'+param+'Val');
-  const apply=()=>{ const v=+el.value; lab.textContent=fmt(v); const r=PARAM_RANGES[param]; const x=(v-r.min)/(r.max-r.min); MapState.setParamNorm(param,x); on(v); updateInlineBadges(); };
+  const el=$('#'+param), lab=$('#'+param+'Val'); if(!el||!lab) return;
+  const apply=()=>{ const v=+el.value; lab.textContent=fmt(v); const r=PARAM_RANGES[param]; if(r){ const x=(v-r.min)/(r.max-r.min); MapState.setParamNorm(param,x); } on(v); updateInlineBadges(); };
   el.addEventListener('input',apply); apply();
 }
 
@@ -150,7 +137,7 @@ function bindMIDI(){
     if(ccLearnParam){ MapState.setCC(ccLearnParam, cc); renderCCTable(); saveAll(); say(`Mapped CC${cc} → ${ccLearnParam}`,'ok'); endLearns(); return }
     MapState.markCCMode(cc,val);
     if(cc===64){ Eng.setSustain(val>=64); lcd('Sustain',val>=64?'On':'Off'); return }
-    if(cc===1){ if(!MapState.paramByCC(1) && !MapState.paramByCC(cc)) Eng.setModDepth(val/127); }
+    if(cc===1){ if(!MapState.paramByCC(1) && !MapState.paramByCC(cc)) Eng.setModDepth?.(val/127); }
     const target = MapState.paramByCC(cc); if(!target){ return }
     const mode = MapState.ccMode[cc]||'absolute';
     if(mode==='absolute'){ setParamByNorm(target, val/127); }
@@ -193,14 +180,16 @@ function bindConfig(){
   $('#clearBtn').onclick=()=>{ localStorage.removeItem('axiom.map.v2'); loadAll(); renderCCTable(); renderPadTable(); updateInlineBadges(); updatePadModeUI(); say('Local settings cleared.','ok') };
 }
 
-function updatePadModeUI(){ $('#padMode').value=state.padMode; $('#drumKit').value=state.drumKit; $('#drumKitRow').style.display = (state.padMode==='drum')?'grid':'none'; $('#padModeVal').textContent=state.padMode; $('#drumKitVal').textContent=state.drumKit; }
+function updatePadModeUI(){ $('#padMode').value=state.padMode; $('#drumKit').value=state.drumKit; const r=$('#drumKitRow'); if(r) r.style.display = (state.padMode==='drum')?'grid':'none'; $('#padModeVal').textContent=state.padMode; $('#drumKitVal').textContent=state.drumKit; }
 
 function ensureDrumKitOptions(){ const dk=$('#drumKit'); if(!dk) return; const want=['standard','808','electro','room','trap','lofi','cr78','dnb']; const labels={standard:'Standard','808':'808',electro:'Electro',room:'Roomy',trap:'Trap',lofi:'Lo‑Fi',cr78:'CR‑78',dnb:'DnB'}; const have=new Set([...dk.options].map(o=>o.value)); for(const id of want){ if(!have.has(id)){ const o=document.createElement('option'); o.value=id; o.textContent=labels[id]; dk.appendChild(o) } } }
 
+function addKeysVolUI(){ const m=$('#volume'); if(!m) return; if($('#keysVol')) return; const row=m.closest('.control')||m.parentElement; const dv=document.createElement('div'); dv.className='control'; dv.innerHTML=`<label>Keys Volume</label><input type="range" id="keysVol" min="0" max="1" step="0.01" value="1"><span id="keysVolVal">100%</span>`; row.after(dv); const el=$('#keysVol'), lab=$('#keysVolVal'); const apply=()=>{ const v=parseFloat(el.value)||0; lab.textContent=Math.round(v*100)+'%'; Eng.setKeysVolume(v); }; el.addEventListener('input',apply); apply(); }
+
 function bindUI(){
-  $('#startBtn').onclick = async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test() } else say('Audio context not running. Click again.','warn'); diag(); ensurePresets(); }catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } };
-  $('#testBtn').onclick = async()=>{ try{ await Eng.start(); Eng.test(); say('Test beep sent.','ok'); diag(); ensurePresets(); }catch(e){ window.__lastErr=e.message; say('Test failed: '+e.message,'bad'); diag() } };
-  $('#midiBtn').onclick = async()=>{ try{ const {list,selected} = await MIDI.connect(); const sel=$('#midiIn'); sel.innerHTML=''; for(const i of list){ const o=document.createElement('option'); o.value=i.id; o.textContent=i.name; sel.appendChild(o) } if(selected) sel.value=selected.id; say(selected?`Connected to <b>${selected.name}</b>.`:'MIDI ready. Select device.','ok'); diag({MIDIInputs:list.length}); ensurePresets(); }catch(e){ window.__lastErr=e.message; say(e.message,'bad'); diag() } };
+  $('#startBtn').onclick = async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test() } else say('Audio context not running. Click again.','warn'); diag(); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } };
+  $('#testBtn').onclick = async()=>{ try{ await Eng.start(); Eng.test(); say('Test beep sent.','ok'); diag(); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say('Test failed: '+e.message,'bad'); diag() } };
+  $('#midiBtn').onclick = async()=>{ try{ const {list,selected} = await MIDI.connect(); const sel=$('#midiIn'); if(sel){ sel.innerHTML=''; for(const i of list){ const o=document.createElement('option'); o.value=i.id; o.textContent=i.name; sel.appendChild(o) } if(selected) sel.value=selected.id; } say(selected?`Connected to <b>${selected.name}</b>.`:'MIDI ready. Select device.','ok'); diag({MIDIInputs:list.length}); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say(e.message,'bad'); diag() } };
   $('#resetBtn').onclick = ()=>{ location.reload() };
 
   // LCD utilities
@@ -211,7 +200,7 @@ function bindUI(){
   const updLCD=()=>{ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>Tr ${state.transpose} / Oct ${state.octave}` };
 
   // Base note selector
-  const baseSel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m}`; baseSel.appendChild(o) } baseSel.value=String(state.base); baseSel.onchange=()=>{ state.base=parseInt(baseSel.value,10); buildKeyboard(state); if(window.COACH) window.COACH.updateScale(); };
+  const baseSel=$('#baseNote'); if(baseSel){ for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m}`; baseSel.appendChild(o) } baseSel.value=String(state.base); baseSel.onchange=()=>{ state.base=parseInt(baseSel.value,10); buildKeyboard(state); if(window.COACH) window.COACH.updateScale(); }; }
 
   // Sliders → engine
   hookSlider('volume',v=>`${v}dB`,v=>Eng.setVolume(v));
@@ -225,30 +214,33 @@ function bindUI(){
   hookSlider('delay',v=>Number(v).toFixed(2),v=>Eng.setDelay(Number(v)));
   hookSlider('bendRange',v=>String(v),v=>Eng.setBendRange(Number(v)));
 
+  // Add Keys Volume UI next to master
+  addKeysVolUI();
+
   // Presets
   loadPresets();
 
   // Pad mode + kit
   ensureDrumKitOptions();
-  $('#padMode').onchange=()=>{ state.padMode=$('#padMode').value; updatePadModeUI(); saveAll(); };
-  $('#drumKit').onchange=()=>{ state.drumKit=$('#drumKit').value; Eng.setDrumKit(state.drumKit); updatePadModeUI(); saveAll(); say('Drum kit: '+state.drumKit,'ok') };
+  const pm=$('#padMode'); if(pm) pm.onchange=()=>{ state.padMode=$('#padMode').value; updatePadModeUI(); saveAll(); };
+  const dk=$('#drumKit'); if(dk) dk.onchange=()=>{ state.drumKit=$('#drumKit').value; Eng.setDrumKit(state.drumKit); updatePadModeUI(); saveAll(); say('Drum kit: '+state.drumKit,'ok') };
 
   // Panic
   $('#panic').onclick=()=>{ allOff(); say('All notes off','warn') };
 
   // CC quick learn UI
-  const ccSel=$('#ccLearnParam'); ccSel.innerHTML = MapState.ccParams().map(p=>`<option value="${p}">${p}</option>`).join('');
-  $('#ccLearnBtn').onclick=()=>{ startCCLearn(ccSel.value, $('#ccLearnBtn')); };
-  $('#ccReset').onclick=()=>{ MapState.resetCCs(); renderCCTable(); updateInlineBadges(); saveAll(); say('CC map reset to Axiom defaults (K1..K8 → CC16..23).','ok'); };
+  const ccSel=$('#ccLearnParam'); if(ccSel){ ccSel.innerHTML = MapState.ccParams().map(p=>`<option value="${p}">${p}</option>`).join(''); }
+  if($('#ccLearnBtn')) $('#ccLearnBtn').onclick=()=>{ startCCLearn(ccSel.value, $('#ccLearnBtn')); };
+  if($('#ccReset')) $('#ccReset').onclick=()=>{ MapState.resetCCs(); renderCCTable(); updateInlineBadges(); saveAll(); say('CC map reset to Axiom defaults (K1..K8 → CC16..23).','ok'); };
 
   // Pad quick learn UI
-  const pSel=$('#padIndex'); pSel.innerHTML=Array.from({length:8},(_,i)=>`<option value="${i}">Pad ${i+1}</option>`).join(''); pSel.value='0';
-  $('#padLearnBtn').onclick=()=>{ startPadLearn(parseInt(pSel.value,10), $('#padLearnBtn')); };
-  $('#padReset').onclick=()=>{ MapState.resetPads(); MapState.resetPadGain(); renderPadTable(); updateInlineBadges(); saveAll(); say('Pads reset to 40,41,42,43,36,37,38,39 with 100% volume.','ok'); };
+  const pSel=$('#padIndex'); if(pSel){ pSel.innerHTML=Array.from({length:8},(_,i)=>`<option value="${i}">Pad ${i+1}</option>`).join(''); pSel.value='0'; }
+  if($('#padLearnBtn')) $('#padLearnBtn').onclick=()=>{ startPadLearn(parseInt(pSel.value,10), $('#padLearnBtn')); };
+  if($('#padReset')) $('#padReset').onclick=()=>{ MapState.resetPads(); MapState.resetPadGain(); renderPadTable(); updateInlineBadges(); saveAll(); say('Pads reset to 40,41,42,43,36,37,38,39 with 100% volume.','ok'); };
 }
 
 function bindKeyMouse(){
-  const kb=$('#kb');
+  const kb=$('#kb'); if(!kb) return;
   kb.addEventListener('mousedown', async e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); const m=+t.dataset.midi; playOn(m,110); const up=()=>{ playOff(m); window.removeEventListener('mouseup',up) }; window.addEventListener('mouseup',up) });
   kb.addEventListener('touchstart', async e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); playOn(+t.dataset.midi,110) },{passive:true});
   kb.addEventListener('touchend', e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; playOff(+t.dataset.midi) });
