@@ -95,17 +95,18 @@ function playOff(m){ if(window.COACH) window.COACH.noteOff(m); else rawNoteOff(m
 function allOff(){ Eng.releaseAll(); state.held.clear(); document.querySelectorAll('.white,.black,.pad').forEach(el=>el.classList.remove('active')) }
 
 async function handlePadHit(idx, midi, vel){
-  await Eng.start();
+  await Eng.start();           // important
   if(state.padMode==='off') return;
-  const gain=(MapState.padGain?.[idx]??1);
+  const gain = (MapState.padGain?.[idx] ?? 1);
   flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120);
   if(state.padMode==='drum'){
     Eng.setDrumKit(state.drumKit);
     Eng.triggerDrum(midi, (vel||110)/127, gain);
-  } else if(state.padMode==='instrument'){
+  } else {
     playOn(midi, Math.round((vel||110)*gain));
   }
 }
+
 
 
 function lcd(a,b){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>${a||''}${b?' — '+b:''}` }

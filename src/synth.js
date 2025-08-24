@@ -83,27 +83,97 @@ export class SynthEngine{
     const P=KITS[kit]||KITS.standard;
 
     // One-shot out with optional small reverb send
-    const hitGain=ctx.createGain(); hitGain.gain.value=0.9*v; hitGain.connect(out);
-    const send = ctx.createGain();
-    end.gain.value = 0.18 * v;
-    hitGain.connect(send).connect(this.rev); // convolver already routes to revGain → comp in init() // share existing reverb bus
+const hitGain = ctx.createGain();
+hitGain.gain.value = 0.9 * v;
+hitGain.connect(out);
 
-    const kick=(base,dec,click)=>{ const o=ctx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(base,now(ctx)); o.frequency.exponentialRampToValueAtTime(Math.max(30,base*0.33), now(ctx)+0.12); const {g,t}=this._envGain(0.001, 0.05, 0.0001, dec, 1.2*v); o.connect(g.gain); g.gain.connect(hitGain); if(click>0){ const n=this._mkNoise(0.02), hp=ctx.createBiquadFilter(), cg=ctx.createGain(); hp.type='highpass'; hp.frequency.value=3000; cg.gain.value=0.15*v*click; n.connect(hp).connect(cg).connect(hitGain); n.start(t); n.stop(t+0.03) } o.start(); o.stop(now(ctx)+dec+0.05) };
+// light reverb send for drums
+const send = ctx.createGain();
+send.gain.value = 0.18 * v;
+hitGain.connect(send).connect(this.rev); // this.rev already feeds revGain → comp in init()
 
-    const snare=(tone,noiseAmt)=>{ // tone + bandpassed noise, short env
-      const {g,t}=this._envGain(0.001, 0.06, 0.0001, 0.12, 0.9*v); const toneOsc=ctx.createOscillator(); toneOsc.type='triangle'; toneOsc.frequency.setValueAtTime(tone, t); toneOsc.connect(g.gain); g.gain.connect(hitGain);
-      const n=this._mkNoise(0.3), bp1=ctx.createBiquadFilter(), bp2=ctx.createBiquadFilter(), hp=ctx.createBiquadFilter(), ng=ctx.createGain(); bp1.type='bandpass'; bp1.frequency.value=tone; bp1.Q.value=1.0; bp2.type='bandpass'; bp2.frequency.value=tone*2; bp2.Q.value=0.7; hp.type='highpass'; hp.frequency.value=900; ng.gain.value=0.5*noiseAmt*v; n.connect(hp).connect(bp1).connect(ng).connect(hitGain); n.connect(bp2).connect(ng); n.start(t); n.stop(t+0.15); toneOsc.start(t); toneOsc.stop(t+0.14) };
+const kick = (base, dec, click) => {
+  const o = ctx.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(base, now(ctx));
+  o.frequency.exponentialRampToValueAtTime(Math.max(30, base * 0.33), now(ctx) + 0.12);
 
-    const sidestick=()=>{ const {g,t}=this._envGain(0.001,0.03,0,0.08, 0.8*v); const n=this._mkNoise(0.08), bp=ctx.createBiquadFilter(), hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1200; bp.type='bandpass'; bp.frequency.value=1800; bp.Q.value=2.0; n.connect(hp).connect(bp).connect(g.gain); g.gain.connect(hitGain); n.start(t); n.stop(t+0.08) };
+  const { g, t } = this._envGain(0.001, 0.05, 0.0001, dec, 1.2*v);
+  // ✅ audio → Gain → hitGain
+  o.connect(g); g.connect(hitGain);
 
-    const clap=()=>{ // multi-burst clap: 0,20,40ms
-      const baseT=now(ctx); const mk=(dt)=>{ const n=this._mkNoise(0.12), hp=ctx.createBiquadFilter(), bp=ctx.createBiquadFilter(), g=ctx.createGain(); hp.type='highpass'; hp.frequency.value=1200; bp.type='bandpass'; bp.frequency.value=2000; bp.Q.value=1.2; g.gain.setValueAtTime(0, baseT+dt); g.gain.linearRampToValueAtTime(0.6*v, baseT+dt+0.002); g.gain.exponentialRampToValueAtTime(0.0001, baseT+dt+0.09); n.connect(hp).connect(bp).connect(g).connect(hitGain); n.start(baseT+dt); n.stop(baseT+dt+0.12) }; mk(0); mk(0.02); mk(0.04); };
+  if (click > 0) {
+    const n = this._mkNoise(0.02), hp = ctx.createBiquadFilter(), cg = ctx.createGain();
+    hp.type = 'highpass'; hp.frequency.value = 3000; cg.gain.value = 0.15 * v * click;
+    n.connect(hp).connect(cg).connect(hitGain);
+    n.start(t); n.stop(t + 0.03);
+  }
+  o.start(); o.stop(now(ctx) + dec + 0.05);
+};
 
-    const hat=(open=false)=>{ const n=this._mkNoise(open?0.35:0.08), hp=ctx.createBiquadFilter(), hg=ctx.createGain(); hp.type='highpass'; hp.frequency.value=P.hatHP; hg.gain.value=(open?0.22:0.32)*v; n.connect(hp).connect(hg).connect(hitGain); const t=now(ctx); n.start(t); n.stop(t+(open?0.30:0.05)) };
+const snare = (tone, noiseAmt) => {
+  const { g, t } = this._envGain(0.001, 0.06, 0.0001, 0.12, 0.9*v);
+  const toneOsc = ctx.createOscillator(); toneOsc.type = 'triangle'; toneOsc.frequency.setValueAtTime(tone, t);
+  toneOsc.connect(g); g.connect(hitGain); // ✅
 
-    const tom=(freq)=>{ const o=ctx.createOscillator(); o.type='sine'; const {g,t}=this._envGain(0.001,0.04,0,0.22, 0.8*v); o.frequency.setValueAtTime(freq,t); o.connect(g.gain); g.gain.connect(hitGain); o.start(t); o.stop(t+0.26) };
+  const n = this._mkNoise(0.3), bp1 = ctx.createBiquadFilter(), bp2 = ctx.createBiquadFilter(),
+        hp = ctx.createBiquadFilter(), ng = ctx.createGain();
+  bp1.type='bandpass'; bp1.frequency.value=tone;   bp1.Q.value=1.0;
+  bp2.type='bandpass'; bp2.frequency.value=tone*2; bp2.Q.value=0.7;
+  hp.type='highpass';  hp.frequency.value=900;
+  ng.gain.value = 0.5 * noiseAmt * v;
+  n.connect(hp).connect(bp1).connect(ng).connect(hitGain);
+  n.connect(bp2).connect(ng);
+  n.start(t); n.stop(t + 0.15);
+  toneOsc.start(t); toneOsc.stop(t + 0.14);
+};
 
-    const crash=()=>{ const n=this._mkNoise(0.9), hp=ctx.createBiquadFilter(), g=ctx.createGain(); hp.type='highpass'; hp.frequency.value=P.crash; g.gain.value=0.22*v; n.connect(hp).connect(g).connect(hitGain); const t=now(ctx); n.start(t); n.stop(t+0.9) };
+const sidestick = () => {
+  const { g, t } = this._envGain(0.001, 0.03, 0, 0.08, 0.8*v);
+  const n = this._mkNoise(0.08), bp = ctx.createBiquadFilter(), hp = ctx.createBiquadFilter();
+  hp.type='highpass'; hp.frequency.value=1200;
+  bp.type='bandpass'; bp.frequency.value=1800; bp.Q.value=2.0;
+  n.connect(hp).connect(bp).connect(g); g.connect(hitGain); // ✅
+  n.start(t); n.stop(t + 0.08);
+};
+
+const clap = () => {
+  const baseT = now(ctx);
+  const mk = (dt) => {
+    const n=this._mkNoise(0.12), hp=ctx.createBiquadFilter(), bp=ctx.createBiquadFilter(), g=ctx.createGain();
+    hp.type='highpass'; hp.frequency.value=1200;
+    bp.type='bandpass'; bp.frequency.value=2000; bp.Q.value=1.2;
+    g.gain.setValueAtTime(0, baseT+dt);
+    g.gain.linearRampToValueAtTime(0.6*v, baseT+dt+0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, baseT+dt+0.09);
+    n.connect(hp).connect(bp).connect(g).connect(hitGain); // ✅
+    n.start(baseT+dt); n.stop(baseT+dt+0.12);
+  };
+  mk(0); mk(0.02); mk(0.04);
+};
+
+const hat = (open=false) => {
+  const n=this._mkNoise(open?0.35:0.08), hp=ctx.createBiquadFilter(), hg=ctx.createGain();
+  hp.type='highpass'; hp.frequency.value=P.hatHP;
+  hg.gain.value=(open?0.22:0.32)*v;
+  n.connect(hp).connect(hg).connect(hitGain);
+  const t=now(ctx); n.start(t); n.stop(t+(open?0.30:0.05));
+};
+
+const tom = (freq) => {
+  const o = ctx.createOscillator(); o.type='sine';
+  const { g, t } = this._envGain(0.001, 0.04, 0, 0.22, 0.8*v);
+  o.frequency.setValueAtTime(freq,t);
+  o.connect(g); g.connect(hitGain); // ✅
+  o.start(t); o.stop(t+0.26);
+};
+
+const crash = () => {
+  const n=this._mkNoise(0.9), hp=ctx.createBiquadFilter(), g=ctx.createGain();
+  hp.type='highpass'; hp.frequency.value=P.crash;
+  g.gain.value=0.22*v;
+  n.connect(hp).connect(g).connect(hitGain); // ✅
+  const t=now(ctx); n.start(t); n.stop(t+0.9);
+};
 
     switch(midi){
       case 36: kick(P.kick.base,P.kick.dec,P.kick.click); break; // kick
