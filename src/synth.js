@@ -104,7 +104,7 @@ export class SynthEngine{
   noteOn(midi, v=0.8){
     if(!this.ctx) return;
     const ctx=this.ctx; const t=ctx.currentTime; const f=440*Math.pow(2,(midi-69)/12);
-    const o=ctx.createOscillator(); o.type='sawtooth';
+    const o=ctx.createOscillator(); o.type = (this.preset?.osc) || 'sawtooth';
     o.frequency.setValueAtTime(f, t); // per-note base pitch
 
     const lfo=ctx.createOscillator(); lfo.type='sine'; lfo.frequency.value=5;
@@ -167,7 +167,18 @@ export class SynthEngine{
     }
   }
 
-  setPreset(id,p){ this.presetId=id; /* hook for preset system */ }
+  setPreset(id,p){
+    this.presetId = id;
+    // merge with defaults so missing fields don't break
+    const def={osc:'sawtooth', env:null, cutoff:null, q:null, reverb:null, delay:null};
+    this.preset = Object.assign(def, p||{});
+    // push preset params into engine immediately
+    if(this.preset.env){ const {a=10,d=200,s=0.6,r=300}=this.preset.env; this.setEnv(a,d,s,r); }
+    if(this.preset.cutoff!=null) this.setCutoff(this.preset.cutoff);
+    if(this.preset.q!=null)      this.setQ(this.preset.q);
+    if(this.preset.reverb!=null) this.setReverb(this.preset.reverb);
+    if(this.preset.delay!=null)  this.setDelay(this.preset.delay);
+  }
 
   // ---- small IR
   makeSmallIR(ctx){ if(!ctx) return null; const len=(ctx.sampleRate*1.2)|0; const buf=ctx.createBuffer(2,len,ctx.sampleRate); for(let ch=0;ch<2;ch++){ const d=buf.getChannelData(ch); for(let i=0;i<len;i++){ const t=i/ctx.sampleRate; d[i]=(Math.random()*2-1)*Math.pow(1-t/1.2,3)*0.4 } } return buf }

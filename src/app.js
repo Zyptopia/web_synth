@@ -145,7 +145,25 @@ function hookSlider(param,fmt,on){
 
 function loadPresets(){ const sel=$('#preset'); if(!sel) return; sel.innerHTML=''; for(const p of PRESETS){ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o) } sel.value='piano'; applyPreset('piano'); sel.onchange=()=>applyPreset(sel.value) }
 const ensurePresets=()=>{ const sel=$('#preset'); if(sel && sel.options.length===0) loadPresets(); };
-const applyPreset=(id)=>{ const p=PRESETS.find(x=>x.id===id)||PRESETS[0]; Eng.setPreset(p.id,p) };
+
+const applyPreset=(id)=>{
+  const p=PRESETS.find(x=>x.id===id)||PRESETS[0];
+  Eng.setPreset(p.id,p);
+
+  // reflect on the UI and engine
+  if(p.env){ 
+    $('#attack').value=p.env.a; 
+    $('#decay').value=p.env.d; 
+    $('#sustain').value=p.env.s; 
+    $('#release').value=p.env.r; 
+    ['attack','decay','sustain','release'].forEach(k=>$('#'+k).dispatchEvent(new Event('input')));
+  }
+  if(p.cutoff!=null){ $('#cutoff').value=p.cutoff; $('#cutoff').dispatchEvent(new Event('input')); }
+  if(p.q!=null){      $('#q').value=p.q;         $('#q').dispatchEvent(new Event('input')); }
+  if(p.reverb!=null){ $('#reverb').value=p.reverb; $('#reverb').dispatchEvent(new Event('input')); }
+  if(p.delay!=null){  $('#delay').value=p.delay;   $('#delay').dispatchEvent(new Event('input')); }
+};
+
 
 function bindTyping(){
   const keyW='asdfghjkl;'.split(''), keyB='wetyuop'.split('');

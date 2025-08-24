@@ -1,38 +1,16 @@
+// Presets for Axiom 25 web synth
+// Each preset may define: osc, env {a,d,s,r} in ms, cutoff (Hz), q, reverb (0..1), delay (0..1)
+
 export const PRESETS = [
-  // Pianos / Keys
-  { id:'piano',  name:'Concert Piano (synth)', osc:'triangle', env:{a:0.02,d:0.25,s:0.5,r:0.45}, filt:{cut:4800,q:0.9}, fx:{rev:0.22,delay:0.08} },
-  { id:'grand',  name:'Grand Piano – Bright',  osc:'triangle', env:{a:0.01,d:0.26,s:0.52,r:0.55}, filt:{cut:6000,q:0.7}, fx:{rev:0.24,delay:0.08} },
-  { id:'soft',   name:'Soft Piano',            osc:'triangle', env:{a:0.02,d:0.40,s:0.65,r:0.90}, filt:{cut:3400,q:0.7}, fx:{rev:0.35,delay:0.10} },
-  { id:'honky',  name:'Bar Piano',             osc:'square',   env:{a:0.003,d:0.22,s:0.45,r:0.35},filt:{cut:5200,q:0.9}, fx:{rev:0.12,delay:0.06} },
-  { id:'ep',     name:'Electric Piano',        osc:'triangle', env:{a:0.01,d:0.35,s:0.55,r:0.50},filt:{cut:3800,q:0.7}, fx:{rev:0.30,delay:0.12} },
-  { id:'tines',  name:'Tines EP (chorus‑ish)', osc:'triangle', env:{a:0.005,d:0.36,s:0.70,r:0.45},filt:{cut:4200,q:0.8}, fx:{rev:0.28,delay:0.12} },
-
-  // Leads / Plucks
-  { id:'pluck',  name:'Pluck',                 osc:'square',   env:{a:0.002,d:0.18,s:0.0,r:0.18},filt:{cut:5200,q:1.2}, fx:{rev:0.18,delay:0.16} },
-  { id:'pluckBright', name:'Bright Pluck',     osc:'sawtooth', env:{a:0.002,d:0.15,s:0.0,r:0.16},filt:{cut:6500,q:1.0}, fx:{rev:0.14,delay:0.14} },
-  { id:'leadSaw', name:'Saw Lead',             osc:'sawtooth', env:{a:0.01,d:0.18,s:0.45,r:0.30},filt:{cut:6000,q:0.9}, fx:{rev:0.15,delay:0.12} },
-  { id:'leadSquare', name:'Square Lead',       osc:'square',   env:{a:0.01,d:0.20,s:0.50,r:0.28},filt:{cut:5200,q:0.8}, fx:{rev:0.12,delay:0.10} },
-  { id:'brass',  name:'Analog Brass',          osc:'sawtooth', env:{a:0.02,d:0.25,s:0.55,r:0.35},filt:{cut:3000,q:1.2}, fx:{rev:0.14,delay:0.08} },
-
-  // Pads / Strings / Choir
-  { id:'pad',    name:'Warm Pad',              osc:'sawtooth', env:{a:0.25,d:0.60,s:0.70,r:1.20},filt:{cut:2600,q:0.7}, fx:{rev:0.35,delay:0.18} },
-  { id:'glass',  name:'Glass Pad',             osc:'triangle', env:{a:0.20,d:0.70,s:0.60,r:1.30},filt:{cut:3000,q:1.4}, fx:{rev:0.40,delay:0.16} },
-  { id:'choir',  name:'Choir‑ish Pad',         osc:'triangle', env:{a:0.30,d:0.80,s:0.75,r:1.40},filt:{cut:2400,q:1.1}, fx:{rev:0.45,delay:0.12} },
-  { id:'ambient',name:'Ambient Air',           osc:'triangle', env:{a:0.80,d:1.20,s:0.80,r:2.00},filt:{cut:2000,q:0.9}, fx:{rev:0.55,delay:0.20} },
-  { id:'strings',name:'Strings',               osc:'sawtooth', env:{a:0.15,d:0.60,s:0.70,r:0.90},filt:{cut:3400,q:0.7}, fx:{rev:0.35,delay:0.10} },
-  { id:'slowStr',name:'Slow Strings',          osc:'sawtooth', env:{a:0.60,d:0.80,s:0.75,r:1.60},filt:{cut:3000,q:0.8}, fx:{rev:0.45,delay:0.06} },
-
-  // Organs / Mallets / Bells
-  { id:'organ',  name:'Organ',                 osc:'square',   env:{a:0.0, d:0.10,s:0.80,r:0.15},filt:{cut:6500,q:0.6}, fx:{rev:0.18,delay:0.08} },
-  { id:'organPerc', name:'Organ Percussive',   osc:'square',   env:{a:0.0, d:0.18,s:0.30,r:0.20},filt:{cut:6000,q:0.9}, fx:{rev:0.10,delay:0.05} },
-  { id:'bell',   name:'Bell‑ish',              osc:'sine',     env:{a:0.0, d:0.70,s:0.0, r:1.40},filt:{cut:7000,q:1.5}, fx:{rev:0.35,delay:0.12} },
-  { id:'vibes',  name:'Vibes/Mallet',          osc:'sine',     env:{a:0.0, d:0.80,s:0.0, r:1.00},filt:{cut:5200,q:1.2}, fx:{rev:0.28,delay:0.10} },
-
-  // Basses
-  { id:'bass',   name:'Bass (mono)',           osc:'square',   env:{a:0.005,d:0.15,s:0.40,r:0.18},filt:{cut:2000,q:1.1}, fx:{rev:0.05,delay:0.03}, mono:true },
-  { id:'sub',    name:'Sub Bass (mono)',       osc:'sine',     env:{a:0.003,d:0.12,s:0.60,r:0.18},filt:{cut:800, q:0.8},  fx:{rev:0.03,delay:0.02}, mono:true },
-  { id:'acid',   name:'Acid Bass (mono)',      osc:'sawtooth', env:{a:0.003,d:0.18,s:0.40,r:0.18},filt:{cut:1500,q:1.6}, fx:{rev:0.06,delay:0.03}, mono:true },
-
-  // Utility
-  { id:'drum',   name:'Drum Pads Only',        osc:'triangle', env:{a:0.01,d:0.20,s:0.50,r:0.30},filt:{cut:4500,q:0.8}, fx:{rev:0.12,delay:0.10} }
+  { id:'piano',   name:'Concert Piano', osc:'triangle', cutoff:12000, q:0.7, reverb:0.22, delay:0.00, env:{ a:5,  d:220, s:0.50, r:400 } },
+  { id:'grand',   name:'Grand Piano',   osc:'triangle', cutoff:14000, q:0.8, reverb:0.28, delay:0.05, env:{ a:3,  d:260, s:0.50, r:520 } },
+  { id:'ep',      name:'Electric Piano',osc:'sine',     cutoff:10000, q:0.6, reverb:0.30, delay:0.12, env:{ a:10, d:300, s:0.40, r:600 } },
+  { id:'organ',   name:'Organ',         osc:'square',   cutoff:14000, q:0.2, reverb:0.15, delay:0.10, env:{ a:5,  d:0,   s:0.90, r:50  } },
+  { id:'bass',    name:'Mono Bass',     osc:'sawtooth', cutoff:800,   q:1.2, reverb:0.05, delay:0.00, env:{ a:2,  d:120, s:0.30, r:120 } },
+  { id:'pluck',   name:'Pluck',         osc:'square',   cutoff:4000,  q:1.0, reverb:0.12, delay:0.18, env:{ a:1,  d:120, s:0.00, r:80  } },
+  { id:'pad',     name:'Warm Pad',      osc:'sawtooth', cutoff:3000,  q:0.9, reverb:0.35, delay:0.25, env:{ a:400,d:1000,s:0.80, r:1500} },
+  { id:'lead',    name:'Saw Lead',      osc:'sawtooth', cutoff:12000, q:0.6, reverb:0.12, delay:0.10, env:{ a:5,  d:140, s:0.50, r:160 } },
+  { id:'stringer',name:'Stringer',      osc:'sawtooth', cutoff:5000,  q:1.0, reverb:0.32, delay:0.20, env:{ a:60, d:700, s:0.70, r:800 } },
+  { id:'keys',    name:'Bright Keys',   osc:'square',   cutoff:9000,  q:0.8, reverb:0.18, delay:0.14, env:{ a:8,  d:240, s:0.45, r:300 } },
+  { id:'lofi',    name:'Lo‑Fi Pad',     osc:'triangle', cutoff:2500,  q:1.0, reverb:0.40, delay:0.22, env:{ a:250,d:900, s:0.75, r:1200} }
 ];
