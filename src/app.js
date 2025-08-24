@@ -215,7 +215,6 @@ function bindUI(){
 // Mouse on keys
 function bindKeyMouse(){ const kb=$('#kb'); kb.addEventListener('mousedown', async e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); const m=+t.dataset.midi; playOn(m,110); const up=()=>{ playOff(m); window.removeEventListener('mouseup',up) }; window.addEventListener('mouseup',up) }); kb.addEventListener('touchstart', async e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); playOn(+t.dataset.midi,110) },{passive:true}); kb.addEventListener('touchend', e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; playOff(+t.dataset.midi) }); }
 
-// Boot
 buildKeyboard(state); buildPads(); injectInlineMap(); bindKeyMouse(); bindTyping(); bindMIDI(); bindUI(); loadAll(); renderCCTable(); renderPadTable(); bindConfig(); updateInlineBadges();
 
 docReady();
