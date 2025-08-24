@@ -2,6 +2,7 @@ import {SynthEngine} from './synth.js';
 import {MidiManager} from './midi.js';
 import {PRESETS} from './presets.js';
 import {MapState, PARAM_RANGES, DRUM_CHOICES, midiName} from './mapping.js';
+import {Coach} from './coach.js';
 
 const $ = (s)=>document.querySelector(s);
 const $$ = (s)=>Array.from(document.querySelectorAll(s));
@@ -78,11 +79,19 @@ const Eng = new SynthEngine();
 const MIDI = new MidiManager();
 window.Eng=Eng;
 
+// Coach (metronome, arp, scale, velocity)
+let COACH;
+
 const state={ base:60, held:new Set(), transpose:0, octave:0, ch:1, padMode:'drum', drumKit:'standard' };
 const eff=(m)=> m + state.transpose + state.octave*12;
 
-function playOn(m,vel=100){ const mv=eff(m); Eng.noteOn(mv,vel/127); state.held.add(mv); flashKey(state,mv,true); }
-function playOff(m){ const mv=eff(m); if(!state.held.has(mv)){flashKey(state,mv,false); return} if(Eng.sustain){flashKey(state,mv,false); return} Eng.noteOff(mv); state.held.delete(mv); flashKey(state,mv,false) }
+// Raw note handlers
+function rawNoteOn(m,vel=100){ const mv=eff(m); Eng.noteOn(mv,vel/127); state.held.add(mv); flashKey(state,mv,true); }
+function rawNoteOff(m){ const mv=eff(m); if(!state.held.has(mv)){flashKey(state,mv,false); return} if(Eng.sustain){flashKey(state,mv,false); return} Eng.noteOff(mv); state.held.delete(mv); flashKey(state,mv,false) }
+// Coach-aware wrappers
+function playOn(m,vel=100){ if(window.COACH) window.COACH.noteOn(m,vel); else rawNoteOn(m,vel) }
+function playOff(m){ if(window.COACH) window.COACH.noteOff(m); else rawNoteOff(m) }
+
 function allOff(){ Eng.releaseAll(); state.held.clear(); document.querySelectorAll('.white,.black,.pad').forEach(el=>el.classList.remove('active')) }
 
 function handlePadHit(idx, midi, vel){ if(state.padMode==='off') return; flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120); if(state.padMode==='drum'){ Eng.setDrumKit(state.drumKit); Eng.triggerDrum(midi, (vel||110)/127); } else if(state.padMode==='instrument'){ playOn(midi, vel||110); } }
@@ -171,6 +180,8 @@ function bindConfig(){
 
 function updatePadModeUI(){ $('#padMode').value=state.padMode; $('#drumKit').value=state.drumKit; $('#drumKitRow').style.display = (state.padMode==='drum')?'grid':'none'; $('#padModeVal').textContent=state.padMode; $('#drumKitVal').textContent=state.drumKit; }
 
+function ensureDrumKitOptions(){ const dk=$('#drumKit'); if(!dk) return; const want=['standard','808','electro','room','trap','lofi','cr78','dnb']; const labels={standard:'Standard','808':'808',electro:'Electro',room:'Roomy',trap:'Trap',lofi:'Lo‑Fi',cr78:'CR‑78',dnb:'DnB'}; const have=new Set([...dk.options].map(o=>o.value)); for(const id of want){ if(!have.has(id)){ const o=document.createElement('option'); o.value=id; o.textContent=labels[id]; dk.appendChild(o) } } }
+
 function bindUI(){
   $('#startBtn').onclick = async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test() } else say('Audio context not running. Click again.','warn'); diag(); ensurePresets(); }catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } };
   $('#testBtn').onclick = async()=>{ try{ await Eng.start(); Eng.test(); say('Test beep sent.','ok'); diag(); ensurePresets(); }catch(e){ window.__lastErr=e.message; say('Test failed: '+e.message,'bad'); diag() } };
@@ -185,7 +196,7 @@ function bindUI(){
   const updLCD=()=>{ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>Tr ${state.transpose} / Oct ${state.octave}` };
 
   // Base note selector
-  const baseSel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m}`; baseSel.appendChild(o) } baseSel.value=String(state.base); baseSel.onchange=()=>{ state.base=parseInt(baseSel.value,10); buildKeyboard(state) };
+  const baseSel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m}`; baseSel.appendChild(o) } baseSel.value=String(state.base); baseSel.onchange=()=>{ state.base=parseInt(baseSel.value,10); buildKeyboard(state); if(window.COACH) window.COACH.updateScale(); };
 
   // Sliders → engine
   hookSlider('volume',v=>`${v}dB`,v=>Eng.setVolume(v));
@@ -203,8 +214,9 @@ function bindUI(){
   loadPresets();
 
   // Pad mode + kit
+  ensureDrumKitOptions();
   $('#padMode').onchange=()=>{ state.padMode=$('#padMode').value; updatePadModeUI(); saveAll(); };
-  $('#drumKit').onchange=()=>{ state.drumKit=$('#drumKit').value; Eng.setDrumKit(state.drumKit); updatePadModeUI(); saveAll(); };
+  $('#drumKit').onchange=()=>{ state.drumKit=$('#drumKit').value; Eng.setDrumKit(state.drumKit); updatePadModeUI(); saveAll(); say('Drum kit: '+state.drumKit,'ok') };
 
   // Panic
   $('#panic').onclick=()=>{ allOff(); say('All notes off','warn') };
@@ -241,6 +253,10 @@ renderCCTable();
 renderPadTable();
 bindConfig();
 updateInlineBadges();
+
+// Coach mount
+COACH = new Coach({ noteOnRaw:(m,v)=>rawNoteOn(m,v), noteOffRaw:(m)=>rawNoteOff(m), getKBEl:()=>document.querySelector('#kb') });
+window.COACH=COACH; COACH.mount();
 
 // Initial diag/presets
 say('Ready. Start Audio → Test Tone → Connect MIDI.','ok');
