@@ -94,7 +94,7 @@ function playOff(m){ if(window.COACH) window.COACH.noteOff(m); else rawNoteOff(m
 
 function allOff(){ Eng.releaseAll(); state.held.clear(); document.querySelectorAll('.white,.black,.pad').forEach(el=>el.classList.remove('active')) }
 
-function handlePadHit(idx, midi, vel){ if(state.padMode==='off') return; flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120); if(state.padMode==='drum'){ Eng.setDrumKit(state.drumKit); Eng.triggerDrum(midi, (vel||110)/127); } else if(state.padMode==='instrument'){ playOn(midi, vel||110); } }
+function handlePadHit(idx, midi, vel){ if(state.padMode==='off') return; const gain=(MapState.padGain?.[idx]??1); flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120); if(state.padMode==='drum'){ Eng.setDrumKit(state.drumKit); Eng.triggerDrum(midi, (vel||110)/127, gain); } else if(state.padMode==='instrument'){ playOn(midi, Math.round((vel||110)*gain)); } }
 
 function lcd(a,b){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>${a||''}${b?' — '+b:''}` }
 
@@ -118,8 +118,8 @@ function bindTyping(){
 
 // --------------- Learn / Mapping ---------------
 let ccLearnParam=null, ccLearnBtn=null, padLearnIndex=null, padLearnBtn=null, learnTimer=null;
-function startCCLearn(param,btn){ if(ccLearnParam===param){ endLearns(); say('CC learn cancelled.','warn'); return } ccLearnParam=param; ccLearnBtn?.classList.remove('active'); ccLearnBtn=btn; btn?.classList.add('active'); say(`Twist a knob to map → ${param} (Esc to cancel)`,'warn'); clearTimeout(learnTimer); learnTimer=setTimeout(()=>{ endLearns(); say('CC learn timed out.','warn') },15000); }
-function startPadLearn(idx,btn){ if(padLearnIndex===idx){ endLearns(); say('Pad learn cancelled.','warn'); return } padLearnIndex=idx; padLearnBtn?.classList.remove('active'); padLearnBtn=btn; btn?.classList.add('active'); say(`Hit a pad to map → Pad ${idx+1} (Esc to cancel)`,'warn'); clearTimeout(learnTimer); learnTimer=setTimeout(()=>{ endLearns(); say('Pad learn timed out.','warn') },15000); }
+function startCCLearn(param,btn){ if(ccLearnParam===param){ endLearns(); say('CC learn cancelled.','warn'); return } ccLearnParam=param; ccLearnBtn?.classList.remove('active'); ccLearnBtn=btn; btn?.classList.add('active'); say(`Twist a knob to map → ${param} (Esc to cancel)`, 'warn'); clearTimeout(learnTimer); learnTimer=setTimeout(()=>{ endLearns(); say('CC learn timed out.','warn') },15000); }
+function startPadLearn(idx,btn){ if(padLearnIndex===idx){ endLearns(); say('Pad learn cancelled.','warn'); return } padLearnIndex=idx; padLearnBtn?.classList.remove('active'); padLearnBtn=btn; btn?.classList.add('active'); say(`Hit a pad to map → Pad ${idx+1} (Esc to cancel)`, 'warn'); clearTimeout(learnTimer); learnTimer=setTimeout(()=>{ endLearns(); say('Pad learn timed out.','warn') },15000); }
 function endLearns(){ if(ccLearnBtn) ccLearnBtn.classList.remove('active'); if(padLearnBtn) padLearnBtn.classList.remove('active'); ccLearnParam=null; padLearnIndex=null; clearTimeout(learnTimer); learnTimer=null; updateInlineBadges(); }
 window.addEventListener('keydown',e=>{ if(e.key==='Escape') endLearns() });
 
@@ -158,23 +158,25 @@ function renderCCTable(){
 }
 function renderPadTable(){
   const table=$('#padTable'); if(!table) return;
-  table.innerHTML=`<tr><th>Pad</th><th>MIDI Note</th><th>Name</th><th>Learn</th></tr>`+
+  table.innerHTML=`<tr><th>Pad</th><th>MIDI Note</th><th>Name</th><th>Vol</th><th>Learn</th></tr>`+
     MapState.padNotes.map((m,i)=>{
       const opts=DRUM_CHOICES.map(([name,n])=>`<option value="${n}" ${n===m?'selected':''}>${n} — ${name}</option>`).join('');
-      return `<tr><td>Pad ${i+1}</td><td><select data-pad-idx="${i}" class="padSel">${opts}</select></td><td>${m} (${midiName(m)})</td><td><button class="learnPad" data-idx="${i}">●</button></td></tr>`
+      const vol=(MapState.padGain?.[i]??1);
+      return `<tr><td>Pad ${i+1}</td><td><select data-pad-idx="${i}" class="padSel">${opts}</select></td><td>${m} (${midiName(m)})</td><td><input type="range" min="0" max="1" step="0.01" value="${vol}" class="padVol" data-pad-idx="${i}"><span class="pv">${Math.round(vol*100)}%</span></td><td><button class="learnPad" data-idx="${i}">●</button></td></tr>`
     }).join('');
   table.querySelectorAll('.padSel').forEach(sel=>{ sel.onchange=()=>{ const idx=+sel.dataset.padIdx; MapState.padNotes[idx]=parseInt(sel.value,10); saveAll(); updateInlineBadges(); }; });
+  table.querySelectorAll('.padVol').forEach(sl=>{ sl.oninput=()=>{ const idx=+sl.dataset.padIdx; const v=parseFloat(sl.value)||0; if(!MapState.padGain) MapState.padGain=[1,1,1,1,1,1,1,1]; MapState.padGain[idx]=Math.max(0,Math.min(1,v)); sl.parentElement.querySelector('.pv').textContent=`${Math.round(MapState.padGain[idx]*100)}%`; saveAll(); }; });
   table.querySelectorAll('.learnPad').forEach(btn=>{ btn.onclick=()=>{ startPadLearn(parseInt(btn.dataset.idx,10), btn); }; });
 }
 
 // --------------- Persistence & Config ---------------
-function saveAll(){ localStorage.setItem('axiom.map.v2', JSON.stringify({ccMap:MapState.ccMap, ccMode:MapState.ccMode, padNotes:MapState.padNotes, padMode:state.padMode, drumKit:state.drumKit})) }
-function loadAll(){ try{ const s=localStorage.getItem('axiom.map.v2'); if(s){ const o=JSON.parse(s); if(o.ccMap) MapState.ccMap=o.ccMap; if(o.ccMode) MapState.ccMode=o.ccMode; if(o.padNotes) MapState.padNotes=o.padNotes; if(o.padMode) state.padMode=o.padMode; if(o.drumKit) state.drumKit=o.drumKit; } }catch(_){} }
+function saveAll(){ localStorage.setItem('axiom.map.v2', JSON.stringify({ccMap:MapState.ccMap, ccMode:MapState.ccMode, padNotes:MapState.padNotes, padGain:MapState.padGain, padMode:state.padMode, drumKit:state.drumKit})) }
+function loadAll(){ try{ const s=localStorage.getItem('axiom.map.v2'); if(s){ const o=JSON.parse(s); if(o.ccMap) MapState.ccMap=o.ccMap; if(o.ccMode) MapState.ccMode=o.ccMode; if(o.padNotes) MapState.padNotes=o.padNotes; if(o.padGain) MapState.padGain=o.padGain; if(o.padMode) state.padMode=o.padMode; if(o.drumKit) state.drumKit=o.drumKit; } }catch(_){} }
 
 function bindConfig(){
   // Export/Import
-  $('#exportBtn').onclick=()=>{ const obj={ ccMap:MapState.ccMap, ccMode:MapState.ccMode, padNotes:MapState.padNotes, padMode:state.padMode, drumKit:state.drumKit }; const txt=JSON.stringify(obj,null,2); navigator.clipboard?.writeText(txt); const pb=$('#pastebox'); pb.value = (pb.value ? pb.value + '\n' : '') + txt; };
-  $('#importBtn').onclick=()=>{ const txt=prompt('Paste exported JSON'); if(!txt) return; try{ const obj=JSON.parse(txt); if(obj.ccMap) MapState.ccMap=obj.ccMap; if(obj.ccMode) MapState.ccMode=obj.ccMode; if(obj.padNotes) MapState.padNotes=obj.padNotes; if(obj.padMode) state.padMode=obj.padMode; if(obj.drumKit) state.drumKit=obj.drumKit; saveAll(); renderCCTable(); renderPadTable(); updateInlineBadges(); updatePadModeUI(); say('Imported.','ok') }catch(e){ say('Import failed: '+e.message,'bad') } };
+  $('#exportBtn').onclick=()=>{ const obj={ ccMap:MapState.ccMap, ccMode:MapState.ccMode, padNotes:MapState.padNotes, padGain:MapState.padGain, padMode:state.padMode, drumKit:state.drumKit }; const txt=JSON.stringify(obj,null,2); navigator.clipboard?.writeText(txt); const pb=$('#pastebox'); pb.value = (pb.value ? pb.value + '\n' : '') + txt; };
+  $('#importBtn').onclick=()=>{ const txt=prompt('Paste exported JSON'); if(!txt) return; try{ const obj=JSON.parse(txt); if(obj.ccMap) MapState.ccMap=obj.ccMap; if(obj.ccMode) MapState.ccMode=obj.ccMode; if(obj.padNotes) MapState.padNotes=obj.padNotes; if(obj.padGain) MapState.padGain=obj.padGain; if(obj.padMode) state.padMode=obj.padMode; if(obj.drumKit) state.drumKit=obj.drumKit; saveAll(); renderCCTable(); renderPadTable(); updateInlineBadges(); updatePadModeUI(); say('Imported.','ok') }catch(e){ say('Import failed: '+e.message,'bad') } };
   $('#clearBtn').onclick=()=>{ localStorage.removeItem('axiom.map.v2'); loadAll(); renderCCTable(); renderPadTable(); updateInlineBadges(); updatePadModeUI(); say('Local settings cleared.','ok') };
 }
 
@@ -229,7 +231,7 @@ function bindUI(){
   // Pad quick learn UI
   const pSel=$('#padIndex'); pSel.innerHTML=Array.from({length:8},(_,i)=>`<option value="${i}">Pad ${i+1}</option>`).join(''); pSel.value='0';
   $('#padLearnBtn').onclick=()=>{ startPadLearn(parseInt(pSel.value,10), $('#padLearnBtn')); };
-  $('#padReset').onclick=()=>{ MapState.resetPads(); renderPadTable(); updateInlineBadges(); saveAll(); say('Pads reset to 40,41,42,43,36,37,38,39.','ok'); };
+  $('#padReset').onclick=()=>{ MapState.resetPads(); MapState.resetPadGain(); renderPadTable(); updateInlineBadges(); saveAll(); say('Pads reset to 40,41,42,43,36,37,38,39 with 100% volume.','ok'); };
 }
 
 function bindKeyMouse(){

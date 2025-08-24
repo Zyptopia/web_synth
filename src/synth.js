@@ -1,5 +1,5 @@
-// SynthEngine — poly synth + expanded drum kits (no samples)
-// ----------------------------------------------------------
+// SynthEngine — poly synth + improved drum kits (cleaner snares/claps, per‑pad gain)
+// ---------------------------------------------------------------------------------
 export const midiToFreq = m=>440*Math.pow(2,(m-69)/12);
 const dB = g=>Math.pow(10,g/20);
 const now = (ctx)=>ctx.currentTime;
@@ -63,44 +63,60 @@ export class SynthEngine{
   // ----------- Drum engine -----------
   setDrumKit(id){ this.drumKit=id }
 
-  triggerDrum(midi,vel){ this.init(); const ctx=this.ctx, t=now(ctx); const kit=this.drumKit||'standard';
-    const mkNoise=(dur)=>{const len=ctx.sampleRate*dur,buf=ctx.createBuffer(1,len,ctx.sampleRate),ch=buf.getChannelData(0);for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1); const src=ctx.createBufferSource(); src.buffer=buf; return src};
+  // cleaner noise shaping helpers
+  _mkNoise(dur){ const ctx=this.ctx; const len=ctx.sampleRate*dur,buf=ctx.createBuffer(1,len,ctx.sampleRate),ch=buf.getChannelData(0); for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1); const src=ctx.createBufferSource(); src.buffer=buf; return src }
+  _envGain(a=0.001, d=0.08, s=0, r=0.12, peak=1){ const g=this.ctx.createGain(); const t=now(this.ctx); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak, t+a); g.gain.exponentialRampToValueAtTime(Math.max(0.0001,s), t+a+d); g.gain.exponentialRampToValueAtTime(0.0001, t+a+d+r); return {g,t} }
+
+  triggerDrum(midi,vel01, gain=1){ this.init(); const ctx=this.ctx; const v=Math.max(0.01,Math.min(1,vel01))*gain; const kit=this.drumKit||'standard';
     const out=this.comp;
 
-    // Per-kit tunings
     const KITS={
-      standard:{kick:{base:120,dec:0.25,click:0}, snare:{tone:1800,noise:0.22}, hpfHat:6000, clap:true, tom:[160,200], crash:2500},
-      room:{    kick:{base:75, dec:0.35,click:0},  snare:{tone:1600,noise:0.25}, hpfHat:5200, clap:true, tom:[170,210], crash:2500},
-      electro:{ kick:{base:95, dec:0.22,click:1},  snare:{tone:2200,noise:0.18}, hpfHat:6500, clap:true, tom:[200,260], crash:2800},
-      '808':{  kick:{base:55, dec:0.55,click:0},   snare:{tone:1800,noise:0.22}, hpfHat:8000, clap:true, tom:[140,180], crash:4000},
-      trap:{   kick:{base:48, dec:0.75,click:0},   snare:{tone:2000,noise:0.20}, hpfHat:9000, clap:true, tom:[150,190], crash:5000},
-      lofi:{   kick:{base:80, dec:0.28,click:0},   snare:{tone:1200,noise:0.35}, hpfHat:4200, clap:true, tom:[150,190], crash:2200},
-      cr78:{   kick:{base:100,dec:0.18,click:1},   snare:{tone:1500,noise:0.15}, hpfHat:5000, clap:false,tom:[150,180], crash:3000},
-      dnb:{    kick:{base:85, dec:0.20,click:1},   snare:{tone:2000,noise:0.30}, hpfHat:10000,clap:false,tom:[180,220], crash:5500}
+      standard:{kick:{base:120,dec:0.25,click:0.0}, snare:{tone:1800,noise:0.22}, hatHP:6500, clap:true, tom:[160,200], crash:2500},
+      room:{    kick:{base:75, dec:0.35,click:0.0}, snare:{tone:1600,noise:0.25}, hatHP:5200, clap:true, tom:[170,210], crash:2500},
+      electro:{ kick:{base:95, dec:0.22,click:0.8}, snare:{tone:2200,noise:0.18}, hatHP:7000, clap:true, tom:[200,260], crash:2800},
+      '808':{  kick:{base:55, dec:0.55,click:0.0}, snare:{tone:1900,noise:0.16}, hatHP:8500, clap:true, tom:[140,180], crash:4000},
+      trap:{   kick:{base:48, dec:0.75,click:0.0}, snare:{tone:2000,noise:0.15}, hatHP:9500, clap:true, tom:[150,190], crash:5000},
+      lofi:{   kick:{base:80, dec:0.28,click:0.0}, snare:{tone:1200,noise:0.32}, hatHP:4200, clap:true, tom:[150,190], crash:2200},
+      cr78:{   kick:{base:100,dec:0.18,click:0.6}, snare:{tone:1500,noise:0.12}, hatHP:5000, clap:false,tom:[150,180], crash:3000},
+      dnb:{    kick:{base:85, dec:0.20,click:0.9}, snare:{tone:2100,noise:0.22}, hatHP:11000,clap:false,tom:[180,220], crash:5500}
     };
     const P=KITS[kit]||KITS.standard;
 
-    const kick=(base,dec,click)=>{ const o=ctx.createOscillator(), g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(base,t); o.frequency.exponentialRampToValueAtTime(Math.max(30,base*0.33),t+0.12); if(click){ const n=mkNoise(0.02), hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=3000; const cg=ctx.createGain(); cg.gain.value=0.2*vel; n.connect(hp).connect(cg).connect(out); n.start(t); n.stop(t+0.03);} g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(1.1*vel,t+0.004); g.gain.exponentialRampToValueAtTime(0.0001,t+dec); o.connect(g).connect(out); o.start(t); o.stop(t+dec+0.05) };
-    const snare=(tone,noise)=>{ const n=mkNoise(noise), bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=tone; const g=ctx.createGain(); g.gain.value=0.8*vel; n.connect(bp).connect(g).connect(out); n.start(t); n.stop(t+noise) };
-    const hat=(open=false)=>{ const n=mkNoise(open?0.28:0.06); const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=P.hpfHat; const g=ctx.createGain(); g.gain.value=(open?0.28:0.36)*vel; n.connect(hp).connect(g).connect(out); n.start(t); n.stop(t+(open?0.28:0.06)) };
-    const clap=()=>{ if(!P.clap){ snare(P.snare.tone*0.9,0.12); return } const n=mkNoise(0.15), hp=ctx.createBiquadFilter(), g=ctx.createGain(); hp.type='highpass'; hp.frequency.value=1500; g.gain.value=0.6*vel; n.connect(hp).connect(g).connect(out); n.start(t); n.stop(t+0.15) };
-    const tom=(freq)=>{ const o=ctx.createOscillator(), g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(freq,t); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.75*vel,t+0.005); g.gain.exponentialRampToValueAtTime(0.0001,t+0.28); o.connect(g).connect(out); o.start(t); o.stop(t+0.3) };
-    const crash=()=>{ const n=mkNoise(0.8), hp=ctx.createBiquadFilter(), g=ctx.createGain(); hp.type='highpass'; hp.frequency.value=P.crash; g.gain.value=0.28*vel; n.connect(hp).connect(g).connect(out); n.start(t); n.stop(t+0.8) };
+    // One-shot out with optional small reverb send
+    const hitGain=ctx.createGain(); hitGain.gain.value=0.9*v; hitGain.connect(out);
+    const sendR=ctx.createGain(); sendR.gain.value=0.18*v; hitGain.connect(this.rev).connect(this.revGain); // share existing reverb bus
+
+    const kick=(base,dec,click)=>{ const o=ctx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(base,now(ctx)); o.frequency.exponentialRampToValueAtTime(Math.max(30,base*0.33), now(ctx)+0.12); const {g,t}=this._envGain(0.001, 0.05, 0.0001, dec, 1.2*v); o.connect(g.gain); g.gain.connect(hitGain); if(click>0){ const n=this._mkNoise(0.02), hp=ctx.createBiquadFilter(), cg=ctx.createGain(); hp.type='highpass'; hp.frequency.value=3000; cg.gain.value=0.15*v*click; n.connect(hp).connect(cg).connect(hitGain); n.start(t); n.stop(t+0.03) } o.start(); o.stop(now(ctx)+dec+0.05) };
+
+    const snare=(tone,noiseAmt)=>{ // tone + bandpassed noise, short env
+      const {g,t}=this._envGain(0.001, 0.06, 0.0001, 0.12, 0.9*v); const toneOsc=ctx.createOscillator(); toneOsc.type='triangle'; toneOsc.frequency.setValueAtTime(tone, t); toneOsc.connect(g.gain); g.gain.connect(hitGain);
+      const n=this._mkNoise(0.3), bp1=ctx.createBiquadFilter(), bp2=ctx.createBiquadFilter(), hp=ctx.createBiquadFilter(), ng=ctx.createGain(); bp1.type='bandpass'; bp1.frequency.value=tone; bp1.Q.value=1.0; bp2.type='bandpass'; bp2.frequency.value=tone*2; bp2.Q.value=0.7; hp.type='highpass'; hp.frequency.value=900; ng.gain.value=0.5*noiseAmt*v; n.connect(hp).connect(bp1).connect(ng).connect(hitGain); n.connect(bp2).connect(ng); n.start(t); n.stop(t+0.15); toneOsc.start(t); toneOsc.stop(t+0.14) };
+
+    const sidestick=()=>{ const {g,t}=this._envGain(0.001,0.03,0,0.08, 0.8*v); const n=this._mkNoise(0.08), bp=ctx.createBiquadFilter(), hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1200; bp.type='bandpass'; bp.frequency.value=1800; bp.Q.value=2.0; n.connect(hp).connect(bp).connect(g.gain); g.gain.connect(hitGain); n.start(t); n.stop(t+0.08) };
+
+    const clap=()=>{ // multi-burst clap: 0,20,40ms
+      const baseT=now(ctx); const mk=(dt)=>{ const n=this._mkNoise(0.12), hp=ctx.createBiquadFilter(), bp=ctx.createBiquadFilter(), g=ctx.createGain(); hp.type='highpass'; hp.frequency.value=1200; bp.type='bandpass'; bp.frequency.value=2000; bp.Q.value=1.2; g.gain.setValueAtTime(0, baseT+dt); g.gain.linearRampToValueAtTime(0.6*v, baseT+dt+0.002); g.gain.exponentialRampToValueAtTime(0.0001, baseT+dt+0.09); n.connect(hp).connect(bp).connect(g).connect(hitGain); n.start(baseT+dt); n.stop(baseT+dt+0.12) }; mk(0); mk(0.02); mk(0.04); };
+
+    const hat=(open=false)=>{ const n=this._mkNoise(open?0.35:0.08), hp=ctx.createBiquadFilter(), hg=ctx.createGain(); hp.type='highpass'; hp.frequency.value=P.hatHP; hg.gain.value=(open?0.22:0.32)*v; n.connect(hp).connect(hg).connect(hitGain); const t=now(ctx); n.start(t); n.stop(t+(open?0.30:0.05)) };
+
+    const tom=(freq)=>{ const o=ctx.createOscillator(); o.type='sine'; const {g,t}=this._envGain(0.001,0.04,0,0.22, 0.8*v); o.frequency.setValueAtTime(freq,t); o.connect(g.gain); g.gain.connect(hitGain); o.start(t); o.stop(t+0.26) };
+
+    const crash=()=>{ const n=this._mkNoise(0.9), hp=ctx.createBiquadFilter(), g=ctx.createGain(); hp.type='highpass'; hp.frequency.value=P.crash; g.gain.value=0.22*v; n.connect(hp).connect(g).connect(hitGain); const t=now(ctx); n.start(t); n.stop(t+0.9) };
 
     switch(midi){
       case 36: kick(P.kick.base,P.kick.dec,P.kick.click); break; // kick
-      case 37: snare(P.snare.tone*0.7,0.12); break;             // side stick-ish
-      case 38: snare(P.snare.tone,P.snare.noise); break;        // main snare
-      case 39: clap(); break;                                   // clap
-      case 40: snare(P.snare.tone*1.1,0.20); break;             // el. snare
-      case 41: tom(P.tom[0]); break;                            // low tom
-      case 42: hat(false); break;                               // closed hat
-      case 43: tom(P.tom[1]); break;                            // high floor tom
-      case 45: tom((P.tom[0]+P.tom[1])/2); break;               // mid tom
-      case 46: hat(true); break;                                // open hat
-      case 49: crash(); break;                                  // crash
-      case 51: crash(); break;                                  // ride (reuse)
-      default: hat(false);                                      // fallback
+      case 37: sidestick(); break;                               // side stick
+      case 38: snare(P.snare.tone,P.snare.noise); break;          // main snare
+      case 39: clap(); break;                                     // clap
+      case 40: snare(P.snare.tone*1.12,Math.max(0.12,P.snare.noise*0.9)); break; // elec snare
+      case 41: tom(P.tom[0]); break;                              // low tom
+      case 42: hat(false); break;                                 // closed hat
+      case 43: tom(P.tom[1]); break;                              // high floor tom
+      case 45: tom((P.tom[0]+P.tom[1])/2); break;                 // mid tom
+      case 46: hat(true); break;                                  // open hat
+      case 49: crash(); break;                                    // crash
+      case 51: crash(); break;                                    // ride (reuse)
+      default: hat(false);
     }
   }
 
