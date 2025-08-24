@@ -84,7 +84,9 @@ export class SynthEngine{
 
     // One-shot out with optional small reverb send
     const hitGain=ctx.createGain(); hitGain.gain.value=0.9*v; hitGain.connect(out);
-    const sendR=ctx.createGain(); sendR.gain.value=0.18*v; hitGain.connect(this.rev).connect(this.revGain); // share existing reverb bus
+    const send = ctx.createGain();
+    end.gain.value = 0.18 * v;
+    hitGain.connect(send).connect(this.rev); // convolver already routes to revGain → comp in init() // share existing reverb bus
 
     const kick=(base,dec,click)=>{ const o=ctx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(base,now(ctx)); o.frequency.exponentialRampToValueAtTime(Math.max(30,base*0.33), now(ctx)+0.12); const {g,t}=this._envGain(0.001, 0.05, 0.0001, dec, 1.2*v); o.connect(g.gain); g.gain.connect(hitGain); if(click>0){ const n=this._mkNoise(0.02), hp=ctx.createBiquadFilter(), cg=ctx.createGain(); hp.type='highpass'; hp.frequency.value=3000; cg.gain.value=0.15*v*click; n.connect(hp).connect(cg).connect(hitGain); n.start(t); n.stop(t+0.03) } o.start(); o.stop(now(ctx)+dec+0.05) };
 

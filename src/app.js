@@ -29,7 +29,7 @@ function buildPads(){
   for(let i=0;i<8;i++){
     const d=document.createElement('div'); d.className='pad';
     d.innerHTML=`<small>Pad ${i+1}</small><button class="mapBtn" title="Map this pad">●</button>`;
-    d.onmousedown=async(e)=>{ if(e.target.classList.contains('mapBtn')) return; await Eng.start(); handlePadHit(i, MapState.padNotes[i], 120); };
+    d.onmousedown = async (e)=>{ if(e.target.classList.contains('mapBtn')) return; await handlePadHit(i, MapState.padNotes[i], 120); };
     d.querySelector('.mapBtn').onclick=(e)=>{ e.stopPropagation(); startPadLearn(i, d.querySelector('.mapBtn')) };
     root.appendChild(d);
   }
@@ -94,7 +94,19 @@ function playOff(m){ if(window.COACH) window.COACH.noteOff(m); else rawNoteOff(m
 
 function allOff(){ Eng.releaseAll(); state.held.clear(); document.querySelectorAll('.white,.black,.pad').forEach(el=>el.classList.remove('active')) }
 
-function handlePadHit(idx, midi, vel){ if(state.padMode==='off') return; const gain=(MapState.padGain?.[idx]??1); flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120); if(state.padMode==='drum'){ Eng.setDrumKit(state.drumKit); Eng.triggerDrum(midi, (vel||110)/127, gain); } else if(state.padMode==='instrument'){ playOn(midi, Math.round((vel||110)*gain)); } }
+async function handlePadHit(idx, midi, vel){
+  await Eng.start();
+  if(state.padMode==='off') return;
+  const gain=(MapState.padGain?.[idx]??1);
+  flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120);
+  if(state.padMode==='drum'){
+    Eng.setDrumKit(state.drumKit);
+    Eng.triggerDrum(midi, (vel||110)/127, gain);
+  } else if(state.padMode==='instrument'){
+    playOn(midi, Math.round((vel||110)*gain));
+  }
+}
+
 
 function lcd(a,b){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>${a||''}${b?' — '+b:''}` }
 

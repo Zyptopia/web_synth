@@ -31,6 +31,7 @@ export class Coach{
 #coach .help{display:none; font-size:12px; color:#bfc8d2; grid-column:1 / -1; background:#0f1317; border:1px solid #1d2126; border-radius:10px; padding:8px}
 #kb .scale-ok{box-shadow: inset 0 0 0 2px #2ea043aa}
 #kb .scale-no{opacity:.55}
+#kb .hint{box-shadow: inset 0 0 0 2px #ffd33d99}
 #coachToggle{position:fixed; right:16px; bottom:16px; z-index:9998; background:#0b5bd3; color:#fff; border:none; border-radius:999px; padding:10px 14px; box-shadow:0 6px 16px rgba(0,0,0,.35);}
 `;
     const style=document.createElement('style'); style.textContent=css; document.head.appendChild(style);
@@ -112,9 +113,41 @@ export class Coach{
   patternOrder(list){ switch(this.arpPattern){ case 'down': return [...list].reverse(); case 'updown': { const up=[...list]; const dn=[...list].reverse().slice(1,-1); return up.concat(dn) } case 'random': return [list[Math.floor(Math.random()*list.length)]]; case 'chord': default: return list; } }
 
   // -------- Scale highlight / Chord hints ---------
-  updateScale(){ const kb=this.getKBEl?.(); if(!kb) return; const keys=[...kb.querySelectorAll('[data-midi]')]; keys.forEach(el=>{ el.classList.remove('scale-ok','scale-no','hint') }); if(!this.scaleOn) return; const allow=this.scaleSet(this.scaleKey,this.scaleType); keys.forEach(el=>{ const m=+el.dataset.midi; const ok=allow.has(m%12); el.classList.add(ok?'scale-ok':'scale-no') }); }
-  scaleSet(key, type){ const S={ major:[0,2,4,5,7,9,11], minor:[0,2,3,5,7,8,10], pentMajor:[0,2,4,7,9], pentMinor:[0,3,5,7,10], blues:[0,3,5,6,7,10], dorian:[0,2,3,5,7,9,10], mixolydian:[0,2,4,5,7,9,10] }; const ints=S[type]||S.major; const set=new Set(); for(const i of ints){ set.add((i+key)%12) } return set }
-  applyHints(root){ const kb=this.getKBEl?.(); if(!kb) return; [...kb.querySelectorAll('.hint')].forEach(el=>el.classList.remove('hint')); if(!this.chordHints || root==null) return; const isMinor=(this.scaleType.includes('minor')||this.scaleType==='dorian'); const third=root+(isMinor?3:4); const fifth=root+7; for(const m of [third,fifth]){ const el=kb.querySelector(`[data-midi="${m}"]`); if(el) el.classList.add('hint') } }
+updateScale(){
+  const kb = this.getKBEl?.(); if(!kb) return;
+  const keys = [...kb.querySelectorAll('[data-midi]')];
+  keys.forEach(el => el.classList.remove('scale-ok','scale-no','hint'));
+  if(!this.scaleOn) return;
+  const allow = this.scaleSet(this.scaleKey, this.scaleType);
+  keys.forEach(el => {
+    const m = +el.dataset.midi;
+    const ok = allow.has(m % 12);
+    el.classList.add(ok ? 'scale-ok' : 'scale-no');
+  });
+}
+
+applyHints(root){
+  const kb = this.getKBEl?.(); if(!kb) return;
+
+  // clear old hints
+  [...kb.querySelectorAll('.hint')].forEach(el => el.classList.remove('hint'));
+
+  if(!this.chordHints || root == null) return;
+
+  // Compare by pitch-class so octave/transposition doesn’t matter
+  const isMinor = (this.scaleType.includes('minor') || this.scaleType === 'dorian');
+  const rootPC  =  root % 12;
+  const thirdPC = (root + (isMinor ? 3 : 4)) % 12;
+  const fifthPC = (root + 7) % 12;
+
+  kb.querySelectorAll('[data-midi]').forEach(el => {
+    const pc = (+el.dataset.midi) % 12;
+    if (pc === rootPC || pc === thirdPC || pc === fifthPC) {
+      el.classList.add('hint');
+    }
+  });
+}
+
 
   // -------- Velocity curve ---------
   shapeVel(vel){ const x=vel/127; if(this.velCurve==='soft') return Math.round(127*Math.pow(x,0.7)); if(this.velCurve==='hard') return Math.round(127*Math.pow(x,1.7)); return vel }
