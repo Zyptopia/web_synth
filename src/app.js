@@ -1,7 +1,7 @@
 import {SynthEngine} from './synth.js';
 import {MidiManager} from './midi.js';
 import {PRESETS} from './presets.js';
-import {MapState, DRUM_CHOICES, midiName} from './mapping.js';
+import {MapState, PARAM_RANGES, DRUM_CHOICES, midiName} from './mapping.js';
 
 const $ = (s)=>document.querySelector(s);
 const $$ = (s)=>Array.from(document.querySelectorAll(s));
@@ -12,7 +12,10 @@ const fmtMs=v=>`${Math.round(v)}ms`, fmtHz=v=>v>=1000?(v/1000).toFixed(1)+'k':Ma
 function buildKeyboard(state){ const kb=$('#kb'); kb.innerHTML=''; const W=[0,2,4,5,7,9,11], B={1:1,3:1,6:1,8:1,10:1}; for(let i=0;i<25;i++){ const n=state.base+i, s=n%12; if(W.includes(s)){ const w=document.createElement('div'); w.className='white'; w.dataset.midi=n; kb.appendChild(w); const next=(s+1)%12; if(B[next]){ const b=document.createElement('div'); b.className='black'; b.dataset.midi=n+1; w.appendChild(b)} } } }
 function flashKey(state,m,on){ if(m<state.base-1||m>=state.base+32) return; const el=$(`#kb [data-midi="${m}"]`); if(!el) return; el.classList.toggle('active',!!on) }
 
-function buildPads(){ const root=$('#pads'); root.innerHTML=''; for(let i=0;i<8;i++){ const d=document.createElement('div'); d.className='pad'; d.innerHTML=`<small>Pad ${i+1}</small>`; d.onmousedown=async()=>{ await Eng.start(); Eng.setPreset('drum'); Eng.noteOn(MapState.padNotes[i],0.9); d.classList.add('active'); setTimeout(()=>d.classList.remove('active'),120) }; root.appendChild(d) } }
+function buildPads(){ const root=$('#pads'); root.innerHTML=''; for(let i=0;i<8;i++){ const d=document.createElement('div'); d.className='pad'; d.innerHTML=`<small>Pad ${i+1}</small><button class="mapBtn" title="Map this pad">●</button>`; d.onmousedown=async(e)=>{ if(e.target.classList.contains('mapBtn')) return; await Eng.start(); Eng.setPreset('drum'); Eng.noteOn(MapState.padNotes[i],0.9); d.classList.add('active'); setTimeout(()=>d.classList.remove('active'),120) }; d.querySelector('.mapBtn').onclick=(e)=>{ e.stopPropagation(); startPadLearn(i, d.querySelector('.mapBtn')) }; root.appendChild(d) } }
+
+// Inline mapping buttons for each control
+function injectInlineMap(){ const params = MapState.ccParams(); for(const p of params){ const el=$('#'+p); if(!el) continue; const row=el.closest('.control'); if(!row) continue; const b=document.createElement('button'); b.className='miniMap'; b.title='Map this control (Learn)'; b.textContent='●'; b.onclick=()=>startCCLearn(p,b); row.appendChild(b) } }
 
 // Diagnostics grid
 function diag(extra={}){ const cells=[ ['Secure',String(window.isSecureContext)], ['Host',location.hostname||'(file)'], ['Protocol',location.protocol], ['Engine', Eng?.mode||'—'], ['AudioState', Eng?.ctx?.state||'—'], ['WebMIDI', ('requestMIDIAccess'in navigator)?'yes':'no'], ['Buttons','yes'], ['LastErr', window.__lastErr||'—'] ]; for(const [k,v] of Object.entries(extra)) cells.push([k,v]); const root=$('#diag'); if(root) root.innerHTML=cells.map(([k,v])=>`<div class=di><b>${k}</b>${v}</div>`).join('') }
@@ -37,8 +40,9 @@ function allOff(){ Eng.releaseAll(); state.held.clear(); document.querySelectorA
 // LCD helper
 function lcd(a,b){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>${a}${b?' — '+b:''}` }
 
-// Sliders → engine
-function hook(id,fmt,on){ const el=$('#'+id), lab=$('#'+id+'Val'); const apply=()=>{ const v=+el.value; lab.textContent=fmt(v); on(v) }; el.addEventListener('input',apply); apply() }
+// Sliders → engine + remember normalized param (for relative CCs)
+function hookSlider(param,fmt,on){ const el=$('#'+param), lab=$('#'+param+'Val'); const apply=()=>{ const v=+el.value; lab.textContent=fmt(v); // store normalized
+    const r=PARAM_RANGES[param]; const x=(v-r.min)/(r.max-r.min); MapState.setParamNorm(param,x); on(v) }; el.addEventListener('input',apply); apply() }
 
 // Presets
 function loadPresets(){ const sel=$('#preset'); sel.innerHTML=''; for(const p of PRESETS){ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o) } sel.value='piano'; applyPreset('piano'); sel.onchange=()=>applyPreset(sel.value) }
@@ -50,11 +54,16 @@ function bindTyping(){ const keyW='asdfghjkl;'.split(''), keyB='wetyuop'.split('
   window.addEventListener('keyup', e=>{ const k=e.key.toLowerCase(); const iw=keyW.indexOf(k), ib=keyB.indexOf(k); let m=null; if(iw>-1)m=state.base+offW[iw]; else if(ib>-1)m=state.base+offB[ib]; if(m!=null) playOff(m) });
 }
 
-// MIDI wiring with mapping + learn modes
-let ccLearnParam=null; let padLearnIndex=null;
+// Learn state
+let ccLearnParam=null; let ccLearnBtn=null; let padLearnIndex=null; let padLearnBtn=null;
+function startCCLearn(param,btn){ ccLearnParam=param; ccLearnBtn?.classList.remove('active'); ccLearnBtn=btn; btn?.classList.add('active'); say(`Twist a knob to map → ${param}`,'warn') }
+function startPadLearn(idx,btn){ padLearnIndex=idx; padLearnBtn?.classList.remove('active'); padLearnBtn=btn; btn?.classList.add('active'); say(`Hit a pad to map → Pad ${idx+1}`,'warn') }
+function endLearns(){ if(ccLearnBtn) ccLearnBtn.classList.remove('active'); if(padLearnBtn) padLearnBtn.classList.remove('active'); ccLearnParam=null; padLearnIndex=null }
+
+// MIDI wiring with mapping + relative encoders support
 function bindMIDI(){
   MIDI.onNoteOn=(d1,d2)=>{
-    // If a hardware pad sends notes, we still just play them (drum or synth per preset)
+    if(padLearnIndex!=null){ MapState.padNotes[padLearnIndex]=d1; renderPadTable(); saveAll(); say(`Pad ${padLearnIndex+1} → MIDI ${d1} (${midiName(d1)})`,'ok'); endLearns(); return }
     if($('#preset').value==='drum') Eng.setPreset('drum', PRESETS.find(p=>p.id==='drum'));
     playOn(d1,d2);
   };
@@ -62,52 +71,63 @@ function bindMIDI(){
   MIDI.onBend=(bend)=>{ const cents=(bend/8192)*Eng.bendRange; Eng.bendTo(cents) };
   MIDI.onChChange=(ch)=>{ state.ch=ch };
   MIDI.onCC=(cc,val)=>{
-    if(ccLearnParam){
-      MapState.setCC(ccLearnParam, cc); renderCCTable(); saveAll(); ccLearnParam=null; say(`Mapped CC${cc} → ${ccLearnParam}`,'ok'); return;
-    }
+    if(ccLearnParam){ MapState.setCC(ccLearnParam, cc); renderCCTable(); saveAll(); say(`Mapped CC${cc} → ${ccLearnParam}`,'ok'); endLearns(); return }
+
+    // Detect rel/abs once
+    MapState.markCCMode(cc,val);
+
     // Special pedals
     if(cc===64){ Eng.setSustain(val>=64); lcd('Sustain',val>=64?'On':'Off'); return }
-    // Use mapping
+    if(cc===1){ // mod wheel works even if unmapped
+      if(!MapState.paramByCC(1) && !MapState.paramByCC(cc)) Eng.setModDepth(val/127);
+    }
+
     const target = MapState.paramByCC(cc);
-    if(!target){ if(cc===1){ Eng.setModDepth(val/127); lcd('Mod',val); } return }
-    const x=val/127;
-    switch(target){
-      case 'volume': { const db=-36 + x*(6+36); $('#volume').value=String(Math.round(db)); $('#volume').dispatchEvent(new Event('input')); break }
-      case 'cutoff': { const v=Math.round(150 + x*(12000-150)); Eng.setCutoff(v); const el=$('#cutoff'); if(el){ el.value=String(v); $('#cutoffVal').textContent=v>=1000?(v/1000).toFixed(1)+'k':String(v) } break }
-      case 'q':      { const v=(0.2 + x*(18-0.2)); Eng.setQ(v); const el=$('#q'); if(el){ el.value=String(v.toFixed(1)); $('#qVal').textContent=el.value } break }
-      case 'attack': { const v=Math.round(x*2000); const el=$('#attack'); if(el){ el.value=String(v); el.dispatchEvent(new Event('input')) } break }
-      case 'decay':  { const v=Math.round(x*3000); const el=$('#decay'); if(el){ el.value=String(v); el.dispatchEvent(new Event('input')) } break }
-      case 'sustain':{ const v=Number(x.toFixed(2)); const el=$('#sustain'); if(el){ el.value=String(v); el.dispatchEvent(new Event('input')) } break }
-      case 'release':{ const v=Math.round(10 + x*5990); const el=$('#release'); if(el){ el.value=String(v); el.dispatchEvent(new Event('input')) } break }
-      case 'reverb': { const v=Number(x.toFixed(2)); const el=$('#reverb'); if(el){ el.value=String(v); el.dispatchEvent(new Event('input')) } break }
-      case 'delay':  { const v=Number(x.toFixed(2)); const el=$('#delay'); if(el){ el.value=String(v); el.dispatchEvent(new Event('input')) } break }
-      case 'modDepth':{ Eng.setModDepth(x); break }
+    if(!target){ return }
+
+    const mode = MapState.ccMode[cc]||'absolute';
+    if(mode==='absolute'){
+      const x = val/127;
+      setParamByNorm(target, x);
+    } else {
+      // relative (two's complement around 64) → accumulate into stored normalized value
+      const delta = MapState.relDelta(val)/64; // -1..+1 step ≈ ±0.0156
+      const prev = MapState.getParamNorm(target);
+      const next = clamp(prev + delta, 0, 1);
+      setParamByNorm(target, next);
     }
   };
 }
 
-// Mapping UI
+function setParamByNorm(param, x){
+  MapState.setParamNorm(param, x);
+  const r = PARAM_RANGES[param];
+  const val = r.min + x*(r.max-r.min);
+  const el = $('#'+param);
+  if(el){ el.value = String(val); el.dispatchEvent(new Event('input')) }
+}
+
+// Mapping UI tables (kept minimal; main flow uses inline map buttons)
 function renderCCTable(){
   const params = MapState.ccParams();
   const table = $('#ccTable');
-  table.innerHTML = `<tr><th>Parameter</th><th>CC#</th><th></th></tr>` +
+  if(!table) return;
+  table.innerHTML = `<tr><th>Parameter</th><th>CC#</th><th>Mode</th></tr>` +
     params.map(p=>{
       const cc = MapState.ccMap[p] ?? '';
+      const mode = cc!=='' && MapState.ccMode[cc] ? MapState.ccMode[cc] : '';
       return `<tr>
         <td>${p}</td>
         <td><input data-cc-param="${p}" class="ccNum" type="number" min="0" max="127" value="${cc}"></td>
-        <td><button class="learnCC" data-param="${p}">Learn</button></td>
+        <td>${mode}</td>
       </tr>`
     }).join('');
   table.querySelectorAll('.ccNum').forEach(inp=>{
     inp.onchange=()=>{ MapState.setCC(inp.dataset.ccParam, clamp(parseInt(inp.value,10)||0,0,127)); saveAll() };
   });
-  table.querySelectorAll('.learnCC').forEach(btn=>{
-    btn.onclick=()=>{ ccLearnParam = btn.dataset.param; say(`Turn a knob to map → ${ccLearnParam}`,'warn') };
-  });
 }
 function renderPadTable(){
-  const table=$('#padTable');
+  const table=$('#padTable'); if(!table) return;
   table.innerHTML = `<tr><th>Pad</th><th>MIDI Note</th><th>Name</th></tr>`+
     MapState.padNotes.map((m,i)=>{
       const opts = DRUM_CHOICES.map(([name,n])=>`<option value="${n}" ${n===m?'selected':''}>${n} — ${name}</option>`).join('');
@@ -120,38 +140,16 @@ function renderPadTable(){
   table.querySelectorAll('.padSel').forEach(sel=>{
     sel.onchange=()=>{ const idx=+sel.dataset.padIdx; MapState.padNotes[idx]=parseInt(sel.value,10); saveAll() };
   });
-  const idxSel=$('#padIndex'); idxSel.innerHTML=''; for(let i=0;i<8;i++){ const o=document.createElement('option'); o.value=String(i); o.textContent=`Pad ${i+1}`; idxSel.appendChild(o) }
 }
-
-function bindMappingUI(){
-  // build param dropdown for learn
-  const dd=$('#ccLearnParam'); dd.innerHTML=''; for(const p of MapState.ccParams()){ const o=document.createElement('option'); o.value=p; o.textContent=p; dd.appendChild(o) }
-  $('#ccLearnBtn').onclick=()=>{ ccLearnParam=dd.value; say(`Turn a knob to map → ${ccLearnParam}`,'warn') };
-  $('#ccReset').onclick=()=>{ MapState.resetCC(); renderCCTable(); saveAll(); say('CC mapping reset to Axiom defaults.','ok') };
-
-  $('#padLearnBtn').onclick=()=>{ padLearnIndex = parseInt($('#padIndex').value,10); say(`Hit a pad on your Axiom to map → Pad ${padLearnIndex+1}`,'warn') };
-  $('#padReset').onclick=()=>{ MapState.resetPads(); renderPadTable(); saveAll(); say('Pad notes reset.','ok') };
-}
-
-// Capture pad learn on incoming notes (channel-agnostic)
-(function hookPadLearn(){
-  const origNoteOn = (d1,d2)=>{}; // placeholder
-  // We intercept MIDI.onNoteOn via a wrapper
-  const _onNote = (d1,d2)=>{
-    if(padLearnIndex!=null){ MapState.padNotes[padLearnIndex]=d1; renderPadTable(); saveAll(); say(`Pad ${padLearnIndex+1} → MIDI ${d1} (${midiName(d1)})`,'ok'); padLearnIndex=null; return }
-    playOn(d1,d2);
-  };
-  MIDI.onNoteOn = _onNote;
-})();
 
 // Export/Import
-function saveAll(){ localStorage.setItem('axiom.map.v1', JSON.stringify({ccMap:MapState.ccMap, padNotes:MapState.padNotes})) }
-function loadAll(){ try{ const s=localStorage.getItem('axiom.map.v1'); if(s){ const o=JSON.parse(s); if(o.ccMap) MapState.ccMap=o.ccMap; if(o.padNotes) MapState.padNotes=o.padNotes } }catch(_){} }
+function saveAll(){ localStorage.setItem('axiom.map.v2', JSON.stringify({ccMap:MapState.ccMap, ccMode:MapState.ccMode, padNotes:MapState.padNotes})) }
+function loadAll(){ try{ const s=localStorage.getItem('axiom.map.v2'); if(s){ const o=JSON.parse(s); if(o.ccMap) MapState.ccMap=o.ccMap; if(o.ccMode) MapState.ccMode=o.ccMode; if(o.padNotes) MapState.padNotes=o.padNotes } }catch(_){} }
 
 function bindConfig(){
-  $('#exportBtn').onclick=()=>{ const obj={ ccMap:MapState.ccMap, padNotes:MapState.padNotes }; const txt=JSON.stringify(obj,null,2); navigator.clipboard?.writeText(txt); const pb=$('#pastebox'); pb.value=(pb.value?pb.value+'':'')+txt; say('Config copied to clipboard.','ok') };
-  $('#importBtn').onclick=()=>{ const txt=prompt('Paste exported JSON'); if(!txt) return; try{ const obj=JSON.parse(txt); if(obj.ccMap) MapState.ccMap=obj.ccMap; if(obj.padNotes) MapState.padNotes=obj.padNotes; saveAll(); renderCCTable(); renderPadTable(); say('Imported.','ok') }catch(e){ say('Import failed: '+e.message,'bad') } };
-  $('#clearBtn').onclick=()=>{ localStorage.removeItem('axiom.map.v1'); loadAll(); renderCCTable(); renderPadTable(); say('Local settings cleared.','ok') };
+  $('#exportBtn').onclick=()=>{ const obj={ ccMap:MapState.ccMap, ccMode:MapState.ccMode, padNotes:MapState.padNotes }; const txt=JSON.stringify(obj,null,2); navigator.clipboard?.writeText(txt); const pb=$('#pastebox'); pb.value=(pb.value?pb.value+'':'')+txt; };
+  $('#importBtn').onclick=()=>{ const txt=prompt('Paste exported JSON'); if(!txt) return; try{ const obj=JSON.parse(txt); if(obj.ccMap) MapState.ccMap=obj.ccMap; if(obj.ccMode) MapState.ccMode=obj.ccMode; if(obj.padNotes) MapState.padNotes=obj.padNotes; saveAll(); renderCCTable(); renderPadTable(); say('Imported.','ok') }catch(e){ say('Import failed: '+e.message,'bad') } };
+  $('#clearBtn').onclick=()=>{ localStorage.removeItem('axiom.map.v2'); loadAll(); renderCCTable(); renderPadTable(); say('Local settings cleared.','ok') };
 }
 
 // UI binders, base note, transpose/octave
@@ -171,18 +169,17 @@ function bindUI(){
   // base note picker
   const baseSel=$('#baseNote'); for(let m=36;m<=72;m++){ const o=document.createElement('option'); o.value=m; o.textContent=`MIDI ${m}`; baseSel.appendChild(o) } baseSel.value=String(state.base); baseSel.onchange=()=>{ state.base=parseInt(baseSel.value,10); buildKeyboard(state) };
 
-  // sliders → engine
-  const hook=(id,fmt,on)=>{ const el=$('#'+id), lab=$('#'+id+'Val'); const apply=()=>{ const v=+el.value; lab.textContent=fmt(v); on(v) }; el.addEventListener('input',apply); apply() };
-  hook('volume',v=>`${v}dB`,v=>Eng.setVolume(v));
-  hook('attack',fmtMs,v=>Eng.setEnv(v,+$('#decay').value,+$('#sustain').value,+$('#release').value));
-  hook('decay',fmtMs,v=>Eng.setEnv(+$('#attack').value,v,+$('#sustain').value,+$('#release').value));
-  hook('sustain',v=>Number(v).toFixed(2),v=>Eng.setEnv(+$('#attack').value,+$('#decay').value,Number(v),+$('#release').value));
-  hook('release',fmtMs,v=>Eng.setEnv(+$('#attack').value,+$('#decay').value,+$('#sustain').value,v));
-  hook('cutoff',fmtHz,v=>Eng.setCutoff(v));
-  hook('q',v=>Number(v).toFixed(1),v=>Eng.setQ(Number(v)));
-  hook('reverb',v=>Number(v).toFixed(2),v=>Eng.setReverb(Number(v)));
-  hook('delay',v=>Number(v).toFixed(2),v=>Eng.setDelay(Number(v)));
-  hook('bendRange',v=>String(v),v=>Eng.setBendRange(Number(v)));
+  // sliders → engine (and remember normalized)
+  hookSlider('volume',v=>`${v}dB`,v=>Eng.setVolume(v));
+  hookSlider('attack',fmtMs,v=>Eng.setEnv(v,+$('#decay').value,+$('#sustain').value,+$('#release').value));
+  hookSlider('decay',fmtMs,v=>Eng.setEnv(+$('#attack').value,v,+$('#sustain').value,+$('#release').value));
+  hookSlider('sustain',v=>Number(v).toFixed(2),v=>Eng.setEnv(+$('#attack').value,+$('#decay').value,Number(v),+$('#release').value));
+  hookSlider('release',fmtMs,v=>Eng.setEnv(+$('#attack').value,+$('#decay').value,+$('#sustain').value,v));
+  hookSlider('cutoff',fmtHz,v=>Eng.setCutoff(v));
+  hookSlider('q',v=>Number(v).toFixed(1),v=>Eng.setQ(Number(v)));
+  hookSlider('reverb',v=>Number(v).toFixed(2),v=>Eng.setReverb(Number(v)));
+  hookSlider('delay',v=>Number(v).toFixed(2),v=>Eng.setDelay(Number(v)));
+  hookSlider('bendRange',v=>String(v),v=>Eng.setBendRange(Number(v)));
 
   // Presets
   loadPresets();
@@ -192,7 +189,7 @@ function bindUI(){
 function bindKeyMouse(){ const kb=$('#kb'); kb.addEventListener('mousedown', async e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); const m=+t.dataset.midi; playOn(m,110); const up=()=>{ playOff(m); window.removeEventListener('mouseup',up) }; window.addEventListener('mouseup',up) }); kb.addEventListener('touchstart', async e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); playOn(+t.dataset.midi,110) },{passive:true}); kb.addEventListener('touchend', e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; playOff(+t.dataset.midi) }); }
 
 // Boot
-buildKeyboard(state); buildPads(); bindKeyMouse(); bindTyping(); bindMIDI(); bindUI(); loadAll(); renderCCTable(); renderPadTable(); bindMappingUI();
+buildKeyboard(state); buildPads(); injectInlineMap(); bindKeyMouse(); bindTyping(); bindMIDI(); bindUI(); loadAll(); renderCCTable(); renderPadTable(); bindConfig();
 
 docReady();
 function docReady(){ say('Ready. Start Audio → Test Tone → Connect MIDI.','ok'); diag(); window.addEventListener('visibilitychange',()=>diag()); }
