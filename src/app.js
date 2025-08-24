@@ -174,8 +174,7 @@ function saveAll(){ localStorage.setItem('axiom.map.v2', JSON.stringify({ccMap:M
 function loadAll(){ try{ const s=localStorage.getItem('axiom.map.v2'); if(s){ const o=JSON.parse(s); if(o.ccMap) MapState.ccMap=o.ccMap; if(o.ccMode) MapState.ccMode=o.ccMode; if(o.padNotes) MapState.padNotes=o.padNotes } }catch(_){} }
 
 function bindConfig(){
-  $('#exportBtn').onclick=()=>{ const obj={ ccMap:MapState.ccMap, ccMode:MapState.ccMode, padNotes:MapState.padNotes }; const txt=JSON.stringify(obj,null,2); navigator.clipboard?.writeText(txt); const pb=$('#pastebox'); pb.value=(pb.value?pb.value+'
-':'')+txt; };
+  $('#exportBtn').onclick=()=>{ const obj={ ccMap:MapState.ccMap, ccMode:MapState.ccMode, padNotes:MapState.padNotes }; const txt=JSON.stringify(obj,null,2); navigator.clipboard?.writeText(txt); const pb=$('#pastebox'); pb.value=(pb.value?pb.value+'':'')+txt; };
   $('#importBtn').onclick=()=>{ const txt=prompt('Paste exported JSON'); if(!txt) return; try{ const obj=JSON.parse(txt); if(obj.ccMap) MapState.ccMap=obj.ccMap; if(obj.ccMode) MapState.ccMode=obj.ccMode; if(obj.padNotes) MapState.padNotes=obj.padNotes; saveAll(); renderCCTable(); renderPadTable(); updateInlineBadges(); say('Imported.','ok') }catch(e){ say('Import failed: '+e.message,'bad') } };
   $('#clearBtn').onclick=()=>{ localStorage.removeItem('axiom.map.v2'); loadAll(); renderCCTable(); renderPadTable(); updateInlineBadges(); say('Local settings cleared.','ok') };
 }
