@@ -1,12 +1,26 @@
 // SynthEngine — keyboard + drum engine
-// v7: separate keyboard (inst) volume, drum mix, cleaned drum routing, kits
+// v8: SAFE setters before audio start, reapply-on-build, keys/drums submix, fixed drum routing
 
 export class SynthEngine{
-  constructor(){ this.started=false; this.mode='idle'; this.presetId='piano'; this.sustain=false; this.bendRange=200; }
+  constructor(){
+    this.started=false; this._built=false; this.mode='idle';
+    this.presetId='piano'; this.sustain=false; this.bendRange=200;
+    // remember UI values set before audio starts
+    this._volDb=0; this._keysVol=1; this.cutoff=14000; this.q=0.8; this._revMix=0.18; this._delMix=0.0;
+    this.env={a:0.02,d:0.2,s:0.6,r:0.4};
+  }
 
-  async start(){ if(this.started && this.ctx?.state==='running') return true; this.ctx = this.ctx || new (window.AudioContext||window.webkitAudioContext)(); if(this.ctx.state!=='running'){ try{ await this.ctx.resume(); }catch{} } this.build(); this.started=true; this.mode='on'; return this.ctx.state==='running'; }
+  async start(){
+    if(this.started && this.ctx?.state==='running') return true;
+    this.ctx = this.ctx || new (window.AudioContext||window.webkitAudioContext)();
+    if(this.ctx.state!=='running'){ try{ await this.ctx.resume(); }catch(_){} }
+    this.build();
+    this.started=true; this.mode='on';
+    return this.ctx?.state==='running';
+  }
 
-  build(){ const ctx=this.ctx; if(this._built) return; this._built=true;
+  build(){
+    const ctx=this.ctx; if(!ctx) return; if(this._built) return; this._built=true;
     // Nodes
     this.master = ctx.createGain(); this.master.gain.value = 0.8; // dB controlled in app
     // Submixes
@@ -14,11 +28,11 @@ export class SynthEngine{
     this.drumGain = ctx.createGain(); this.drumGain.gain.value = 1.0; // drums-only
 
     // Synth voice path (shared): filter → instGain → comp
-    this.filter = ctx.createBiquadFilter(); this.filter.type='lowpass'; this.filter.frequency.value=14000; this.filter.Q.value=0.8;
+    this.filter = ctx.createBiquadFilter(); this.filter.type='lowpass'; this.filter.frequency.value=this.cutoff; this.filter.Q.value=this.q;
 
     // FX
-    this.rev = ctx.createConvolver(); this.revGain = ctx.createGain(); this.revGain.gain.value=0.18;
-    this.delay = ctx.createDelay(1.0); this.delay.delayTime.value=0.25; this.delayFB=ctx.createGain(); this.delayFB.gain.value=0.25; this.delayGain=ctx.createGain(); this.delayGain.gain.value=0.0; this.delay.connect(this.delayFB).connect(this.delay);
+    this.rev = ctx.createConvolver(); this.revGain = ctx.createGain(); this.revGain.gain.value=this._revMix;
+    this.delay = ctx.createDelay(1.0); this.delay.delayTime.value=0.25; this.delayFB=ctx.createGain(); this.delayFB.gain.value=0.25; this.delayGain=ctx.createGain(); this.delayGain.gain.value=this._delMix; this.delay.connect(this.delayFB).connect(this.delay);
 
     // Master comp
     this.comp = ctx.createDynamicsCompressor(); this.comp.threshold.value=-18; this.comp.knee.value=6; this.comp.ratio.value=2; this.comp.attack.value=0.003; this.comp.release.value=0.24;
@@ -33,86 +47,79 @@ export class SynthEngine{
     // Reverb IR
     this.rev.buffer = this.makeSmallIR(ctx);
 
-    // defaults
-    this.env={a:0.02,d:0.2,s:0.6,r:0.4};
-    this.cutoff=14000; this.q=0.8; this.keyVoices=new Map();
-    this.kits = this.makeKits(); this.currentKit='standard';
+    // defaults / state
+    this.keyVoices=new Map();
+    this.kits = this.makeKits(); this.currentKit=this.currentKit||'standard';
 
     // Re-apply any values set before start()
-if (this._volDb != null) {
-  const lin = Math.pow(10, this._volDb/20);
-  this.master.gain.setValueAtTime(lin, this.ctx.currentTime);
-}
-if (this._keysVol != null) this.instGain.gain.setValueAtTime(this._keysVol, this.ctx.currentTime);
-if (this.cutoff != null)   this.filter.frequency.setValueAtTime(this.cutoff, this.ctx.currentTime);
-if (this.q != null)        this.filter.Q.setValueAtTime(this.q, this.ctx.currentTime);
-if (this._revMix != null)  this.revGain.gain.setValueAtTime(this._revMix, this.ctx.currentTime);
-if (this._delMix != null)  this.delayGain.gain.setValueAtTime(this._delMix, this.ctx.currentTime);
+    if (this._volDb != null) {
+      const lin = Math.pow(10, this._volDb/20);
+      this.master.gain.setValueAtTime(lin, ctx.currentTime);
+    }
+    if (this._keysVol != null) this.instGain.gain.setValueAtTime(this._keysVol, ctx.currentTime);
+    if (this.cutoff != null)   this.filter.frequency.setValueAtTime(this.cutoff, ctx.currentTime);
+    if (this.q != null)        this.filter.Q.setValueAtTime(this.q, ctx.currentTime);
+    if (this._revMix != null)  this.revGain.gain.setValueAtTime(this._revMix, ctx.currentTime);
+    if (this._delMix != null)  this.delayGain.gain.setValueAtTime(this._delMix, ctx.currentTime);
   }
 
-  // ---- Controls ----
-setVolume(db){
-  this._volDb = db;                           // remember desired volume
-  const lin = Math.pow(10, db/20);
-  if (this.master) this.master.gain.setTargetAtTime(lin, this.ctx.currentTime, 0.01);
-}
-
-setKeysVolume(v){                              // 0..1
-  this._keysVol = Math.max(0, Math.min(1, v)); // remember desired keys volume
-  if (this.instGain) this.instGain.gain.setTargetAtTime(this._keysVol, this.ctx.currentTime, 0.01);
-}
-
-setBendRange(cents){ this.bendRange=cents }
-
-setEnv(a,d,s,r){ this.env={a:a/1000,d:d/1000,s, r:r/1000} }
-
-setCutoff(hz){
-  this.cutoff = hz;                            // remember
-  if (this.filter) this.filter.frequency.setTargetAtTime(hz, this.ctx.currentTime, 0.01);
-}
-
-setQ(q){
-  this.q = q;                                  // remember
-  if (this.filter) this.filter.Q.setTargetAtTime(q, this.ctx.currentTime, 0.01);
-}
-
-setReverb(mix){
-  this._revMix = Math.max(0,Math.min(1,mix));  // remember
-  if (this.revGain) this.revGain.gain.setTargetAtTime(this._revMix, this.ctx.currentTime, 0.01);
-}
-
-setDelay(mix){
-  this._delMix = Math.max(0,Math.min(1,mix));  // remember
-  if (this.delayGain) this.delayGain.gain.setTargetAtTime(this._delMix, this.ctx.currentTime, 0.01);
-}
-
+  // ---- Controls (safe even before start) ----
+  setVolume(db){
+    this._volDb = db; // remember
+    if (this.master && this.ctx) {
+      const lin = Math.pow(10, db/20);
+      this.master.gain.setTargetAtTime(lin, this.ctx.currentTime, 0.01);
+    }
+  }
+  setKeysVolume(v){
+    this._keysVol = Math.max(0, Math.min(1, v));
+    if (this.instGain && this.ctx) {
+      this.instGain.gain.setTargetAtTime(this._keysVol, this.ctx.currentTime, 0.01);
+    }
+  }
+  setBendRange(cents){ this.bendRange=cents }
+  setEnv(a,d,s,r){ this.env={a:a/1000,d:d/1000,s, r:r/1000} }
+  setCutoff(hz){
+    this.cutoff = hz;
+    if (this.filter && this.ctx) this.filter.frequency.setTargetAtTime(hz, this.ctx.currentTime, 0.01);
+  }
+  setQ(q){
+    this.q = q;
+    if (this.filter && this.ctx) this.filter.Q.setTargetAtTime(q, this.ctx.currentTime, 0.01);
+  }
+  setReverb(mix){
+    this._revMix = Math.max(0,Math.min(1,mix));
+    if (this.revGain && this.ctx) this.revGain.gain.setTargetAtTime(this._revMix, this.ctx.currentTime, 0.01);
+  }
+  setDelay(mix){
+    this._delMix = Math.max(0,Math.min(1,mix));
+    if (this.delayGain && this.ctx) this.delayGain.gain.setTargetAtTime(this._delMix, this.ctx.currentTime, 0.01);
+  }
   setBendRangeSemis(semi){ this.bendRange = semi*100 }
 
-  test(){ const ctx=this.ctx; const o=ctx.createOscillator(); const g=ctx.createGain(); o.type='sine'; o.frequency.value=880; g.gain.value=0.1; o.connect(g).connect(this.master); o.start(); o.stop(ctx.currentTime+0.15) }
+  test(){ if(!this.ctx) return; const ctx=this.ctx; const o=ctx.createOscillator(); const g=ctx.createGain(); o.type='sine'; o.frequency.value=880; g.gain.value=0.1; o.connect(g).connect(this.master); o.start(); o.stop(ctx.currentTime+0.15) }
 
   // ---- Synth voices ----
-  noteOn(midi, v=0.8){ const ctx=this.ctx; const t=ctx.currentTime; const f=440*Math.pow(2,(midi-69)/12); const o=ctx.createOscillator(); o.type='sawtooth'; const sh=ctx.createOscillator(); sh.type='sine'; sh.frequency.value=5; const shg=ctx.createGain(); shg.gain.value=0.002*f; sh.connect(shg).connect(o.frequency);
+  noteOn(midi, v=0.8){ if(!this.ctx) return; const ctx=this.ctx; const t=ctx.currentTime; const f=440*Math.pow(2,(midi-69)/12); const o=ctx.createOscillator(); o.type='sawtooth'; const lfo=ctx.createOscillator(); lfo.type='sine'; lfo.frequency.value=5; const lfg=ctx.createGain(); lfg.gain.value=0.002*f; lfo.connect(lfg).connect(o.frequency);
     const g=ctx.createGain(); g.gain.setValueAtTime(0, t); // ADSR
     g.gain.linearRampToValueAtTime(0.8*v, t+this.env.a);
     g.gain.linearRampToValueAtTime(this.env.s*0.8*v, t+this.env.a+this.env.d);
     o.connect(g).connect(this.filter);
-    o.start(t);
-    this.keyVoices.set(midi,{o,g});
+    o.start(t); lfo.start(t);
+    this.keyVoices.set(midi,{o,g,lfo});
   }
-  noteOff(midi){ const v=this.keyVoices.get(midi); if(!v) return; const t=this.ctx.currentTime; v.gainEndAt = t+this.env.r; v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(v.g.gain.value, t); v.g.gain.exponentialRampToValueAtTime(0.0001, t+this.env.r); v.o.stop(t+this.env.r+0.02); this.keyVoices.delete(midi); }
-  releaseAll(){ for(const [m,v] of [...this.keyVoices]){ this.noteOff(m) } }
-  bendTo(cents){ /* left as exercise; simple vibrato already present */ }
+  noteOff(midi){ if(!this.ctx) return; const v=this.keyVoices.get(midi); if(!v) return; const t=this.ctx.currentTime; v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(v.g.gain.value, t); v.g.gain.exponentialRampToValueAtTime(0.0001, t+this.env.r); v.o.stop(t+this.env.r+0.02); v.lfo?.stop(t+this.env.r+0.02); this.keyVoices.delete(midi); }
+  releaseAll(){ for(const [m] of [...this.keyVoices]){ this.noteOff(m) } }
+  bendTo(cents){ /* placeholder: vibrato already present */ }
   setSustain(on){ this.sustain=on }
 
   // ---- Drums ----
-  setDrumKit(id){ if(this.kits[id]) this.currentKit=id }
-  triggerDrum(midi, vel01=0.9, padGain=1){ const ctx=this.ctx; const v=Math.max(0.01, Math.min(1, vel01))*padGain; const now=()=>ctx.currentTime; const out=this.drumGain; const P=this.kits[this.currentKit];
+  setDrumKit(id){ if(this.kits?.[id]) this.currentKit=id }
+  triggerDrum(midi, vel01=0.9, padGain=1){ if(!this.ctx) return; const ctx=this.ctx; const v=Math.max(0.01, Math.min(1, vel01))*padGain; const now=()=>ctx.currentTime; const out=this.drumGain; const P=this.kits[this.currentKit];
     const hitGain=ctx.createGain(); hitGain.gain.value=0.9*v; hitGain.connect(out);
     const send=ctx.createGain(); send.gain.value=0.18*v; hitGain.connect(send).connect(this.rev);
 
-    const freqOf=(p)=> ({36:P.kick,37:P.rim,38:P.snare,39:P.clap,40:P.tomL,41:P.tomM,42:P.hatC,43:P.tomH,46:P.hatO,49:P.crash}[p]||P.snare);
-
-    const mkNoise=(dur)=>{ const buf=ctx.createBuffer(1, Math.max(1,Math.floor(ctx.sampleRate*dur)), ctx.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]= (Math.random()*2-1)*0.7 } const n=ctx.createBufferSource(); n.buffer=buf; return n };
+    const mkNoise=(dur)=>{ const buf=ctx.createBuffer(1, Math.max(1,Math.floor(ctx.sampleRate*dur)), ctx.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*0.7 } const n=ctx.createBufferSource(); n.buffer=buf; return n };
     const env=(a,d,s,r,amp=1)=>{ const g=ctx.createGain(); const t=now(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(amp,t+a); g.gain.exponentialRampToValueAtTime(0.0001, t+a+d+r); return {g,t} };
 
     const kick=(base,dec,click)=>{ const o=ctx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(base, now()); o.frequency.exponentialRampToValueAtTime(Math.max(30, base*0.33), now()+0.12); const {g,t}=env(0.001,0.05,0.0001,dec,1.2*v); o.connect(g).connect(hitGain); if(click>0){ const n=mkNoise(0.02), hp=ctx.createBiquadFilter(), cg=ctx.createGain(); hp.type='highpass'; hp.frequency.value=3000; cg.gain.value=0.15*v*click; n.connect(hp).connect(cg).connect(hitGain); n.start(t); n.stop(t+0.03);} o.start(); o.stop(now()+dec+0.05); };
@@ -138,10 +145,10 @@ setDelay(mix){
     }
   }
 
-  setPreset(id,p){ this.presetId=id; /* your existing preset logic can live here if needed */ }
+  setPreset(id,p){ this.presetId=id; /* hook for preset system */ }
 
   // ---- small IR
-  makeSmallIR(ctx){ const len=ctx.sampleRate*1.2; const buf=ctx.createBuffer(2,len,ctx.sampleRate); for(let ch=0;ch<2;ch++){ const d=buf.getChannelData(ch); for(let i=0;i<len;i++){ const t=i/ctx.sampleRate; d[i]=(Math.random()*2-1)*Math.pow(1-t/1.2,3)*0.4 } } return buf }
+  makeSmallIR(ctx){ if(!ctx) return null; const len=ctx.sampleRate*1.2|0; const buf=ctx.createBuffer(2,len,ctx.sampleRate); for(let ch=0;ch<2;ch++){ const d=buf.getChannelData(ch); for(let i=0;i<len;i++){ const t=i/ctx.sampleRate; d[i]=(Math.random()*2-1)*Math.pow(1-t/1.2,3)*0.4 } } return buf }
 
   makeKits(){ return {
     standard:{ kick:80, snare:190, hatHP:8000, crash:4500, tomL:110, tomM:150, tomH:200 },

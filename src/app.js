@@ -74,6 +74,24 @@ window.__lastErr='—';
 window.addEventListener('error',e=>{window.__lastErr=e.message; diag()});
 window.addEventListener('unhandledrejection',e=>{window.__lastErr=String(e.reason?.message||e.reason||'Promise'); diag()});
 
+
+function applyEngineFromUI(){
+  if(!Eng?.started) return;
+  try{
+    Eng.setVolume(+$('#volume').value);
+    Eng.setEnv(+$('#attack').value, +$('#decay').value, +$('#sustain').value, +$('#release').value);
+    Eng.setCutoff(+$('#cutoff').value);
+    Eng.setQ(+$('#q').value);
+    Eng.setReverb(+$('#reverb').value);
+    Eng.setDelay(+$('#delay').value);
+    Eng.setBendRange(Number($('#bendRange').value));
+    const kv=document.querySelector('#keysVol');
+    if(kv) Eng.setKeysVolume(parseFloat(kv.value)||0);
+  }catch(e){
+    window.__lastErr=e.message; diag();
+  }
+}
+
 // ---------------- Engine & MIDI ----------------
 const Eng = new SynthEngine();
 const MIDI = new MidiManager();
@@ -101,9 +119,29 @@ function lcd(a,b){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>
 // ---------------- Controls ----------------
 function hookSlider(param,fmt,on){
   const el=$('#'+param), lab=$('#'+param+'Val'); if(!el||!lab) return;
-  const apply=()=>{ const v=+el.value; lab.textContent=fmt(v); const r=PARAM_RANGES[param]; if(r){ const x=(v-r.min)/(r.max-r.min); MapState.setParamNorm(param,x); } on(v); updateInlineBadges(); };
-  el.addEventListener('input',apply); apply();
+
+  const applyUI=()=>{ 
+    const v=+el.value; 
+    lab.textContent=fmt(v); 
+    const r=PARAM_RANGES[param]; 
+    if(r){ 
+      const x=(v-r.min)/(r.max-r.min); 
+      MapState.setParamNorm(param,x); 
+    } 
+    updateInlineBadges(); 
+  };
+  const applyEngine=()=>{ 
+    if(Eng?.started){ 
+      const v=+el.value; 
+      try{ on(v); }catch(_){} 
+    } 
+  };
+
+  el.addEventListener('input',()=>{ applyUI(); applyEngine(); });
+  applyUI();             // UI shows values right away
+  // (engine gets set later by applyEngineFromUI after Start)
 }
+
 
 function loadPresets(){ const sel=$('#preset'); if(!sel) return; sel.innerHTML=''; for(const p of PRESETS){ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o) } sel.value='piano'; applyPreset('piano'); sel.onchange=()=>applyPreset(sel.value) }
 const ensurePresets=()=>{ const sel=$('#preset'); if(sel && sel.options.length===0) loadPresets(); };
@@ -193,16 +231,21 @@ function addKeysVolUI(){
   dv.innerHTML=`<label>Keys Volume</label><input type="range" id="keysVol" min="0" max="1" step="0.01" value="1"><span id="keysVolVal">100%</span>`;
   row.after(dv);
   const el=$('#keysVol'), lab=$('#keysVolVal');
-  const apply=()=>{ const v=parseFloat(el.value)||0; lab.textContent=Math.round(v*100)+'%'; if (Eng.instGain) Eng.setKeysVolume(v); }; // <-- guard
+  const apply=()=>{ 
+  const v=parseFloat(el.value)||0; 
+  lab.textContent=Math.round(v*100)+'%'; 
+  if(Eng?.started && Eng.instGain) Eng.setKeysVolume(v);   // <-- guard
+};
+
   el.addEventListener('input',apply);
   apply(); // harmless before audio; re-fired below after start
 }
 
 
 function bindUI(){
-  $('#startBtn').onclick = async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test() } else say('Audio context not running. Click again.','warn'); diag(); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } const kv=document.querySelector('#keysVol'); if(kv) kv.dispatchEvent(new Event('input'));};
-  $('#testBtn').onclick = async()=>{ try{ await Eng.start(); Eng.test(); say('Test beep sent.','ok'); diag(); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say('Test failed: '+e.message,'bad'); diag() } const kv2=document.querySelector('#keysVol'); if(kv2) kv2.dispatchEvent(new Event('input'));};
-  $('#midiBtn').onclick = async()=>{ try{ const {list,selected} = await MIDI.connect(); const sel=$('#midiIn'); if(sel){ sel.innerHTML=''; for(const i of list){ const o=document.createElement('option'); o.value=i.id; o.textContent=i.name; sel.appendChild(o) } if(selected) sel.value=selected.id; } say(selected?`Connected to <b>${selected.name}</b>.`:'MIDI ready. Select device.','ok'); diag({MIDIInputs:list.length}); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say(e.message,'bad'); diag() } const kv3=document.querySelector('#keysVol'); if(kv3) kv3.dispatchEvent(new Event('input'));};
+  $('#startBtn').onclick = async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test() } else say('Audio context not running. Click again.','warn'); diag(); ensurePresets(); addKeysVolUI(); applyEngineFromUI(); }catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } const kv=document.querySelector('#keysVol'); if(kv) kv.dispatchEvent(new Event('input'));};
+  $('#testBtn').onclick = async()=>{ try{ await Eng.start(); Eng.test(); say('Test beep sent.','ok'); diag(); ensurePresets(); addKeysVolUI(); applyEngineFromUI(); }catch(e){ window.__lastErr=e.message; say('Test failed: '+e.message,'bad'); diag() } const kv2=document.querySelector('#keysVol'); if(kv2) kv2.dispatchEvent(new Event('input'));};
+  $('#midiBtn').onclick = async()=>{ try{ const {list,selected} = await MIDI.connect(); const sel=$('#midiIn'); if(sel){ sel.innerHTML=''; for(const i of list){ const o=document.createElement('option'); o.value=i.id; o.textContent=i.name; sel.appendChild(o) } if(selected) sel.value=selected.id; } say(selected?`Connected to <b>${selected.name}</b>.`:'MIDI ready. Select device.','ok'); diag({MIDIInputs:list.length}); ensurePresets(); addKeysVolUI(); applyEngineFromUI(); }catch(e){ window.__lastErr=e.message; say(e.message,'bad'); diag() } const kv3=document.querySelector('#keysVol'); if(kv3) kv3.dispatchEvent(new Event('input'));};
   $('#resetBtn').onclick = ()=>{ location.reload() };
 
   // LCD utilities
