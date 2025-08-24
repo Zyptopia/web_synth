@@ -63,6 +63,23 @@
             <select id="preset"></select>
             <button id="panic">🛑</button>
           </div>
+          <div class="control"><label>Pads Mode</label>
+            <select id="padMode">
+              <option value="drum">Drum Kit (pads trigger drums)</option>
+              <option value="instrument">Instrument Notes (use preset)</option>
+              <option value="off">Off (pads inactive)</option>
+            </select>
+            <div class="val" id="padModeVal"></div>
+          </div>
+          <div class="control" id="drumKitRow"><label>Drum Kit</label>
+            <select id="drumKit">
+              <option value="standard">Standard</option>
+              <option value="808">808‑ish</option>
+              <option value="electro">Electro/Noise</option>
+              <option value="room">Roomy</option>
+            </select>
+            <div class="val" id="drumKitVal"></div>
+          </div>
           <div class="control"><label>Master Volume</label><input id="volume" type="range" min="-36" max="6" step="1" value="-6"><div id="volumeVal" class="val">-6dB</div></div>
           <div class="control"><label>Attack</label><input id="attack" type="range" min="0" max="2000" step="10" value="20"><div id="attackVal" class="val">20ms</div></div>
           <div class="control"><label>Decay</label><input id="decay" type="range" min="0" max="3000" step="10" value="200"><div id="decayVal" class="val">200ms</div></div>
