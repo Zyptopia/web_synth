@@ -37,22 +37,55 @@ export class SynthEngine{
     this.env={a:0.02,d:0.2,s:0.6,r:0.4};
     this.cutoff=14000; this.q=0.8; this.keyVoices=new Map();
     this.kits = this.makeKits(); this.currentKit='standard';
+
+    // Re-apply any values set before start()
+if (this._volDb != null) {
+  const lin = Math.pow(10, this._volDb/20);
+  this.master.gain.setValueAtTime(lin, this.ctx.currentTime);
+}
+if (this._keysVol != null) this.instGain.gain.setValueAtTime(this._keysVol, this.ctx.currentTime);
+if (this.cutoff != null)   this.filter.frequency.setValueAtTime(this.cutoff, this.ctx.currentTime);
+if (this.q != null)        this.filter.Q.setValueAtTime(this.q, this.ctx.currentTime);
+if (this._revMix != null)  this.revGain.gain.setValueAtTime(this._revMix, this.ctx.currentTime);
+if (this._delMix != null)  this.delayGain.gain.setValueAtTime(this._delMix, this.ctx.currentTime);
   }
 
   // ---- Controls ----
-  setVolume(db){ // master
-    const lin = Math.pow(10, db/20);
-    this.master.gain.setTargetAtTime(lin, this.ctx.currentTime, 0.01);
-  }
-  setKeysVolume(v){ // 0..1
-    this.instGain.gain.setTargetAtTime(Math.max(0,Math.min(1,v)), this.ctx.currentTime, 0.01);
-  }
-  setBendRange(cents){ this.bendRange=cents }
-  setEnv(a,d,s,r){ this.env={a:a/1000,d:d/1000,s, r:r/1000} }
-  setCutoff(hz){ this.cutoff=hz; this.filter.frequency.setTargetAtTime(hz, this.ctx.currentTime, 0.01) }
-  setQ(q){ this.q=q; this.filter.Q.setTargetAtTime(q, this.ctx.currentTime, 0.01) }
-  setReverb(mix){ this.revGain.gain.setTargetAtTime(Math.max(0,Math.min(1,mix)), this.ctx.currentTime, 0.01) }
-  setDelay(mix){ this.delayGain.gain.setTargetAtTime(Math.max(0,Math.min(1,mix)), this.ctx.currentTime, 0.01) }
+setVolume(db){
+  this._volDb = db;                           // remember desired volume
+  const lin = Math.pow(10, db/20);
+  if (this.master) this.master.gain.setTargetAtTime(lin, this.ctx.currentTime, 0.01);
+}
+
+setKeysVolume(v){                              // 0..1
+  this._keysVol = Math.max(0, Math.min(1, v)); // remember desired keys volume
+  if (this.instGain) this.instGain.gain.setTargetAtTime(this._keysVol, this.ctx.currentTime, 0.01);
+}
+
+setBendRange(cents){ this.bendRange=cents }
+
+setEnv(a,d,s,r){ this.env={a:a/1000,d:d/1000,s, r:r/1000} }
+
+setCutoff(hz){
+  this.cutoff = hz;                            // remember
+  if (this.filter) this.filter.frequency.setTargetAtTime(hz, this.ctx.currentTime, 0.01);
+}
+
+setQ(q){
+  this.q = q;                                  // remember
+  if (this.filter) this.filter.Q.setTargetAtTime(q, this.ctx.currentTime, 0.01);
+}
+
+setReverb(mix){
+  this._revMix = Math.max(0,Math.min(1,mix));  // remember
+  if (this.revGain) this.revGain.gain.setTargetAtTime(this._revMix, this.ctx.currentTime, 0.01);
+}
+
+setDelay(mix){
+  this._delMix = Math.max(0,Math.min(1,mix));  // remember
+  if (this.delayGain) this.delayGain.gain.setTargetAtTime(this._delMix, this.ctx.currentTime, 0.01);
+}
+
   setBendRangeSemis(semi){ this.bendRange = semi*100 }
 
   test(){ const ctx=this.ctx; const o=ctx.createOscillator(); const g=ctx.createGain(); o.type='sine'; o.frequency.value=880; g.gain.value=0.1; o.connect(g).connect(this.master); o.start(); o.stop(ctx.currentTime+0.15) }

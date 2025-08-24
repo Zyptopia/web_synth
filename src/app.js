@@ -184,12 +184,25 @@ function updatePadModeUI(){ $('#padMode').value=state.padMode; $('#drumKit').val
 
 function ensureDrumKitOptions(){ const dk=$('#drumKit'); if(!dk) return; const want=['standard','808','electro','room','trap','lofi','cr78','dnb']; const labels={standard:'Standard','808':'808',electro:'Electro',room:'Roomy',trap:'Trap',lofi:'Lo‑Fi',cr78:'CR‑78',dnb:'DnB'}; const have=new Set([...dk.options].map(o=>o.value)); for(const id of want){ if(!have.has(id)){ const o=document.createElement('option'); o.value=id; o.textContent=labels[id]; dk.appendChild(o) } } }
 
-function addKeysVolUI(){ const m=$('#volume'); if(!m) return; if($('#keysVol')) return; const row=m.closest('.control')||m.parentElement; const dv=document.createElement('div'); dv.className='control'; dv.innerHTML=`<label>Keys Volume</label><input type="range" id="keysVol" min="0" max="1" step="0.01" value="1"><span id="keysVolVal">100%</span>`; row.after(dv); const el=$('#keysVol'), lab=$('#keysVolVal'); const apply=()=>{ const v=parseFloat(el.value)||0; lab.textContent=Math.round(v*100)+'%'; Eng.setKeysVolume(v); }; el.addEventListener('input',apply); apply(); }
+function addKeysVolUI(){
+  const m=$('#volume'); if(!m) return;
+  if($('#keysVol')) return;
+  const row=m.closest('.control')||m.parentElement;
+  const dv=document.createElement('div');
+  dv.className='control';
+  dv.innerHTML=`<label>Keys Volume</label><input type="range" id="keysVol" min="0" max="1" step="0.01" value="1"><span id="keysVolVal">100%</span>`;
+  row.after(dv);
+  const el=$('#keysVol'), lab=$('#keysVolVal');
+  const apply=()=>{ const v=parseFloat(el.value)||0; lab.textContent=Math.round(v*100)+'%'; if (Eng.instGain) Eng.setKeysVolume(v); }; // <-- guard
+  el.addEventListener('input',apply);
+  apply(); // harmless before audio; re-fired below after start
+}
+
 
 function bindUI(){
-  $('#startBtn').onclick = async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test() } else say('Audio context not running. Click again.','warn'); diag(); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } };
-  $('#testBtn').onclick = async()=>{ try{ await Eng.start(); Eng.test(); say('Test beep sent.','ok'); diag(); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say('Test failed: '+e.message,'bad'); diag() } };
-  $('#midiBtn').onclick = async()=>{ try{ const {list,selected} = await MIDI.connect(); const sel=$('#midiIn'); if(sel){ sel.innerHTML=''; for(const i of list){ const o=document.createElement('option'); o.value=i.id; o.textContent=i.name; sel.appendChild(o) } if(selected) sel.value=selected.id; } say(selected?`Connected to <b>${selected.name}</b>.`:'MIDI ready. Select device.','ok'); diag({MIDIInputs:list.length}); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say(e.message,'bad'); diag() } };
+  $('#startBtn').onclick = async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test() } else say('Audio context not running. Click again.','warn'); diag(); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } const kv=document.querySelector('#keysVol'); if(kv) kv.dispatchEvent(new Event('input'));};
+  $('#testBtn').onclick = async()=>{ try{ await Eng.start(); Eng.test(); say('Test beep sent.','ok'); diag(); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say('Test failed: '+e.message,'bad'); diag() } const kv2=document.querySelector('#keysVol'); if(kv2) kv2.dispatchEvent(new Event('input'));};
+  $('#midiBtn').onclick = async()=>{ try{ const {list,selected} = await MIDI.connect(); const sel=$('#midiIn'); if(sel){ sel.innerHTML=''; for(const i of list){ const o=document.createElement('option'); o.value=i.id; o.textContent=i.name; sel.appendChild(o) } if(selected) sel.value=selected.id; } say(selected?`Connected to <b>${selected.name}</b>.`:'MIDI ready. Select device.','ok'); diag({MIDIInputs:list.length}); ensurePresets(); addKeysVolUI(); }catch(e){ window.__lastErr=e.message; say(e.message,'bad'); diag() } const kv3=document.querySelector('#keysVol'); if(kv3) kv3.dispatchEvent(new Event('input'));};
   $('#resetBtn').onclick = ()=>{ location.reload() };
 
   // LCD utilities
