@@ -112,21 +112,21 @@ export class Coach{
   runArp(){ if(this.arpTimer) return; const step=()=>{ if(this.held.length===0){ this.arpTimer=null; return } const notes=this.patternOrder(this.held); const idx=this.arpIdx%notes.length; const n=notes[idx]; this.arpIdx++; this.noteOnRaw(n,110); const perMS=(60/this.bpm)*1000*(4/this.arpRate); const gateMS=perMS*this.arpGate; setTimeout(()=>this.noteOffRaw(n), gateMS); this.arpTimer=setTimeout(step, perMS); }; step(); }
   patternOrder(list){ switch(this.arpPattern){ case 'down': return [...list].reverse(); case 'updown': { const up=[...list]; const dn=[...list].reverse().slice(1,-1); return up.concat(dn) } case 'random': return [list[Math.floor(Math.random()*list.length)]]; case 'chord': default: return list; } }
 
- // -------- Scale highlight / Chord hints ---------
+// -------- Scale highlight / Chord hints (final, stable) --------
 updateScale(){
-  const kb = this.getKBEl?.();
-  if (!kb) return;
-
+  const kb = this.getKBEl?.(); if (!kb) return;
   const keys = [...kb.querySelectorAll('[data-midi]')];
   for (const el of keys) el.classList.remove('scale-ok','scale-no','hint');
 
   if (!this.scaleOn) return;
 
-  const allow = this.scaleSet(this.scaleKey, this.scaleType);
+  const allow = this.scaleSet(this.scaleKey ?? 0, this.scaleType || 'major');
   for (const el of keys) {
     const m = +el.dataset.midi;
-    el.classList.add(allow.has(m % 12) ? 'scale-ok' : 'scale-no');
+    el.classList.add( allow.has(m % 12) ? 'scale-ok' : 'scale-no' );
   }
+  // keep any active hints re-applied after scale redraw
+  if (this._lastRootPC != null) this.applyHints(this._lastRootPC);
 }
 
 scaleSet(key, type){
@@ -141,29 +141,58 @@ scaleSet(key, type){
   };
   const ints = S[type] || S.major;
   const set = new Set();
-  for (const i of ints) set.add((i + key) % 12);
+  for (const i of ints) set.add((i + (key||0)) % 12);
   return set;
 }
 
-applyHints(root){
-  const kb = this.getKBEl?.();
-  if (!kb) return;
+applyHints(rootPC){
+  const kb = this.getKBEl?.(); if (!kb) return;
 
-  // clear old hints
+  // clear previous
   for (const el of kb.querySelectorAll('.hint')) el.classList.remove('hint');
 
-  if (!this.chordHints || root == null) return;
+  // default ON if UI hasn't set it
+  const hintsOn = (this.chordHints !== false);
+  if (!hintsOn || rootPC == null) return;
 
-  const isMinor = (this.scaleType.includes('minor') || this.scaleType === 'dorian');
-  const rootPC  =  root % 12;
-  const thirdPC = (root + (isMinor ? 3 : 4)) % 12;
-  const fifthPC = (root + 7) % 12;
+  const isMinor = (String(this.scaleType||'').includes('minor') || this.scaleType === 'dorian');
+  const thirdPC = (rootPC + (isMinor ? 3 : 4)) % 12;
+  const fifthPC = (rootPC + 7) % 12;
 
   for (const el of kb.querySelectorAll('[data-midi]')) {
     const pc = (+el.dataset.midi) % 12;
     if (pc === rootPC || pc === thirdPC || pc === fifthPC) el.classList.add('hint');
   }
 }
+
+noteOn(midi, vel=100){
+  // forward the actual sound
+  this.noteOnRaw?.(midi, vel);
+
+  // track held notes + root for hints
+  this._held = this._held || new Set();
+  this._held.add(midi);
+  this._lastRootPC = midi % 12;    // last key pressed wins
+  this.applyHints(this._lastRootPC);
+}
+
+noteOff(midi){
+  this.noteOffRaw?.(midi);
+  if (!this._held) return;
+  this._held.delete(midi);
+
+  if (this._held.size === 0){
+    this._lastRootPC = null;
+    this.applyHints(null);          // clears hints
+  } else {
+    // keep hints based on most recent pressed that's still held
+    let last = null;
+    for (const m of this._held) last = m;     // Set iteration preserves insertion order
+    this._lastRootPC = last % 12;
+    this.applyHints(this._lastRootPC);
+  }
+}
+
 
 
   // -------- Velocity curve ---------
