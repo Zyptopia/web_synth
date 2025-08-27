@@ -113,6 +113,8 @@ function installTransportUI(){
       #transport select{background:#1b1e24;border:1px solid #334;border-radius:8px;color:#fff;padding:6px}
       #transport .sep{width:1px;height:20px;background:#4456}
       #transport .mini{opacity:.8}
+      #tBeat{width:10px;height:10px;border-radius:50%;background:#555;margin-left:6px;box-shadow:0 0 0 0 #0f0}
+      #tBeat.on{background:#0f7;box-shadow:0 0 10px 2px #0f7}
     </style>
     <button id=tPlay>▶</button>
     <button id=tStop>■</button>
@@ -123,6 +125,7 @@ function installTransportUI(){
     <select id=tLen>
       <option value=1>1 bar</option><option value=2>2 bars</option><option selected value=4>4 bars</option><option value=8>8 bars</option>
     </select>
+    <span id=tBeat title="Beat"></span>
     <span class=sep></span>
     <label class=mini>Record <select id=tRecSrc><option value=master>Master</option><option value=keys>Keys</option><option value=drums>Drums</option></select></label>
   `;
@@ -133,7 +136,8 @@ function installTransportUI(){
   if(!LOOPER && CLOCK){
     LOOPER=new Looper(CLOCK);
     LOOPER.setLength(4);
-    // sample-accurate scheduling against AudioContext time
+
+    // schedule at exact AudioContext time
     const schedule=(at, ev, track)=>{
       const ms = Math.max(0, (at - Eng.ctx.currentTime) * 1000);
       if(track==='keys'){
@@ -143,6 +147,15 @@ function installTransportUI(){
       }
     };
     LOOPER.play(schedule);
+
+    // beat LED for feedback
+    CLOCK.on('tick', ({when, beat})=>{
+      const led = wrap.querySelector('#tBeat');
+      if(!led) return;
+      // flash on each quarter-note (every 4 ticks)
+      const isQuarter = Math.abs(((when/beat)*4) % 4) < 0.001;
+      if(isQuarter){ led.classList.add('on'); setTimeout(()=>led.classList.remove('on'), 60); }
+    });
   }
   if(!REC && Eng?.ctx){ REC=new Recorder(Eng.ctx, {master:Eng.master, keys:Eng.instGain, drums:Eng.drumGain}); }
   window.CLOCK=CLOCK; window.LOOPER=LOOPER; window.REC=REC;
@@ -152,23 +165,36 @@ function installTransportUI(){
   const tPlay=$('#tPlay'), tStop=$('#tStop'), tRec=$('#tRec');
   const tBpm=$('#tBpm'), tLoop=$('#tLoop'), tLen=$('#tLen'), tRecSrc=$('#tRecSrc');
 
-  tPlay.onclick=()=>{ CLOCK?.play(); tPlay.classList.add('active'); };
-  tStop.onclick=()=>{ CLOCK?.stop(); tPlay.classList.remove('active');
-    if(tRec.classList.contains('active')){ try{ REC.stop(); }catch{} tRec.classList.remove('active'); }
+  tPlay.onclick=async ()=>{
+    // ensure audio is started (safety)
+    if(!Eng?.ctx || Eng.ctx.state!=='running'){ try{ await Eng.start(); }catch{} }
+    if(!CLOCK){ CLOCK=new Clock({ctx:Eng.ctx, bpm:+tBpm.value||120}); window.CLOCK=CLOCK; }
+    CLOCK.play(); tPlay.classList.add('active');
+    say('Transport: Play','ok');
   };
-  tRec.onclick =()=>{ if(!tRec.classList.contains('active')){
-      REC?.arm(tRecSrc.value).start();
-      tRec.classList.add('active');
+
+  tStop.onclick=()=>{
+    CLOCK?.stop(); tPlay.classList.remove('active');
+    if(tRec.classList.contains('active')){ try{ REC.stop(); }catch{} tRec.classList.remove('active'); }
+    say('Transport: Stop','ok');
+  };
+
+  tRec.onclick =()=>{
+    if(!tRec.classList.contains('active')){
+      try{ REC?.arm(tRecSrc.value).start(); tRec.classList.add('active'); say(`Recording ${tRecSrc.value}…`,'ok'); }
+      catch(e){ window.__lastErr = e.message; say('Record failed: '+e.message,'bad'); diag(); }
     } else {
-      try{ REC.stop(); }catch{}
-      tRec.classList.remove('active');
+      try{ REC.stop(); }catch(e){ /* noop */ }
+      tRec.classList.remove('active'); say('Recording stopped.','ok');
     }
   };
+
   tBpm.oninput =()=>{ const v=+tBpm.value||120; CLOCK?.setBpm(v); };
   tLoop.onchange=()=>{ CLOCK?.enableLoop(tLoop.checked); };
   tLen.onchange =()=>{ LOOPER?.setLength(+tLen.value||4); };
-  tRecSrc.onchange=()=>{ /* armed on start() */ };
+  tRecSrc.onchange=()=>{};
 }
+
 
 
 // Coach (metronome, arp, scale, velocity, composer)
@@ -186,11 +212,25 @@ function playOn(m,vel=100){
   if(window.LOOPER && Eng?.ctx) window.LOOPER.recordNoteOn(m, vel, Eng.ctx.currentTime, 'keys');
   if(window.COACH) window.COACH.noteOn(m,vel); else rawNoteOn(m,vel);
 }
+
 function playOff(m){ if(window.COACH) window.COACH.noteOff(m); else rawNoteOff(m) }
 
 function allOff(){ Eng.releaseAll(); state.held.clear(); document.querySelectorAll('.white,.black,.pad').forEach(el=>el.classList.remove('active')) }
 
-async function handlePadHit(idx, midi, vel){ await Eng.start(); if(state.padMode==='off') return; const gain=(MapState.padGain?.[idx]??1); flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120); if(state.padMode==='drum'){ Eng.setDrumKit(state.drumKit); Eng.triggerDrum(midi, (vel||110)/127, gain); if(window.LOOPER && Eng?.ctx) window.LOOPER.recordNoteOn(midi, vel||110, Eng.ctx.currentTime, state.padMode==='drum'?'drums':'keys'); } else if(state.padMode==='instrument'){ playOn(midi, Math.round((vel||110)*gain)); } }
+async function handlePadHit(idx, midi, vel){
+  await Eng.start();
+  if(state.padMode==='off') return;
+  const gain=(MapState.padGain?.[idx]??1);
+  flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120);
+  if(state.padMode==='drum'){
+    Eng.setDrumKit(state.drumKit);
+    Eng.triggerDrum(midi, (vel||110)/127, gain);
+  } else if(state.padMode==='instrument'){
+    playOn(midi, Math.round((vel||110)*gain));
+  }
+  if(window.LOOPER && Eng?.ctx) window.LOOPER.recordNoteOn(midi, vel||110, Eng.ctx.currentTime, state.padMode==='drum'?'drums':'keys');
+}
+
 
 function lcd(a,b){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>${a||''}${b?' — '+b:''}` }
 
