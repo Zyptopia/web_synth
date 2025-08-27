@@ -163,17 +163,23 @@ function installTransportUI(){
     LOOPER=new Looper(CLOCK);
     LOOPER.setLength(4);
 
+    // After LOOPER.setLength(n):
+    const beats = LOOPER.lenBars * 4;
+    for (const evs of Object.values(LOOPER.tracks)) {
+    for (const ev of evs) ev.t = ((ev.t % beats) + beats) % beats;
+    }
+
     // schedule at exact AudioContext time; respect note duration if present
     const schedule=(at, ev, track)=>{
       if(!Eng?.ctx) return;
       const ms = Math.max(0, (at - Eng.ctx.currentTime) * 1000);
       if(track==='keys'){
         const gateSec = ev.durBeats ? ev.durBeats * (60/(CLOCK?.bpm||120)) : 0.20;
-        setTimeout(()=>Eng.noteOn(ev.midi, (ev.vel||100)/127), ms);
-        setTimeout(()=>Eng.noteOff(ev.midi), ms + gateSec*1000);
-      }else{
-        setTimeout(()=>Eng.triggerDrum(ev.midi, (ev.vel||110)/127), ms);
-      }
+       if(ev.type==='on') setTimeout(()=>Eng.noteOn(ev.midi, (ev.vel||100)/127), ms);
+       else if(ev.type==='off') setTimeout(()=>Eng.noteOff(ev.midi), ms);
+    }else{
+        if(ev.type==='on') setTimeout(()=>Eng.triggerDrum(ev.midi, (ev.vel||110)/127), ms);
+    }
     };
     LOOPER.play(schedule);
 
@@ -341,6 +347,7 @@ function playOff(m){
     PENDING.keys.delete(m);
   }
   if(window.COACH) window.COACH.noteOff(m); else rawNoteOff(m);
+  if(window.LOOPER && Eng?.ctx) window.LOOPER.recordNoteOff(m, Eng.ctx.currentTime, 'keys');
 }
 
 function allOff(){ Eng.releaseAll(); state.held.clear(); document.querySelectorAll('.white,.black,.pad').forEach(el=>el.classList.remove('active')) }
