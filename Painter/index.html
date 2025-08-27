@@ -164,7 +164,7 @@
       </div>
 
       <h2>Shortcuts</h2>
-      <p class="stat">Eraser <span class="kbd">E</span> • New layer <span class="kbd">N</span> • Clear <span class="kbd">C</span> • Play/Stop <span class="kbd">Space</span> • Rec <span class="kbd">R</span></p>
+      <p class="stat">Eraser <span class="kbd">E</span> • New layer <span class="kbd">N</span> • Clear layer <span class="kbd">C</span> • Play/Stop <span class="kbd">Space</span> • Rec <span class="kbd">R</span> • Panic <span class="kbd">P</span></p>
     </aside>
     <div id="stageWrap">
       <!-- Canvases inserted here -->
@@ -232,48 +232,77 @@
 
   btnStartAudio.addEventListener('click', async () => { ensureAudio(); if (audioCtx.state !== 'running') await audioCtx.resume(); });
 
-  // Simple synth per‑note with safe retrigger & release
-  const activeOsc = new Map(); // note -> {osc, gain}
+  // --- Voice management (robust against missed NoteOff) ---
+  const activeOsc = new Map(); // note -> {osc, g, timer}
   const activeNotes = new Map(); // note -> {velocity, t, sustained, pressure}
+  const heldCounts = new Map(); // note -> count of overlapping NoteOn
+  const AUTO_OFF_MS = 8000; // fail-safe in case NoteOff never arrives
 
   function midiToFreq(n) { return 440 * Math.pow(2, (n - 69) / 12); }
 
+  function retriggerEnvelope(g, v) {
+    const now = audioCtx.currentTime;
+    g.gain.cancelScheduledValues(now);
+    g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), now);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, v), now + 0.01);
+    g.gain.exponentialRampToValueAtTime(v*0.7, now + 0.25);
+  }
+
   function startTone(note, velocity=100) {
     ensureAudio();
-    // Retrigger: stop existing voice for this note before starting a new one
-    if (activeOsc.has(note)) { stopTone(note, true); }
-    const osc = audioCtx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.value = midiToFreq(note);
-    const g = audioCtx.createGain();
     const v = Math.max(0.0001, (velocity/127));
-    const now = audioCtx.currentTime;
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(v, now + 0.01); // attack
-    g.gain.exponentialRampToValueAtTime(v*0.7, now + 0.25); // decay
-    osc.connect(g).connect(masterGain.node);
-    osc.start();
-    activeOsc.set(note, {osc, g});
+    let h = activeOsc.get(note);
+    if (!h) {
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = midiToFreq(note);
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      osc.connect(g).connect(masterGain.node);
+      osc.start();
+      h = { osc, g, timer: null };
+      activeOsc.set(note, h);
+    }
+    retriggerEnvelope(h.g, v);
+
+    // refresh fail-safe timer
+    if (h.timer) clearTimeout(h.timer);
+    h.timer = setTimeout(() => forceStop(note), AUTO_OFF_MS);
   }
 
   function stopTone(note, fast=false) {
     const h = activeOsc.get(note);
     if (!h) return;
+    if (h.timer) { clearTimeout(h.timer); h.timer = null; }
     const now = audioCtx.currentTime;
     h.g.gain.cancelScheduledValues(now);
-    if (fast) { h.g.gain.setTargetAtTime(0.0001, now, 0.02); }
-    else { h.g.gain.setTargetAtTime(0.0001, now, 0.08); }
-    setTimeout(() => { try { h.osc.stop(); h.osc.disconnect(); h.g.disconnect(); } catch {} activeOsc.delete(note); }, fast ? 60 : 140);
+    if (fast) h.g.gain.linearRampToValueAtTime(0.0001, now + 0.03);
+    else h.g.gain.linearRampToValueAtTime(0.0001, now + 0.12);
+    try { h.osc.stop(now + 0.15); } catch {}
+    setTimeout(() => { try { h.osc.disconnect(); h.g.disconnect(); } catch {} activeOsc.delete(note); }, 200);
+  }
+
+  function forceStop(note) {
+    heldCounts.delete(note);
+    activeNotes.delete(note);
+    stopTone(note, true);
+    refreshNoteList();
   }
 
   function allNotesOff() {
+    // reset everything
+    heldCounts.clear();
     activeNotes.clear();
     for (const n of Array.from(activeOsc.keys())) stopTone(n, true);
+    sustainDown = false; pressure = 0; mpeScatter = 0;
+    downKeys.clear && downKeys.clear();
     refreshNoteList();
   }
 
   btnPanic.addEventListener('click', allNotesOff);
   window.addEventListener('blur', allNotesOff);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) allNotesOff(); });
+  document.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'p') { allNotesOff(); } });
 
   // --- MIDI ---
   let midi = null;
@@ -325,7 +354,6 @@
   function onMIDIMessage(e) {
     const [status, d1, d2] = e.data;
     const cmd = status & 0xF0;
-    const ch = status & 0x0F;
     if (cmd === 0x90) { // note on (or off if vel=0)
       if (d2 === 0) noteOff(d1);
       else noteOn(d1, d2, 'midi');
@@ -343,7 +371,7 @@
       } else if (cc === 120 || cc === 123) { // all sound off / all notes off
         allNotesOff();
       }
-    } else if (cmd === 0xE0) { // pitch bend (coarse control of flow phase)
+    } else if (cmd === 0xE0) { // pitch bend
       const bend = ((d2 << 7) + d1) - 8192; // -8192..+8191
       flowPhase = bend / 8192 * Math.PI; // -pi..+pi
     } else if ((status & 0xF0) === 0xD0) { // channel pressure
@@ -354,6 +382,7 @@
   }
 
   function noteOn(note, vel=100, source='live') {
+    const cnt = (heldCounts.get(note) || 0) + 1; heldCounts.set(note, cnt);
     activeNotes.set(note, { velocity: vel, t: performance.now(), source, pressure: 0 });
     startTone(note, vel);
     if (isRecording) recordEvent({ t: ctxNowLoop(), type: 'on', note, vel });
@@ -361,14 +390,20 @@
   }
 
   function noteOff(note) {
-    if (sustainDown) { const n = activeNotes.get(note); if (n) n.sustained = true; }
-    else { activeNotes.delete(note); stopTone(note); if (isRecording) recordEvent({ t: ctxNowLoop(), type: 'off', note }); }
+    if (sustainDown) { const n = activeNotes.get(note); if (n) n.sustained = true; refreshNoteList(); return; }
+    const cnt = (heldCounts.get(note) || 0) - 1;
+    if (cnt > 0) { heldCounts.set(note, cnt); return; }
+    heldCounts.delete(note);
+    activeNotes.delete(note);
+    stopTone(note);
+    if (isRecording) recordEvent({ t: ctxNowLoop(), type: 'off', note });
     refreshNoteList();
   }
 
   function flushSustained() {
-    const toStop = []; activeNotes.forEach((val, key) => { if (val.sustained) toStop.push(key); });
-    toStop.forEach(k => { activeNotes.delete(k); stopTone(k); if (isRecording) recordEvent({ t: ctxNowLoop(), type: 'off', note: k }); });
+    const toStop = [];
+    activeNotes.forEach((val, key) => { if (val.sustained) toStop.push(key); });
+    toStop.forEach(k => { heldCounts.delete(k); activeNotes.delete(k); stopTone(k); if (isRecording) recordEvent({ t: ctxNowLoop(), type: 'off', note: k }); });
     refreshNoteList();
   }
 
@@ -378,7 +413,8 @@
     activeNotes.forEach((n, note) => {
       const item = document.createElement('div'); item.className = 'item';
       const name = midiNoteName(note);
-      item.innerHTML = `<span>${name}</span><span class="pill">vel ${n.velocity}${n.sustained ? ' • sus' : ''}</span>`;
+      const held = heldCounts.get(note) || 0;
+      item.innerHTML = `<span>${name}</span><span class="pill">vel ${n.velocity} • held ${held}${n.sustained ? ' • sus' : ''}</span>`;
       noteList.appendChild(item);
     });
   }
@@ -486,9 +522,7 @@
 
   function quantizeTime(t) {
     const q = parseInt(quantSel.value,10); if (!q) return t; // off
-    const step = (1 / q) * secondsPerBeat() * BEATS_PER_BAR; // wrong; fix: 1/q of bar
-    // Better: q = 8 -> 1/8 note. Duration per 1/8 note = 0.5 beats
-    const step2 = secondsPerBeat() * (4 / q); // since 4/q beats per step
+    const step2 = secondsPerBeat() * (4 / q); // 1/q note length
     return Math.round(t / step2) * step2;
   }
 
@@ -516,24 +550,17 @@
 
   function schedulerTick() {
     const now = ctxNow(); const len = loopLength(); const winStart = now; const winEnd = now + scheduleHorizon;
-    // For each take
     for (const take of takes) {
       if (take.muted) continue;
       for (const ev of take.events) {
-        // schedule this event for the nearest future occurrence within window
-        // event times are [0,len)
-        let t = loopStartTime + ev.t; // current loop cycle @ 0
-        while (t < winStart) t += len; // advance into/near window
+        let t = loopStartTime + ev.t;
+        while (t < winStart) t += len;
         if (t >= winStart && t < winEnd) {
-          if (ev.type === 'on') {
-            scheduleAt(t, () => noteOn(ev.note, ev.vel, 'playback'));
-          } else if (ev.type === 'off') {
-            scheduleAt(t, () => noteOff(ev.note));
-          }
+          if (ev.type === 'on') scheduleAt(t, () => noteOn(ev.note, ev.vel, 'playback'));
+          else if (ev.type === 'off') scheduleAt(t, () => noteOff(ev.note));
         }
       }
     }
-    // Update counter
     const pos = ctxNowLoop(); const beatFloat = pos / secondsPerBeat(); const bar = Math.floor(beatFloat / BEATS_PER_BAR) + 1; const beat = (beatFloat % BEATS_PER_BAR) + 1; counterEl.textContent = `${bar}:${beat.toFixed(1)}`;
   }
 
@@ -544,7 +571,6 @@
   btnRec.addEventListener('click', toggleRec);
   document.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); isPlaying ? stopPlay() : startPlay(); } else if (e.key.toLowerCase() === 'r') { e.preventDefault(); toggleRec(); } });
 
-  // Duplicate (tile) pattern when bars increases
   let lastBars = parseInt(barsSel.value,10);
   btnDuplicatePattern.addEventListener('click', () => {
     const newBars = parseInt(barsSel.value,10); const oldBars = lastBars; if (newBars <= oldBars) { lastBars = newBars; return; }
@@ -574,41 +600,35 @@
 
   function loop(nowMs) {
     const dt = Math.max(0.001, Math.min(0.05, (nowMs - last) / 1000)); last = nowMs;
-    // FPS
     frames++; if (nowMs - lastFPS > 1000) { fpsEl.textContent = `${frames} fps`; frames = 0; lastFPS = nowMs; }
 
-    // Compute flow from active notes
     let dx = 0, dy = 0, weightSum = 0, hueNum = 0;
     activeNotes.forEach((n, note) => {
       const wBase = n.velocity / 127;
-      const press = (n.pressure ?? pressure) * 0.8; // aftertouch / channel pressure
+      const press = (n.pressure ?? pressure) * 0.8;
       const w = wBase * (1 + press);
       const angle = (note * GOLDEN_ANGLE + flowPhase) % (Math.PI * 2);
       dx += Math.cos(angle) * w; dy += Math.sin(angle) * w; hueNum += note * w * 7.0; weightSum += w;
     });
 
-    // Spectral influence
     let low=0, mid=0; if (analyser) { analyser.getByteFrequencyData(fft); const n=fft.length; const nLow = Math.floor(n*0.1), nMid = Math.floor(n*0.3); for (let i=0;i<nLow;i++) low+=fft[i]; low/=Math.max(1,nLow*255); for (let i=nLow;i<nLow+nMid;i++) mid+=fft[i]; mid/=Math.max(1,nMid*255); }
 
     if (weightSum > 0) {
       const scatter = scatterRange.valueAsNumber + mpeScatter;
       const speed = 60 * dt * (0.6 + brushScale.valueAsNumber * 0.4) * (1 + mid*0.6);
       pen.px = pen.x; pen.py = pen.y;
-      // random jitter from scatter
       const jitter = () => (Math.random()-0.5) * scatter;
       pen.x += (dx * (1 + weightSum * 1.2) + jitter());
       pen.y += (dy * (1 + weightSum * 1.2) + jitter());
 
-      // Wrap around edges
       const rect = stageWrap.getBoundingClientRect();
       if (pen.x < 0) { pen.x += rect.width; pen.px = pen.x; }
       if (pen.y < 0) { pen.y += rect.height; pen.py = pen.y; }
       if (pen.x > rect.width) { pen.x -= rect.width; pen.px = pen.x; }
       if (pen.y > rect.height) { pen.y -= rect.height; pen.py = pen.y; }
 
-      // Stroke style
       let hue = ((hueNum / Math.max(0.0001, weightSum)) % 360 + 360) % 360;
-      if (presetSel.value === 'mono') hue = 200; // blue‑mono
+      if (presetSel.value === 'mono') hue = 200;
       const alpha = Math.min(1, opacityRange.valueAsNumber * (0.7 + low*0.6));
       const width = 1 + (brushScale.valueAsNumber * (1 + weightSum * 6)) * (1 + (pressure*0.8));
 
@@ -630,7 +650,6 @@
   });
   window.addEventListener('keyup', (e) => { if (!useComputerKeys.checked) return; const k = e.key.toLowerCase(); const note = KEY_LAYOUT[k]; if (note !== undefined) { downKeys.delete(k); noteOff(note); } });
 
-  // Wake audio on pointer
   stageWrap.addEventListener('pointerdown', () => { ensureAudio(); audioCtx && audioCtx.resume(); });
 
   // --- Capture (canvas + audio → WebM) ---
@@ -649,6 +668,9 @@
   function stopCapture() { if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); }
   btnStartCapture.addEventListener('click', startCapture);
   btnStopCapture.addEventListener('click', stopCapture);
+
+  // transport UI state (small helper)
+  window.updateTransportButtons = function(){};
 
 })();
 </script>
