@@ -160,6 +160,12 @@ function installTransportUI(){
   if(!LOOPER && CLOCK){
     LOOPER=new Looper(CLOCK);
     LOOPER.setLength(4);
+    
+    
+    const beats = LOOPER.lenBars * 4;
+for (const evs of Object.values(LOOPER.tracks)) {
+  for (const ev of evs) ev.t = ((ev.t % beats) + beats) % beats;
+}
 
     // schedule at exact AudioContext time; respect note duration if present
     const schedule=(at, ev, track)=>{

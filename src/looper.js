@@ -16,8 +16,9 @@ export class Looper {
   }
   // Playback: call with schedule(whenAbsSec, event, track)
   play(schedule){
-    const secPerBeat=this._secPerBeat(); const stepSec=secPerBeat/4; const loopSec=this.lenBars*4*secPerBeat;
+    const secPerBeat=this._secPerBeat(); const stepSec=secPerBeat/4;
     this.clock.on('tick', ({when})=>{
+      const loopSec = this.lenBars*4*secPerBeat; // <-- use current length
       const loopStart = Math.floor(when/loopSec)*loopSec;
       for(const [track,evs] of Object.entries(this.tracks)){
         for(const ev of evs){ const at=loopStart + ev.t*secPerBeat; if(at>=when && at<when+stepSec){ schedule(at, ev, track); } }
