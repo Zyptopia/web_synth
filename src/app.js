@@ -100,6 +100,25 @@ const Eng = new SynthEngine();
 const MIDI = new MidiManager();
 window.Eng=Eng;
 
+// ---------- Looper helpers (durations, overdub, layers) ----------
+let COACH;
+let CLOCK, LOOPER, REC;
+
+// overdub toggle + current layer id
+window.__looperOD = true;
+window.__layerId = 1;
+
+// track pending note-ons (to compute duration on release)
+const PENDING = { keys:new Map() }; // midi -> { idx, startSec }
+
+// quick timing helpers
+const secPerBeat = ()=> 60/(window.CLOCK?.bpm || 120);
+const loopBeats  = ()=> (window.LOOPER?.lenBars || 4) * 4;
+const quantStepBeats = ()=>{
+  const q = window.LOOPER?.quant || '1/16';
+  return q==='1/8'?0.5 : q==='1/4'?1 : 0.25;
+};
+
 function installTransportUI(){
   if(document.querySelector('#transport')) return;
   const wrap=document.createElement('div');
@@ -116,15 +135,20 @@ function installTransportUI(){
       #tBeat{width:10px;height:10px;border-radius:50%;background:#555;margin-left:6px;box-shadow:0 0 0 0 #0f0}
       #tBeat.on{background:#0f7;box-shadow:0 0 10px 2px #0f7}
     </style>
-    <button id=tPlay>▶</button>
-    <button id=tStop>■</button>
-    <button id=tRec>●</button>
+    <button id=tPlay title="Play">▶</button>
+    <button id=tStop title="Stop">■</button>
+    <button id=tRec title="Record audio">●</button>
     <label class=mini>BPM <input id=tBpm type=number min=20 max=300 step=1 value="120"></label>
     <span class=sep></span>
     <label class=mini>Loop <input id=tLoop type=checkbox checked></label>
     <select id=tLen>
       <option value=1>1 bar</option><option value=2>2 bars</option><option selected value=4>4 bars</option><option value=8>8 bars</option>
     </select>
+    <button id=tOD class="active" title="Overdub on/off (record into loop)">OD</button>
+    <button id=tNew title="Start a new layer">＋</button>
+    <select id=tLayerSel class=mini title="Existing layers"></select>
+    <button id=tDel title="Delete selected layer">✖</button>
+    <button id=tClr title="Clear all layers">CLR</button>
     <span id=tBeat title="Beat"></span>
     <span class=sep></span>
     <label class=mini>Record <select id=tRecSrc><option value=master>Master</option><option value=keys>Keys</option><option value=drums>Drums</option></select></label>
@@ -137,12 +161,14 @@ function installTransportUI(){
     LOOPER=new Looper(CLOCK);
     LOOPER.setLength(4);
 
-    // schedule at exact AudioContext time
+    // schedule at exact AudioContext time; respect note duration if present
     const schedule=(at, ev, track)=>{
       if(!Eng?.ctx) return;
       const ms = Math.max(0, (at - Eng.ctx.currentTime) * 1000);
       if(track==='keys'){
+        const gateSec = ev.durBeats ? ev.durBeats * secPerBeat() : 0.20; // fallback 200ms
         setTimeout(()=>Eng.noteOn(ev.midi, (ev.vel||100)/127), ms);
+        setTimeout(()=>Eng.noteOff(ev.midi), ms + gateSec*1000);
       }else{
         setTimeout(()=>Eng.triggerDrum(ev.midi, (ev.vel||110)/127), ms);
       }
@@ -151,8 +177,8 @@ function installTransportUI(){
 
     // beat LED: flash on quarters (every 4 ticks since tick=16th)
     let tickCounter=0;
-    CLOCK.on('tick', ()=>{ 
-      const led = wrap.querySelector('#tBeat'); 
+    CLOCK.on('tick', ()=>{
+      const led = wrap.querySelector('#tBeat');
       if(!led) return;
       if((tickCounter++ % 4) === 0){ led.classList.add('on'); setTimeout(()=>led.classList.remove('on'), 70); }
     });
@@ -160,13 +186,28 @@ function installTransportUI(){
   if(!REC && Eng?.ctx){ REC=new Recorder(Eng.ctx, {master:Eng.master, keys:Eng.instGain, drums:Eng.drumGain}); }
   window.CLOCK=CLOCK; window.LOOPER=LOOPER; window.REC=REC;
 
+  // ---- layer UI helpers ----
+  const layersRefreshUI = ()=>{
+    const sel = wrap.querySelector('#tLayerSel');
+    if(!sel) return;
+    const layers = new Set([window.__layerId]);
+    if(window.LOOPER){
+      for(const tr of ['keys','drums']){
+        for(const ev of (window.LOOPER.tracks[tr]||[])){ if(ev.layer) layers.add(ev.layer); }
+      }
+    }
+    const arr=[...layers].sort((a,b)=>a-b);
+    sel.innerHTML = arr.map(id=>`<option value="${id}">Layer ${id}</option>`).join('');
+    sel.value = String(window.__layerId);
+  };
+
   // wire controls
-  const $=s=>wrap.querySelector(s);
-  const tPlay=$('#tPlay'), tStop=$('#tStop'), tRec=$('#tRec');
-  const tBpm=$('#tBpm'), tLoop=$('#tLoop'), tLen=$('#tLen'), tRecSrc=$('#tRecSrc');
+  const $w=s=>wrap.querySelector(s);
+  const tPlay=$w('#tPlay'), tStop=$w('#tStop'), tRec=$w('#tRec');
+  const tBpm=$w('#tBpm'), tLoop=$w('#tLoop'), tLen=$w('#tLen'), tRecSrc=$w('#tRecSrc');
+  const tOD=$w('#tOD'), tNew=$w('#tNew'), tLayerSel=$w('#tLayerSel'), tDel=$w('#tDel'), tClr=$w('#tClr');
 
   tPlay.onclick=async ()=>{
-    // Ensure audio is running before starting the clock
     if(!Eng?.ctx || Eng.ctx.state!=='running'){ try{ await Eng.start(); }catch{} }
     if(!CLOCK){ CLOCK=new Clock({ctx:Eng.ctx, bpm:+tBpm.value||120}); window.CLOCK=CLOCK; }
     CLOCK.setBpm(+tBpm.value||120);
@@ -196,28 +237,87 @@ function installTransportUI(){
   tBpm.oninput =()=>{ const v=+tBpm.value||120; CLOCK?.setBpm(v); };
   tLoop.onchange=()=>{ CLOCK?.enableLoop(tLoop.checked); };
   tLen.onchange =()=>{ LOOPER?.setLength(+tLen.value||4); };
+
+  // overdub toggle
+  tOD.onclick = ()=>{
+    window.__looperOD = !window.__looperOD;
+    tOD.classList.toggle('active', window.__looperOD);
+    say(window.__looperOD?'Overdub ON':'Overdub OFF','ok');
+  };
+
+  // create a new layer (future overdubs will be tagged with this layer id)
+  tNew.onclick = ()=>{
+    window.__layerId = (window.__layerId||0) + 1;
+    layersRefreshUI();
+    say('New layer '+window.__layerId,'ok');
+  };
+
+  // delete selected layer (from both keys + drums)
+  tDel.onclick = ()=>{
+    const id = parseInt(tLayerSel.value,10);
+    if(!window.LOOPER || !id) return;
+    for(const tr of ['keys','drums']){
+      window.LOOPER.tracks[tr] = (window.LOOPER.tracks[tr]||[]).filter(ev=>ev.layer!==id);
+    }
+    layersRefreshUI();
+    say('Deleted layer '+id,'warn');
+  };
+
+  // clear all layers/events
+  tClr.onclick = ()=>{
+    if(!window.LOOPER) return;
+    window.LOOPER.tracks.keys = [];
+    window.LOOPER.tracks.drums = [];
+    PENDING.keys.clear();
+    layersRefreshUI();
+    say('Loop cleared.','warn');
+  };
+
   tRecSrc.onchange=()=>{};
+  layersRefreshUI();
 }
 
-
-
 // Coach (metronome, arp, scale, velocity, composer)
-let COACH;
-let CLOCK, LOOPER, REC;
-
 const state={ base:60, held:new Set(), transpose:0, octave:0, ch:1, padMode:'drum', drumKit:'standard' };
 const eff=(m)=> m + state.transpose + state.octave*12;
 
 // Raw note handlers
 function rawNoteOn(m,vel=100){ const mv=eff(m); Eng.noteOn(mv,vel/127); state.held.add(mv); flashKey(state,mv,true); }
 function rawNoteOff(m){ const mv=eff(m); if(!state.held.has(mv)){flashKey(state,mv,false); return} if(Eng.sustain){flashKey(state,mv,false); return} Eng.noteOff(mv); state.held.delete(mv); flashKey(state,mv,false) }
-// Coach-aware wrappers
+
+// Coach-aware wrappers + looper capture with durations/layers
 function playOn(m,vel=100){
-  if(window.LOOPER && Eng?.ctx) window.LOOPER.recordNoteOn(m, vel, Eng.ctx.currentTime, 'keys');
+  // record into looper only if overdub is ON
+  if(window.LOOPER && Eng?.ctx && window.__looperOD){
+    window.LOOPER.recordNoteOn(m, vel, Eng.ctx.currentTime, 'keys');
+    // tag event with current layer + start timing for duration
+    const arr = window.LOOPER.tracks.keys;
+    if(arr && arr.length){
+      const idx = arr.length-1;
+      arr[idx].layer = window.__layerId||1;
+      PENDING.keys.set(m, { idx, startSec: Eng.ctx.currentTime });
+    }
+  }
   if(window.COACH) window.COACH.noteOn(m,vel); else rawNoteOn(m,vel);
 }
 
-function playOff(m){ if(window.COACH) window.COACH.noteOff(m); else rawNoteOff(m) }
+function playOff(m){
+  // finalize duration for any pending recorded note
+  if(window.LOOPER && Eng?.ctx && PENDING.keys.has(m)){
+    const p = PENDING.keys.get(m);
+    const ev = window.LOOPER.tracks.keys?.[p.idx];
+    if(ev){
+      let durBeats = (Eng.ctx.currentTime - p.startSec) / secPerBeat();
+      const step = quantStepBeats();
+      durBeats = Math.max(step, Math.round(durBeats/step)*step);
+      // clamp to loop length to avoid crossing wrap ambiguity
+      durBeats = Math.min(durBeats, loopBeats() - 1e-3);
+      ev.durBeats = durBeats;
+    }
+    PENDING.keys.delete(m);
+  }
+  if(window.COACH) window.COACH.noteOff(m); else rawNoteOff(m);
+}
 
 function allOff(){ Eng.releaseAll(); state.held.clear(); document.querySelectorAll('.white,.black,.pad').forEach(el=>el.classList.remove('active')) }
 
@@ -229,12 +329,17 @@ async function handlePadHit(idx, midi, vel){
   if(state.padMode==='drum'){
     Eng.setDrumKit(state.drumKit);
     Eng.triggerDrum(midi, (vel||110)/127, gain);
+    // drums are one-shot; record only timestamp (no duration needed)
+    if(window.LOOPER && Eng?.ctx && window.__looperOD){
+      window.LOOPER.recordNoteOn(midi, vel||110, Eng.ctx.currentTime, 'drums');
+      const arr = window.LOOPER.tracks.drums;
+      if(arr && arr.length){ arr[arr.length-1].layer = window.__layerId||1; }
+    }
   } else if(state.padMode==='instrument'){
+    // instrument pads act like keys (duration captured via playOn/playOff)
     playOn(midi, Math.round((vel||110)*gain));
   }
-  if(window.LOOPER && Eng?.ctx) window.LOOPER.recordNoteOn(midi, vel||110, Eng.ctx.currentTime, state.padMode==='drum'?'drums':'keys');
 }
-
 
 function lcd(a,b){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>${a||''}${b?' — '+b:''}` }
 
@@ -264,7 +369,6 @@ function hookSlider(param,fmt,on){
   // (engine gets set later by applyEngineFromUI after Start)
 }
 
-
 function loadPresets(){ const sel=$('#preset'); if(!sel) return; sel.innerHTML=''; for(const p of PRESETS){ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o) } sel.value='piano'; applyPreset('piano'); sel.onchange=()=>applyPreset(sel.value) }
 const ensurePresets=()=>{ const sel=$('#preset'); if(sel && sel.options.length===0) loadPresets(); };
 
@@ -285,7 +389,6 @@ const applyPreset=(id)=>{
   if(p.reverb!=null){ $('#reverb').value=p.reverb; $('#reverb').dispatchEvent(new Event('input')); }
   if(p.delay!=null){  $('#delay').value=p.delay;   $('#delay').dispatchEvent(new Event('input')); }
 };
-
 
 function bindTyping(){
   const keyW='asdfghjkl;'.split(''), keyB='wetyuop'.split('');
@@ -328,7 +431,8 @@ function setParamByNorm(param, x){ MapState.setParamNorm(param, x); const r=PARA
 function renderCCTable(){
   const params=MapState.ccParams(); const table=$('#ccTable'); if(!table) return;
   table.innerHTML=`<tr><th>Parameter</th><th>CC#</th><th>Mode</th><th>Learn</th></tr>`+
-    params.map(p=>{ const cc=MapState.ccMap[p]??''; const mode=cc!=='' && MapState.ccMode[cc]?MapState.ccMode[cc]:'';
+    params.map(p=>{ const cc=MapState.ccMap[p]??''; const mode=cc!=='' && MapState.ccMode[cc]?MapState.ccMode[cc]:''.
+      replace?.(/.*/,m=>m) || (MapState.ccMode[cc]||''); // harmless, ensure string
       return `<tr><td>${p}</td><td><input data-cc-param="${p}" class="ccNum" type="number" min="0" max="127" value="${cc}"></td><td>${mode}</td><td><button class="learnCC" data-param="${p}">●</button></td></tr>`
     }).join('');
   table.querySelectorAll('.ccNum').forEach(inp=>{ inp.onchange=()=>{ MapState.setCC(inp.dataset.ccParam, clamp(parseInt(inp.value,10)||0,0,127)); saveAll(); updateInlineBadges(); }; });
@@ -360,7 +464,7 @@ function bindConfig(){
 
 function updatePadModeUI(){ $('#padMode').value=state.padMode; $('#drumKit').value=state.drumKit; const r=$('#drumKitRow'); if(r) r.style.display = (state.padMode==='drum')?'grid':'none'; $('#padModeVal').textContent=state.padMode; $('#drumKitVal').textContent=state.drumKit; }
 
-function ensureDrumKitOptions(){ const dk=$('#drumKit'); if(!dk) return; const want=['standard','808','electro','room','trap','lofi','cr78','dnb']; const labels={standard:'Standard','808':'808',electro:'Electro',room:'Roomy',trap:'Trap',lofi:'Lo‑Fi',cr78:'CR‑78',dnb:'DnB'}; const have=new Set([...dk.options].map(o=>o.value)); for(const id of want){ if(!have.has(id)){ const o=document.createElement('option'); o.value=id; o.textContent=labels[id]; dk.appendChild(o) } } }
+function ensureDrumKitOptions(){ const dk=$('#drumKit'); if(!dk) return; const want=['standard','808','electro','room','trap','lofi','cr78','dnb']; const labels={standard:'Standard','808':'808',electro:'Electro',room:'Roomy',trap:'Trap',lofi:'Lo-Fi',cr78:'CR-78',dnb:'DnB'}; const have=new Set([...dk.options].map(o=>o.value)); for(const id of want){ if(!have.has(id)){ const o=document.createElement('option'); o.value=id; o.textContent=labels[id]; dk.appendChild(o) } } }
 
 function addKeysVolUI(){
   const m=$('#volume'); if(!m) return;
@@ -372,15 +476,13 @@ function addKeysVolUI(){
   row.after(dv);
   const el=$('#keysVol'), lab=$('#keysVolVal');
   const apply=()=>{ 
-  const v=parseFloat(el.value)||0; 
-  lab.textContent=Math.round(v*100)+'%'; 
-  if(Eng?.started && Eng.instGain) Eng.setKeysVolume(v);   // <-- guard
-};
-
+    const v=parseFloat(el.value)||0; 
+    lab.textContent=Math.round(v*100)+'%'; 
+    if(Eng?.started && Eng.instGain) Eng.setKeysVolume(v);
+  };
   el.addEventListener('input',apply);
-  apply(); // harmless before audio; re-fired below after start
+  apply();
 }
-
 
 function bindUI(){
   $('#startBtn').onclick = async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test() } else say('Audio context not running. Click again.','warn'); diag(); ensurePresets(); addKeysVolUI(); applyEngineFromUI(); installTransportUI(); }catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } const kv=document.querySelector('#keysVol'); if(kv) kv.dispatchEvent(new Event('input'));};
