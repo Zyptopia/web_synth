@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Music‑Painter — MIDI + Keyboard</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121923;
+      --text: #e8f0ff;
+      --muted: #97a3b6;
+      --accent: #4cc9f0;
+      --good: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji; }
+    .app { display: grid; grid-template-columns: 320px 1fr; grid-template-rows: auto 1fr; height: 100%; }
+    header { grid-column: 1 / -1; padding: 12px 16px; background: linear-gradient(90deg, #101827, #0e1622 50%, #0b0f14); border-bottom: 1px solid #1f2a37; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 16px; margin: 0; letter-spacing: 0.3px; font-weight: 600; }
+    #stageWrap { position: relative; background: radial-gradient(1200px 1200px at 80% -10%, rgba(76, 201, 240, .1), transparent 60%), radial-gradient(1000px 800px at 20% 110%, rgba(168, 85, 247, .08), transparent 60%); overflow: hidden; }
+    .layerCanvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+    aside { background: var(--panel); border-right: 1px solid #1f2a37; padding: 14px; overflow: auto; }
+    aside h2 { font-size: 13px; font-weight: 700; margin: 16px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+    button, select, input[type="range"] { background: #0f172a; color: var(--text); border: 1px solid #263142; border-radius: 10px; padding: 8px 10px; font-size: 13px; }
+    button { cursor: pointer; }
+    button.primary { background: #142136; border-color: #2a3b52; }
+    button.good { border-color: #1e8a46; background: #09361c; }
+    button.warn { border-color: #8a6a1e; background: #3c2c09; }
+    button.danger { border-color: #8a1e1e; background: #3c0b0b; }
+    button.tiny { padding: 6px 8px; font-size: 12px; }
+    .split { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; }
+    .stat { font-size: 12px; color: var(--muted); }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #0b1220; border: 1px solid #223049; padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+    .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #0c1423; border: 1px solid #243349; color: var(--muted); }
+    .list { display: grid; gap: 8px; }
+    .list .item { background: #0c1421; border: 1px solid #223049; border-radius: 12px; padding: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .muted { color: var(--muted); }
+    .rangeRow { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    footer { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.08); padding: 6px 10px; border-radius: 10px; font-size: 12px; pointer-events: none; }
+    a.link { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>🎨 Music‑Painter — turn notes into strokes</h1>
+      <span class="pill" id="midiStatus">MIDI: not connected</span>
+      <span class="pill" id="audioStatus">Audio: suspended</span>
+      <span class="pill" id="fps">0 fps</span>
+    </header>
+    <aside>
+      <h2>Setup</h2>
+      <div class="row">
+        <button id="btnStartAudio" class="primary">Start Audio</button>
+        <button id="btnConnectMIDI">Connect MIDI</button>
+      </div>
+      <div class="row split">
+        <label class="muted">MIDI Input</label>
+        <select id="midiInputs"></select>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="useComputerKeys" checked /> Use computer keyboard (<span class="kbd">A W S E D F T G Y H U J K</span>)</label>
+      </div>
+
+      <h2>Canvas & Layers</h2>
+      <div class="row">
+        <button id="btnAddLayer" class="good">+ Layer</button>
+        <button id="btnDeleteLayer" class="danger">− Layer</button>
+        <button id="btnClearLayer" class="warn">Clear</button>
+      </div>
+      <div class="row split">
+        <label class="muted">Active Layer</label>
+        <select id="layerSelect"></select>
+      </div>
+      <div class="row">
+        <button id="btnSavePNG">Save PNG</button>
+      </div>
+
+      <h2>Brush</h2>
+      <div class="rangeRow">
+        <label class="muted">Brush scale</label>
+        <input type="range" id="brushScale" min="0.2" max="5" step="0.1" value="1.2"/>
+      </div>
+      <div class="rangeRow">
+        <label class="muted">Opacity</label>
+        <input type="range" id="opacity" min="0.05" max="1" step="0.05" value="0.6"/>
+      </div>
+      <div class="row">
+        <button id="btnEraser">Eraser: Off</button>
+      </div>
+
+      <h2>Notes</h2>
+      <div class="list" id="noteList"></div>
+      <p class="muted" style="margin-top:8px">Pitch → hue, velocity → thickness. Vector field blends all held notes to steer the pen.</p>
+
+      <h2>Shortcuts</h2>
+      <p class="stat">Toggle eraser: <span class="kbd">E</span> • New layer: <span class="kbd">N</span> • Clear: <span class="kbd">C</span></p>
+    </aside>
+    <div id="stageWrap">
+      <!-- Canvases inserted here -->
+      <footer>
+        Tip: Hold multiple notes/chords to steer complex paths. Mod‑wheel adjusts opacity; Sustain pedal can toggle eraser.
+      </footer>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const stageWrap = document.getElementById('stageWrap');
+  const midiStatus = document.getElementById('midiStatus');
+  const audioStatus = document.getElementById('audioStatus');
+  const fpsEl = document.getElementById('fps');
+  const btnStartAudio = document.getElementById('btnStartAudio');
+  const btnConnectMIDI = document.getElementById('btnConnectMIDI');
+  const midiInputsSel = document.getElementById('midiInputs');
+  const useComputerKeys = document.getElementById('useComputerKeys');
+  const btnAddLayer = document.getElementById('btnAddLayer');
+  const btnDeleteLayer = document.getElementById('btnDeleteLayer');
+  const btnClearLayer = document.getElementById('btnClearLayer');
+  const layerSelect = document.getElementById('layerSelect');
+  const btnSavePNG = document.getElementById('btnSavePNG');
+  const brushScale = document.getElementById('brushScale');
+  const opacityRange = document.getElementById('opacity');
+  const btnEraser = document.getElementById('btnEraser');
+  const noteList = document.getElementById('noteList');
+
+  // --- Audio ---
+  let audioCtx = null;
+  const masterGain = { node: null, level: 0.2 };
+
+  function ensureAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain.node = audioCtx.createGain();
+      masterGain.node.gain.value = masterGain.level;
+      masterGain.node.connect(audioCtx.destination);
+      audioStatus.textContent = 'Audio: ' + audioCtx.state;
+      audioCtx.onstatechange = () => {
+        audioStatus.textContent = 'Audio: ' + audioCtx.state;
+      };
+    }
+  }
+
+  btnStartAudio.addEventListener('click', async () => {
+    ensureAudio();
+    if (audioCtx.state !== 'running') {
+      await audioCtx.resume();
+    }
+  });
+
+  // Simple synth per‑note
+  const activeOsc = new Map(); // note -> {osc, gain}
+
+  function midiToFreq(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+
+  function startTone(note, velocity=100) {
+    ensureAudio();
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.value = midiToFreq(note);
+    const g = audioCtx.createGain();
+    const v = Math.max(0.0001, (velocity/127));
+    g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    const now = audioCtx.currentTime;
+    g.gain.exponentialRampToValueAtTime(v, now + 0.01); // quick attack
+    g.gain.exponentialRampToValueAtTime(v*0.6, now + 0.3); // decay
+    osc.connect(g).connect(masterGain.node);
+    osc.start();
+    activeOsc.set(note, {osc, g});
+  }
+
+  function stopTone(note) {
+    const h = activeOsc.get(note);
+    if (!h) return;
+    const now = audioCtx.currentTime;
+    h.g.gain.cancelScheduledValues(now);
+    h.g.gain.setTargetAtTime(0.0001, now, 0.08);
+    setTimeout(() => {
+      try { h.osc.stop(); h.osc.disconnect(); h.g.disconnect(); } catch {}
+      activeOsc.delete(note);
+    }, 120);
+  }
+
+  // --- MIDI ---
+  let midi = null;
+  let midiInput = null;
+
+  async function connectMIDI() {
+    try {
+      midi = await navigator.requestMIDIAccess();
+      midiStatus.textContent = 'MIDI: available';
+      populateMIDIInputs();
+      midi.onstatechange = populateMIDIInputs;
+    } catch (e) {
+      midiStatus.textContent = 'MIDI: unavailable';
+      console.warn('WebMIDI not available', e);
+    }
+  }
+
+  function populateMIDIInputs() {
+    midiInputsSel.innerHTML = '';
+    if (!midi) return;
+    const inputs = Array.from(midi.inputs.values());
+    inputs.forEach((input, idx) => {
+      const opt = document.createElement('option');
+      opt.value = input.id;
+      opt.textContent = input.name || (`Input ${idx+1}`);
+      midiInputsSel.appendChild(opt);
+    });
+    if (inputs.length) {
+      setMIDIInput(inputs[0]);
+      midiInputsSel.value = inputs[0].id;
+    }
+  }
+
+  function setMIDIInput(input) {
+    if (midiInput) midiInput.onmidimessage = null;
+    midiInput = input;
+    if (midiInput) {
+      midiInput.onmidimessage = onMIDIMessage;
+      midiStatus.textContent = 'MIDI: ' + (midiInput.name || 'connected');
+    }
+  }
+
+  midiInputsSel.addEventListener('change', () => {
+    const id = midiInputsSel.value;
+    const inputs = Array.from(midi.inputs.values());
+    const input = inputs.find(i => i.id === id);
+    if (input) setMIDIInput(input);
+  });
+
+  btnConnectMIDI.addEventListener('click', connectMIDI);
+
+  // --- Notes → Drawing map ---
+  const GOLDEN_ANGLE = 2.399963229728653; // radians
+  const activeNotes = new Map(); // note -> {velocity, t}
+  let sustainDown = false;
+
+  function onMIDIMessage(e) {
+    const [status, d1, d2] = e.data;
+    const cmd = status & 0xF0;
+    // Note on/off
+    if (cmd === 0x90) { // note on (or off if vel=0)
+      if (d2 === 0) noteOff(d1);
+      else noteOn(d1, d2);
+    } else if (cmd === 0x80) { // note off
+      noteOff(d1);
+    } else if (cmd === 0xB0) { // control change
+      const cc = d1, val = d2;
+      if (cc === 1) { // mod wheel → opacity
+        const f = (val / 127);
+        opacityRange.value = (0.05 + 0.95 * f).toFixed(2);
+      } else if (cc === 64) { // sustain pedal
+        const was = sustainDown;
+        sustainDown = val >= 64;
+        if (!sustainDown && was) flushSustained();
+        // Optional: toggle eraser w/ pedal
+        toggleEraser(val >= 64);
+      }
+    } else if (cmd === 0xE0) { // pitch bend (coarse control of flow phase)
+      const bend = ((d2 << 7) + d1) - 8192; // -8192..+8191
+      flowPhase = bend / 8192 * Math.PI; // -pi..+pi
+    }
+  }
+
+  function noteOn(note, vel) {
+    activeNotes.set(note, { velocity: vel, t: performance.now() });
+    startTone(note, vel);
+    refreshNoteList();
+  }
+
+  function noteOff(note) {
+    if (sustainDown) { // mark sustained but keep sounding visually & sonically
+      const n = activeNotes.get(note);
+      if (n) n.sustained = true;
+    } else {
+      activeNotes.delete(note);
+      stopTone(note);
+    }
+    refreshNoteList();
+  }
+
+  function flushSustained() {
+    // Release any notes that were let go while sustain was down
+    const toStop = [];
+    activeNotes.forEach((val, key) => {
+      if (val.sustained) toStop.push(key);
+    });
+    toStop.forEach(k => { activeNotes.delete(k); stopTone(k); });
+    refreshNoteList();
+  }
+
+  function refreshNoteList() {
+    noteList.innerHTML = '';
+    if (!activeNotes.size) { noteList.innerHTML = '<div class="item"><span class="muted">No active notes</span><span class="pill">—</span></div>'; return; }
+    activeNotes.forEach((n, note) => {
+      const item = document.createElement('div');
+      item.className = 'item';
+      const name = midiNoteName(note);
+      item.innerHTML = `<span>${name}</span><span class="pill">vel ${n.velocity}${n.sustained ? ' • sus' : ''}</span>`;
+      noteList.appendChild(item);
+    });
+  }
+
+  function midiNoteName(n) {
+    const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const name = names[n % 12];
+    const oct = Math.floor(n/12) - 1;
+    return name + oct;
+  }
+
+  // --- Layers ---
+  const layers = []; // {canvas, ctx}
+  let activeLayer = 0;
+
+  function createLayer() {
+    const c = document.createElement('canvas');
+    c.className = 'layerCanvas';
+    stageWrap.appendChild(c);
+    const ctx = c.getContext('2d');
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    resizeCanvas(c);
+    layers.push({canvas: c, ctx});
+    updateLayerSelect();
+    selectLayer(layers.length - 1);
+  }
+
+  function updateLayerSelect() {
+    layerSelect.innerHTML = '';
+    layers.forEach((_, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = `Layer ${i+1}`;
+      layerSelect.appendChild(opt);
+    });
+    layerSelect.value = String(activeLayer);
+  }
+
+  function selectLayer(i) {
+    activeLayer = Math.max(0, Math.min(i, layers.length - 1));
+    updateLayerSelect();
+  }
+
+  function deleteLayer() {
+    if (layers.length <= 1) return;
+    const {canvas} = layers[activeLayer];
+    canvas.remove();
+    layers.splice(activeLayer, 1);
+    selectLayer(Math.max(0, activeLayer - 1));
+  }
+
+  function clearLayer() {
+    const {canvas, ctx} = layers[activeLayer];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function savePNG() {
+    // Composite all layers into a single temp canvas
+    const w = layers[0].canvas.width, h = layers[0].canvas.height;
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h; const tctx = tmp.getContext('2d');
+    layers.forEach(l => tctx.drawImage(l.canvas, 0, 0));
+    const a = document.createElement('a');
+    a.download = 'music-painter.png';
+    a.href = tmp.toDataURL('image/png');
+    a.click();
+  }
+
+  btnAddLayer.addEventListener('click', () => createLayer());
+  btnDeleteLayer.addEventListener('click', () => deleteLayer());
+  btnClearLayer.addEventListener('click', () => clearLayer());
+  layerSelect.addEventListener('change', () => selectLayer(parseInt(layerSelect.value, 10)));
+  btnSavePNG.addEventListener('click', () => savePNG());
+
+  // --- Render / Brush engine ---
+  const pen = { x: 0, y: 0, px: 0, py: 0 };
+  let flowPhase = 0; // modulated by pitch bend
+  let erasing = false;
+
+  function toggleEraser(force=null) {
+    if (force === null) erasing = !erasing; else erasing = !!force;
+    btnEraser.textContent = `Eraser: ${erasing ? 'On' : 'Off'}`;
+  }
+
+  btnEraser.addEventListener('click', () => toggleEraser());
+
+  function resizeCanvas(c) {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const rect = stageWrap.getBoundingClientRect();
+    c.width = Math.floor(rect.width * dpr);
+    c.height = Math.floor(rect.height * dpr);
+    c.style.width = rect.width + 'px';
+    c.style.height = rect.height + 'px';
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function resizeAll() {
+    layers.forEach(l => resizeCanvas(l.canvas));
+  }
+
+  window.addEventListener('resize', resizeAll);
+
+  // Init with one layer
+  createLayer();
+
+  // Position pen in the middle initially
+  function centerPen() {
+    const rect = stageWrap.getBoundingClientRect();
+    pen.x = rect.width * 0.5; pen.y = rect.height * 0.5;
+    pen.px = pen.x; pen.py = pen.y;
+  }
+  centerPen();
+
+  // Drawing loop
+  let last = performance.now();
+  let frames = 0, lastFPS = performance.now();
+
+  function loop(now) {
+    const dt = Math.max(0.001, Math.min(0.05, (now - last) / 1000));
+    last = now;
+
+    // FPS
+    frames++;
+    if (now - lastFPS > 1000) {
+      fpsEl.textContent = `${frames} fps`;
+      frames = 0; lastFPS = now;
+    }
+
+    // Compute flow from active notes
+    let dx = 0, dy = 0, weightSum = 0, hueNum = 0;
+    activeNotes.forEach((n, note) => {
+      const w = n.velocity / 127;
+      const angle = (note * GOLDEN_ANGLE + flowPhase) % (Math.PI * 2);
+      dx += Math.cos(angle) * w;
+      dy += Math.sin(angle) * w;
+      hueNum += note * w * 7.0; // scale to spread hues nicely
+      weightSum += w;
+    });
+
+    if (weightSum > 0) {
+      const speed = 60 * dt * (0.6 + brushScale.valueAsNumber * 0.4);
+      pen.px = pen.x; pen.py = pen.y;
+      pen.x += dx * speed * (1 + weightSum * 1.4);
+      pen.y += dy * speed * (1 + weightSum * 1.4);
+
+      // Wrap around edges
+      const rect = stageWrap.getBoundingClientRect();
+      if (pen.x < 0) { pen.x += rect.width; pen.px = pen.x; }
+      if (pen.y < 0) { pen.y += rect.height; pen.py = pen.y; }
+      if (pen.x > rect.width) { pen.x -= rect.width; pen.px = pen.x; }
+      if (pen.y > rect.height) { pen.y -= rect.height; pen.py = pen.y; }
+
+      // Stroke style
+      const hue = ((hueNum / Math.max(0.0001, weightSum)) % 360 + 360) % 360;
+      const alpha = opacityRange.valueAsNumber;
+      const width = 1 + (brushScale.valueAsNumber * (1 + weightSum * 6));
+
+      const { ctx } = layers[activeLayer];
+      ctx.globalCompositeOperation = erasing ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = `hsla(${hue.toFixed(1)}, 85%, ${erasing ? 50 : 60}%, ${alpha})`;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(pen.px, pen.py);
+      ctx.lineTo(pen.x, pen.y);
+      ctx.stroke();
+    }
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // --- Computer keyboard as fallback ---
+  const KEY_LAYOUT = {
+    // piano‑like mapping around middle C (C4 = 60)
+    // Row 1: A W S E D F T G Y H U J K
+    'a': 60, 'w': 61, 's': 62, 'e': 63, 'd': 64,
+    'f': 65, 't': 66, 'g': 67, 'y': 68, 'h': 69,
+    'u': 70, 'j': 71, 'k': 72
+  };
+  const downKeys = new Set();
+
+  window.addEventListener('keydown', (e) => {
+    if (!useComputerKeys.checked) return;
+    const k = e.key.toLowerCase();
+    if (k === 'e') { toggleEraser(); e.preventDefault(); return; }
+    if (k === 'n') { createLayer(); e.preventDefault(); return; }
+    if (k === 'c') { clearLayer(); e.preventDefault(); return; }
+    const note = KEY_LAYOUT[k];
+    if (note !== undefined && !downKeys.has(k)) {
+      downKeys.add(k);
+      noteOn(note, 110);
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (!useComputerKeys.checked) return;
+    const k = e.key.toLowerCase();
+    const note = KEY_LAYOUT[k];
+    if (note !== undefined) {
+      downKeys.delete(k);
+      noteOff(note);
+    }
+  });
+
+  // Start UX: try to wake audio on first click inside stage as well
+  stageWrap.addEventListener('pointerdown', () => { ensureAudio(); audioCtx && audioCtx.resume(); });
+
+})();
+</script>
+</body>
+</html>
