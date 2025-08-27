@@ -131,9 +131,10 @@ function installTransportUI(){
       #transport input[type=number]{width:64px;background:#1b1e24;border:1px solid #334;border-radius:8px;color:#fff;padding:6px}
       #transport select{background:#1b1e24;border:1px solid #334;border-radius:8px;color:#fff;padding:6px}
       #transport .sep{width:1px;height:20px;background:#4456}
-      #transport .mini{opacity:.8}
+      #transport .mini{opacity:.85}
       #tBeat{width:10px;height:10px;border-radius:50%;background:#555;margin-left:6px;box-shadow:0 0 0 0 #0f0}
       #tBeat.on{background:#0f7;box-shadow:0 0 10px 2px #0f7}
+      #tPos{min-width:180px;text-align:right;font-variant-numeric:tabular-nums;opacity:.9}
     </style>
     <button id=tPlay title="Play">▶</button>
     <button id=tStop title="Stop">■</button>
@@ -150,6 +151,7 @@ function installTransportUI(){
     <button id=tDel title="Delete selected layer">✖</button>
     <button id=tClr title="Clear all layers">CLR</button>
     <span id=tBeat title="Beat"></span>
+    <span id=tPos class="mini" title="Loop position"></span>
     <span class=sep></span>
     <label class=mini>Record <select id=tRecSrc><option value=master>Master</option><option value=keys>Keys</option><option value=drums>Drums</option></select></label>
   `;
@@ -160,19 +162,13 @@ function installTransportUI(){
   if(!LOOPER && CLOCK){
     LOOPER=new Looper(CLOCK);
     LOOPER.setLength(4);
-    
-    
-    const beats = LOOPER.lenBars * 4;
-for (const evs of Object.values(LOOPER.tracks)) {
-  for (const ev of evs) ev.t = ((ev.t % beats) + beats) % beats;
-}
 
     // schedule at exact AudioContext time; respect note duration if present
     const schedule=(at, ev, track)=>{
       if(!Eng?.ctx) return;
       const ms = Math.max(0, (at - Eng.ctx.currentTime) * 1000);
       if(track==='keys'){
-        const gateSec = ev.durBeats ? ev.durBeats * secPerBeat() : 0.20; // fallback 200ms
+        const gateSec = ev.durBeats ? ev.durBeats * (60/(CLOCK?.bpm||120)) : 0.20;
         setTimeout(()=>Eng.noteOn(ev.midi, (ev.vel||100)/127), ms);
         setTimeout(()=>Eng.noteOff(ev.midi), ms + gateSec*1000);
       }else{
@@ -181,12 +177,32 @@ for (const evs of Object.values(LOOPER.tracks)) {
     };
     LOOPER.play(schedule);
 
-    // beat LED: flash on quarters (every 4 ticks since tick=16th)
+    // LED + loop position counter
+    const led = wrap.querySelector('#tBeat');
+    const posEl = wrap.querySelector('#tPos');
     let tickCounter=0;
-    CLOCK.on('tick', ()=>{
-      const led = wrap.querySelector('#tBeat');
-      if(!led) return;
-      if((tickCounter++ % 4) === 0){ led.classList.add('on'); setTimeout(()=>led.classList.remove('on'), 70); }
+    CLOCK.on('tick', ({when})=>{
+      // flash on quarters (every 4 x 16th)
+      if((tickCounter++ % 4) === 0){ led?.classList.add('on'); setTimeout(()=>led?.classList.remove('on'), 70); }
+
+      // compute position: Bar X/Y • Beat B/4 • S.s to restart
+      const bpm = CLOCK?.bpm || 120;
+      const spb = 60/bpm;
+      const bars = LOOPER?.lenBars || 4;
+      const loopBeats = bars*4;
+      const loopSec = loopBeats*spb;
+
+      const totalBeats = when/spb;
+      const beatInLoop = ((totalBeats % loopBeats) + loopBeats) % loopBeats; // 0..loopBeats-1
+      const bar = Math.floor(beatInLoop/4)+1;
+      const beat = Math.floor(beatInLoop%4)+1;
+
+      const nextRestartSec = Math.ceil(when/loopSec)*loopSec;
+      const remain = Math.max(0, nextRestartSec - when);
+
+      if(posEl){
+        posEl.textContent = `Bar ${bar}/${bars} • Beat ${beat}/4 • ${remain.toFixed(1)}s`;
+      }
     });
   }
   if(!REC && Eng?.ctx){ REC=new Recorder(Eng.ctx, {master:Eng.master, keys:Eng.instGain, drums:Eng.drumGain}); }
@@ -196,7 +212,7 @@ for (const evs of Object.values(LOOPER.tracks)) {
   const layersRefreshUI = ()=>{
     const sel = wrap.querySelector('#tLayerSel');
     if(!sel) return;
-    const layers = new Set([window.__layerId]);
+    const layers = new Set([window.__layerId||1]);
     if(window.LOOPER){
       for(const tr of ['keys','drums']){
         for(const ev of (window.LOOPER.tracks[tr]||[])){ if(ev.layer) layers.add(ev.layer); }
@@ -204,7 +220,7 @@ for (const evs of Object.values(LOOPER.tracks)) {
     }
     const arr=[...layers].sort((a,b)=>a-b);
     sel.innerHTML = arr.map(id=>`<option value="${id}">Layer ${id}</option>`).join('');
-    sel.value = String(window.__layerId);
+    sel.value = String(window.__layerId||1);
   };
 
   // wire controls
@@ -243,6 +259,7 @@ for (const evs of Object.values(LOOPER.tracks)) {
   tBpm.oninput =()=>{ const v=+tBpm.value||120; CLOCK?.setBpm(v); };
   tLoop.onchange=()=>{ CLOCK?.enableLoop(tLoop.checked); };
   tLen.onchange =()=>{ LOOPER?.setLength(+tLen.value||4); };
+  tRecSrc.onchange=()=>{};
 
   // overdub toggle
   tOD.onclick = ()=>{
@@ -251,14 +268,14 @@ for (const evs of Object.values(LOOPER.tracks)) {
     say(window.__looperOD?'Overdub ON':'Overdub OFF','ok');
   };
 
-  // create a new layer (future overdubs will be tagged with this layer id)
+  // create a new layer
   tNew.onclick = ()=>{
     window.__layerId = (window.__layerId||0) + 1;
     layersRefreshUI();
     say('New layer '+window.__layerId,'ok');
   };
 
-  // delete selected layer (from both keys + drums)
+  // delete selected layer
   tDel.onclick = ()=>{
     const id = parseInt(tLayerSel.value,10);
     if(!window.LOOPER || !id) return;
@@ -274,14 +291,15 @@ for (const evs of Object.values(LOOPER.tracks)) {
     if(!window.LOOPER) return;
     window.LOOPER.tracks.keys = [];
     window.LOOPER.tracks.drums = [];
-    PENDING.keys.clear();
+    (window.PENDING?.keys||new Map()).clear?.();
     layersRefreshUI();
     say('Loop cleared.','warn');
   };
 
-  tRecSrc.onchange=()=>{};
+  // init layer menu
   layersRefreshUI();
 }
+
 
 // Coach (metronome, arp, scale, velocity, composer)
 const state={ base:60, held:new Set(), transpose:0, octave:0, ch:1, padMode:'drum', drumKit:'standard' };
