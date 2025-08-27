@@ -102,22 +102,43 @@ export class SynthEngine{
 
   // ---- Synth voices ----
   noteOn(midi, v=0.8){
-    if(!this.ctx) return;
-    const ctx=this.ctx; const t=ctx.currentTime; const f=440*Math.pow(2,(midi-69)/12);
-    const o=ctx.createOscillator(); o.type = (this.preset?.osc) || 'sawtooth';
-    o.frequency.setValueAtTime(f, t); // per-note base pitch
+  const ctx=this.ctx;
+  const t=ctx.currentTime;
+  const f=440*Math.pow(2,(midi-69)/12);
 
-    const lfo=ctx.createOscillator(); lfo.type='sine'; lfo.frequency.value=5;
-    const lfg=ctx.createGain(); lfg.gain.value=0.002*f; lfo.connect(lfg).connect(o.frequency);
-
-    const g=ctx.createGain(); g.gain.setValueAtTime(0, t); // ADSR
-    g.gain.linearRampToValueAtTime(0.8*v, t+this.env.a);
-    g.gain.linearRampToValueAtTime(this.env.s*0.8*v, t+this.env.a+this.env.d);
-
-    o.connect(g).connect(this.filter);
-    o.start(t); lfo.start(t);
-    this.keyVoices.set(midi,{o,g,lfo});
+  // RETRIGGER-SAFE: if a voice for this MIDI is already alive, fade it out now
+  const prev = this.keyVoices.get(midi);
+  if(prev){
+    try{
+      prev.g.gain.cancelScheduledValues(t);
+      prev.g.gain.setTargetAtTime(0.0001, t, 0.01);
+      prev.o.stop(t+0.02);
+    }catch(_){/*noop*/}
+    this.keyVoices.delete(midi);
   }
+
+  // New voice
+  const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+  const sh=ctx.createOscillator(); sh.type='sine'; sh.frequency.value=5;
+  const shg=ctx.createGain(); shg.gain.value=0.002*f; sh.connect(shg).connect(o.frequency);
+
+  const g=ctx.createGain(); g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.8*v, t+this.env.a);
+  g.gain.linearRampToValueAtTime(this.env.s*0.8*v, t+this.env.a+this.env.d);
+
+  o.connect(g).connect(this.filter);
+  o.start(t);
+
+  // Soft watchdog: if something goes wrong, auto-fade after 12s
+  const killAt = t + 12;
+  try{
+    g.gain.setTargetAtTime(0.0001, killAt-0.05, 0.03);
+    o.stop(killAt+0.02);
+  }catch(_){/*noop*/}
+
+  this.keyVoices.set(midi,{o,g});
+}
+
 
   noteOff(midi){
     if(!this.ctx) return;

@@ -308,12 +308,24 @@ function installTransportUI(){
 
 
 // Coach (metronome, arp, scale, velocity, composer)
-const state={ base:60, held:new Set(), transpose:0, octave:0, ch:1, padMode:'drum', drumKit:'standard' };
+const state={ base:60, held:new Set(), down:new Set(), transpose:0, octave:0, ch:1, padMode:'drum', drumKit:'standard' };
 const eff=(m)=> m + state.transpose + state.octave*12;
 
 // Raw note handlers
-function rawNoteOn(m,vel=100){ const mv=eff(m); Eng.noteOn(mv,vel/127); state.held.add(mv); flashKey(state,mv,true); }
-function rawNoteOff(m){ const mv=eff(m); if(!state.held.has(mv)){flashKey(state,mv,false); return} if(Eng.sustain){flashKey(state,mv,false); return} Eng.noteOff(mv); state.held.delete(mv); flashKey(state,mv,false) }
+function rawNoteOn(m,vel=100){ const mv=eff(m); Eng.noteOn(mv,vel/127); state.held.add(mv); state.down.add(mv); flashKey(state,mv,true); }
+function rawNoteOff(m){
+  const mv=eff(m);
+  if(!state.held.has(mv)){flashKey(state,mv,false); return}
+  if(Eng.sustain){flashKey(state,mv,false); return}
+  // key physically up
+  state.down.delete(mv);
+  if(!state.held.has(mv)){ flashKey(state,mv,false); return }
+  // while sustain is ON we don’t send noteOff here; we’ll flush when CC64 goes low
+  if(Eng.sustain){ flashKey(state,mv,false); return }
+  Eng.noteOff(mv);
+  state.held.delete(mv);
+  flashKey(state,mv,false)
+}
 
 // Coach-aware wrappers + looper capture with durations/layers
 function playOn(m,vel=100){
@@ -448,7 +460,18 @@ function bindMIDI(){
   MIDI.onCC=(cc,val)=>{
     if(ccLearnParam){ MapState.setCC(ccLearnParam, cc); renderCCTable(); saveAll(); say(`Mapped CC${cc} → ${ccLearnParam}`,'ok'); endLearns(); return }
     MapState.markCCMode(cc,val);
-    if(cc===64){ Eng.setSustain(val>=64); lcd('Sustain',val>=64?'On':'Off'); return }
+    if(cc===64){
+    const on = val>=64;
+    Eng.setSustain(on);
+    lcd('Sustain', on?'On':'Off');
+    if(!on){
+      // Sustain released: turn off any notes that are sounding only because of sustain
+      for(const mv of [...state.held]){
+        if(!state.down.has(mv)){ Eng.noteOff(mv); state.held.delete(mv); flashKey(state,mv,false); }
+      }
+    }
+    return;
+  }
     if(cc===1){ if(!MapState.paramByCC(1) && !MapState.paramByCC(cc)) Eng.setModDepth?.(val/127); }
     const target = MapState.paramByCC(cc); if(!target){ return }
     const mode = MapState.ccMode[cc]||'absolute';
@@ -555,7 +578,11 @@ function bindUI(){
   const dk=$('#drumKit'); if(dk) dk.onchange=()=>{ state.drumKit=$('#drumKit').value; Eng.setDrumKit(state.drumKit); updatePadModeUI(); saveAll(); say('Drum kit: '+state.drumKit,'ok') };
 
   // Panic
-  $('#panic').onclick=()=>{ allOff(); say('All notes off','warn') };
+    $('#panic').onclick=()=>{ 
+    allOff(); 
+    state.down.clear(); 
+    say('All notes off','warn'); 
+ };
 
   // CC quick learn UI
   const ccSel=$('#ccLearnParam'); if(ccSel){ ccSel.innerHTML = MapState.ccParams().map(p=>`<option value="${p}">${p}</option>`).join(''); }
@@ -574,6 +601,11 @@ function bindKeyMouse(){
   kb.addEventListener('touchstart', async e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; await Eng.start(); playOn(+t.dataset.midi,110) },{passive:true});
   kb.addEventListener('touchend', e=>{ const t=e.target.closest('[data-midi]'); if(!t) return; playOff(+t.dataset.midi) });
 }
+
+// Turn everything off on page hide/blur (safety)
+window.addEventListener('blur',  ()=> allOff());
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) allOff(); });
+
 
 // ---------------- Boot ----------------
 buildKeyboard(state);

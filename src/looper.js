@@ -84,7 +84,8 @@ export class Looper {
       for (const [track, evs] of Object.entries(this.tracks)) {
         for (const ev of evs) {
           const at = loopStart + ev.t * spb;
-          if (at >= when && at < when + stepSec) {
+          const EPS = 1e-5;
+          if(at >= when && at < when + stepSec - EPS){
             schedule(at, ev, track);
           }
         }
