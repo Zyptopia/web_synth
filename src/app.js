@@ -131,7 +131,7 @@ function installTransportUI(){
   `;
   document.body.appendChild(wrap);
 
-  // lazy singletons
+  // Singletons
   if(!CLOCK && Eng?.ctx){ CLOCK=new Clock({ctx:Eng.ctx, bpm:120}); }
   if(!LOOPER && CLOCK){
     LOOPER=new Looper(CLOCK);
@@ -139,6 +139,7 @@ function installTransportUI(){
 
     // schedule at exact AudioContext time
     const schedule=(at, ev, track)=>{
+      if(!Eng?.ctx) return;
       const ms = Math.max(0, (at - Eng.ctx.currentTime) * 1000);
       if(track==='keys'){
         setTimeout(()=>Eng.noteOn(ev.midi, (ev.vel||100)/127), ms);
@@ -148,13 +149,12 @@ function installTransportUI(){
     };
     LOOPER.play(schedule);
 
-    // beat LED for feedback
-    CLOCK.on('tick', ({when, beat})=>{
-      const led = wrap.querySelector('#tBeat');
+    // beat LED: flash on quarters (every 4 ticks since tick=16th)
+    let tickCounter=0;
+    CLOCK.on('tick', ()=>{ 
+      const led = wrap.querySelector('#tBeat'); 
       if(!led) return;
-      // flash on each quarter-note (every 4 ticks)
-      const isQuarter = Math.abs(((when/beat)*4) % 4) < 0.001;
-      if(isQuarter){ led.classList.add('on'); setTimeout(()=>led.classList.remove('on'), 60); }
+      if((tickCounter++ % 4) === 0){ led.classList.add('on'); setTimeout(()=>led.classList.remove('on'), 70); }
     });
   }
   if(!REC && Eng?.ctx){ REC=new Recorder(Eng.ctx, {master:Eng.master, keys:Eng.instGain, drums:Eng.drumGain}); }
@@ -166,10 +166,14 @@ function installTransportUI(){
   const tBpm=$('#tBpm'), tLoop=$('#tLoop'), tLen=$('#tLen'), tRecSrc=$('#tRecSrc');
 
   tPlay.onclick=async ()=>{
-    // ensure audio is started (safety)
+    // Ensure audio is running before starting the clock
     if(!Eng?.ctx || Eng.ctx.state!=='running'){ try{ await Eng.start(); }catch{} }
     if(!CLOCK){ CLOCK=new Clock({ctx:Eng.ctx, bpm:+tBpm.value||120}); window.CLOCK=CLOCK; }
-    CLOCK.play(); tPlay.classList.add('active');
+    CLOCK.setBpm(+tBpm.value||120);
+    CLOCK.enableLoop(tLoop.checked);
+    LOOPER?.setLength(+tLen.value||4);
+    CLOCK.play();
+    tPlay.classList.add('active');
     say('Transport: Play','ok');
   };
 
