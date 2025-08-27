@@ -3,6 +3,9 @@ import {MidiManager} from './midi.js';
 import {PRESETS} from './presets.js';
 import {MapState, PARAM_RANGES, DRUM_CHOICES, midiName} from './mapping.js';
 import {Coach} from './coach.js';
+import {Clock} from './clock.js';
+import {Looper} from './looper.js';
+import {Recorder} from './recorder.js';
 
 const $ = (s)=>document.querySelector(s);
 const $$ = (s)=>Array.from(document.querySelectorAll(s));
@@ -97,8 +100,80 @@ const Eng = new SynthEngine();
 const MIDI = new MidiManager();
 window.Eng=Eng;
 
+function installTransportUI(){
+  if(document.querySelector('#transport')) return;
+  const wrap=document.createElement('div');
+  wrap.id='transport';
+  wrap.innerHTML=`
+    <style>
+      #transport{position:fixed;left:12px;bottom:12px;display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:12px;background:#111a;backdrop-filter:blur(6px);color:#fff;font:14px/1.2 system-ui;z-index:9999}
+      #transport button{border:0;border-radius:10px;padding:8px 10px;background:#2b2f3a;color:#fff;cursor:pointer}
+      #transport button.active{background:#3a5}
+      #transport input[type=number]{width:64px;background:#1b1e24;border:1px solid #334;border-radius:8px;color:#fff;padding:6px}
+      #transport select{background:#1b1e24;border:1px solid #334;border-radius:8px;color:#fff;padding:6px}
+      #transport .sep{width:1px;height:20px;background:#4456}
+      #transport .mini{opacity:.8}
+    </style>
+    <button id=tPlay>▶</button>
+    <button id=tStop>■</button>
+    <button id=tRec>●</button>
+    <label class=mini>BPM <input id=tBpm type=number min=20 max=300 step=1 value="120"></label>
+    <span class=sep></span>
+    <label class=mini>Loop <input id=tLoop type=checkbox checked></label>
+    <select id=tLen>
+      <option value=1>1 bar</option><option value=2>2 bars</option><option selected value=4>4 bars</option><option value=8>8 bars</option>
+    </select>
+    <span class=sep></span>
+    <label class=mini>Record <select id=tRecSrc><option value=master>Master</option><option value=keys>Keys</option><option value=drums>Drums</option></select></label>
+  `;
+  document.body.appendChild(wrap);
+
+  // lazy singletons
+  if(!CLOCK && Eng?.ctx){ CLOCK=new Clock({ctx:Eng.ctx, bpm:120}); }
+  if(!LOOPER && CLOCK){
+    LOOPER=new Looper(CLOCK);
+    LOOPER.setLength(4);
+    // sample-accurate scheduling against AudioContext time
+    const schedule=(at, ev, track)=>{
+      const ms = Math.max(0, (at - Eng.ctx.currentTime) * 1000);
+      if(track==='keys'){
+        setTimeout(()=>Eng.noteOn(ev.midi, (ev.vel||100)/127), ms);
+      }else{
+        setTimeout(()=>Eng.triggerDrum(ev.midi, (ev.vel||110)/127), ms);
+      }
+    };
+    LOOPER.play(schedule);
+  }
+  if(!REC && Eng?.ctx){ REC=new Recorder(Eng.ctx, {master:Eng.master, keys:Eng.instGain, drums:Eng.drumGain}); }
+  window.CLOCK=CLOCK; window.LOOPER=LOOPER; window.REC=REC;
+
+  // wire controls
+  const $=s=>wrap.querySelector(s);
+  const tPlay=$('#tPlay'), tStop=$('#tStop'), tRec=$('#tRec');
+  const tBpm=$('#tBpm'), tLoop=$('#tLoop'), tLen=$('#tLen'), tRecSrc=$('#tRecSrc');
+
+  tPlay.onclick=()=>{ CLOCK?.play(); tPlay.classList.add('active'); };
+  tStop.onclick=()=>{ CLOCK?.stop(); tPlay.classList.remove('active');
+    if(tRec.classList.contains('active')){ try{ REC.stop(); }catch{} tRec.classList.remove('active'); }
+  };
+  tRec.onclick =()=>{ if(!tRec.classList.contains('active')){
+      REC?.arm(tRecSrc.value).start();
+      tRec.classList.add('active');
+    } else {
+      try{ REC.stop(); }catch{}
+      tRec.classList.remove('active');
+    }
+  };
+  tBpm.oninput =()=>{ const v=+tBpm.value||120; CLOCK?.setBpm(v); };
+  tLoop.onchange=()=>{ CLOCK?.enableLoop(tLoop.checked); };
+  tLen.onchange =()=>{ LOOPER?.setLength(+tLen.value||4); };
+  tRecSrc.onchange=()=>{ /* armed on start() */ };
+}
+
+
 // Coach (metronome, arp, scale, velocity, composer)
 let COACH;
+let CLOCK, LOOPER, REC;
 
 const state={ base:60, held:new Set(), transpose:0, octave:0, ch:1, padMode:'drum', drumKit:'standard' };
 const eff=(m)=> m + state.transpose + state.octave*12;
@@ -107,12 +182,15 @@ const eff=(m)=> m + state.transpose + state.octave*12;
 function rawNoteOn(m,vel=100){ const mv=eff(m); Eng.noteOn(mv,vel/127); state.held.add(mv); flashKey(state,mv,true); }
 function rawNoteOff(m){ const mv=eff(m); if(!state.held.has(mv)){flashKey(state,mv,false); return} if(Eng.sustain){flashKey(state,mv,false); return} Eng.noteOff(mv); state.held.delete(mv); flashKey(state,mv,false) }
 // Coach-aware wrappers
-function playOn(m,vel=100){ if(window.COACH) window.COACH.noteOn(m,vel); else rawNoteOn(m,vel) }
+function playOn(m,vel=100){
+  if(window.LOOPER && Eng?.ctx) window.LOOPER.recordNoteOn(m, vel, Eng.ctx.currentTime, 'keys');
+  if(window.COACH) window.COACH.noteOn(m,vel); else rawNoteOn(m,vel);
+}
 function playOff(m){ if(window.COACH) window.COACH.noteOff(m); else rawNoteOff(m) }
 
 function allOff(){ Eng.releaseAll(); state.held.clear(); document.querySelectorAll('.white,.black,.pad').forEach(el=>el.classList.remove('active')) }
 
-async function handlePadHit(idx, midi, vel){ await Eng.start(); if(state.padMode==='off') return; const gain=(MapState.padGain?.[idx]??1); flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120); if(state.padMode==='drum'){ Eng.setDrumKit(state.drumKit); Eng.triggerDrum(midi, (vel||110)/127, gain); } else if(state.padMode==='instrument'){ playOn(midi, Math.round((vel||110)*gain)); } }
+async function handlePadHit(idx, midi, vel){ await Eng.start(); if(state.padMode==='off') return; const gain=(MapState.padGain?.[idx]??1); flashPad(idx,true); setTimeout(()=>flashPad(idx,false),120); if(state.padMode==='drum'){ Eng.setDrumKit(state.drumKit); Eng.triggerDrum(midi, (vel||110)/127, gain); if(window.LOOPER && Eng?.ctx) window.LOOPER.recordNoteOn(midi, vel||110, Eng.ctx.currentTime, state.padMode==='drum'?'drums':'keys'); } else if(state.padMode==='instrument'){ playOn(midi, Math.round((vel||110)*gain)); } }
 
 function lcd(a,b){ $('#lcd').innerHTML=`<small>ZONE 1 • CH ${state.ch}</small>${a||''}${b?' — '+b:''}` }
 
@@ -261,9 +339,9 @@ function addKeysVolUI(){
 
 
 function bindUI(){
-  $('#startBtn').onclick = async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test() } else say('Audio context not running. Click again.','warn'); diag(); ensurePresets(); addKeysVolUI(); applyEngineFromUI(); }catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } const kv=document.querySelector('#keysVol'); if(kv) kv.dispatchEvent(new Event('input'));};
-  $('#testBtn').onclick = async()=>{ try{ await Eng.start(); Eng.test(); say('Test beep sent.','ok'); diag(); ensurePresets(); addKeysVolUI(); applyEngineFromUI(); }catch(e){ window.__lastErr=e.message; say('Test failed: '+e.message,'bad'); diag() } const kv2=document.querySelector('#keysVol'); if(kv2) kv2.dispatchEvent(new Event('input'));};
-  $('#midiBtn').onclick = async()=>{ try{ const {list,selected} = await MIDI.connect(); const sel=$('#midiIn'); if(sel){ sel.innerHTML=''; for(const i of list){ const o=document.createElement('option'); o.value=i.id; o.textContent=i.name; sel.appendChild(o) } if(selected) sel.value=selected.id; } say(selected?`Connected to <b>${selected.name}</b>.`:'MIDI ready. Select device.','ok'); diag({MIDIInputs:list.length}); ensurePresets(); addKeysVolUI(); applyEngineFromUI(); }catch(e){ window.__lastErr=e.message; say(e.message,'bad'); diag() } const kv3=document.querySelector('#keysVol'); if(kv3) kv3.dispatchEvent(new Event('input'));};
+  $('#startBtn').onclick = async()=>{ try{ const ok=await Eng.start(); if(ok){ say('Audio started.','ok'); Eng.test() } else say('Audio context not running. Click again.','warn'); diag(); ensurePresets(); addKeysVolUI(); applyEngineFromUI(); installTransportUI(); }catch(e){ window.__lastErr=e.message; say('Could not start audio: '+e.message,'bad'); diag() } const kv=document.querySelector('#keysVol'); if(kv) kv.dispatchEvent(new Event('input'));};
+  $('#testBtn').onclick = async()=>{ try{ await Eng.start(); Eng.test(); say('Test beep sent.','ok'); diag(); ensurePresets(); addKeysVolUI(); applyEngineFromUI(); installTransportUI(); }catch(e){ window.__lastErr=e.message; say('Test failed: '+e.message,'bad'); diag() } const kv2=document.querySelector('#keysVol'); if(kv2) kv2.dispatchEvent(new Event('input'));};
+  $('#midiBtn').onclick = async()=>{ try{ const {list,selected} = await MIDI.connect(); const sel=$('#midiIn'); if(sel){ sel.innerHTML=''; for(const i of list){ const o=document.createElement('option'); o.value=i.id; o.textContent=i.name; sel.appendChild(o) } if(selected) sel.value=selected.id; } say(selected?`Connected to <b>${selected.name}</b>.`:'MIDI ready. Select device.','ok'); diag({MIDIInputs:list.length}); ensurePresets(); addKeysVolUI(); applyEngineFromUI(); installTransportUI(); }catch(e){ window.__lastErr=e.message; say(e.message,'bad'); diag() } const kv3=document.querySelector('#keysVol'); if(kv3) kv3.dispatchEvent(new Event('input'));};
   $('#resetBtn').onclick = ()=>{ location.reload() };
 
   // LCD utilities
