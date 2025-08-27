@@ -103,6 +103,8 @@ window.Eng=Eng;
 // ---------- Looper helpers (durations, overdub, layers) ----------
 let COACH;
 let CLOCK, LOOPER, REC;
+const LOOP_HELD = new Set(); // MIDI notes currently sounding because of the looper
+
 
 // overdub toggle + current layer id
 window.__looperOD = true;
@@ -171,16 +173,23 @@ function installTransportUI(){
 
     // schedule at exact AudioContext time; respect note duration if present
     const schedule=(at, ev, track)=>{
-      if(!Eng?.ctx) return;
-      const ms = Math.max(0, (at - Eng.ctx.currentTime) * 1000);
-      if(track==='keys'){
-        const gateSec = ev.durBeats ? ev.durBeats * (60/(CLOCK?.bpm||120)) : 0.20;
-       if(ev.type==='on') setTimeout(()=>Eng.noteOn(ev.midi, (ev.vel||100)/127), ms);
-       else if(ev.type==='off') setTimeout(()=>Eng.noteOff(ev.midi), ms);
-    }else{
-        if(ev.type==='on') setTimeout(()=>Eng.triggerDrum(ev.midi, (ev.vel||110)/127), ms);
+  if(!Eng?.ctx) return;
+  const ms = Math.max(0, (at - Eng.ctx.currentTime) * 1000);
+  const run = (fn)=> setTimeout(fn, ms);
+  const EPS = 1e-5; // you may already have this guard in your window test
+
+  if(track==='keys'){
+    if(ev.type==='on'){
+      LOOP_HELD.add(ev.midi);
+      run(()=>Eng.noteOn(ev.midi, (ev.vel||100)/127));
+    }else if(ev.type==='off'){
+      run(()=>{ Eng.noteOff(ev.midi); LOOP_HELD.delete(ev.midi); });
     }
-    };
+  } else if(track==='drums'){
+    if(ev.type==='on') run(()=>Eng.triggerDrum(ev.midi, (ev.vel||110)/127));
+  }
+};
+
     LOOPER.play(schedule);
 
     // LED + loop position counter
@@ -246,11 +255,16 @@ function installTransportUI(){
     say('Transport: Play','ok');
   };
 
-  tStop.onclick=()=>{
-    CLOCK?.stop(); tPlay.classList.remove('active');
-    if(tRec.classList.contains('active')){ try{ REC.stop(); }catch{} tRec.classList.remove('active'); }
-    say('Transport: Stop','ok');
-  };
+tStop.onclick=()=>{
+  CLOCK?.stop(); tPlay.classList.remove('active');
+
+  // NEW: ensure nothing drones after stopping
+  loopAllOff();
+
+  if(tRec.classList.contains('active')){ try{ REC.stop(); }catch{} tRec.classList.remove('active'); }
+  say('Transport: Stop','ok');
+};
+
 
   tRec.onclick =()=>{
     if(!tRec.classList.contains('active')){
@@ -282,28 +296,51 @@ function installTransportUI(){
   };
 
   // delete selected layer
-  tDel.onclick = ()=>{
-    const id = parseInt(tLayerSel.value,10);
-    if(!window.LOOPER || !id) return;
-    for(const tr of ['keys','drums']){
-      window.LOOPER.tracks[tr] = (window.LOOPER.tracks[tr]||[]).filter(ev=>ev.layer!==id);
-    }
-    layersRefreshUI();
-    say('Deleted layer '+id,'warn');
-  };
+tDel.onclick = ()=>{
+  const id = parseInt(tLayerSel.value,10);
+  if(!window.LOOPER || !id) return;
+  for(const tr of ['keys','drums']){
+    window.LOOPER.tracks[tr] = (window.LOOPER.tracks[tr]||[]).filter(ev=>ev.layer!==id);
+  }
+
+  // NEW: if that layer had a sustaining note, its OFF just vanished — stop it now
+  loopAllOff();
+
+  layersRefreshUI();
+  say('Deleted layer '+id,'warn');
+};
+
 
   // clear all layers/events
   tClr.onclick = ()=>{
-    if(!window.LOOPER) return;
-    window.LOOPER.tracks.keys = [];
-    window.LOOPER.tracks.drums = [];
-    (window.PENDING?.keys||new Map()).clear?.();
-    layersRefreshUI();
-    say('Loop cleared.','warn');
-  };
+  if(!window.LOOPER) return;
+  window.LOOPER.tracks.keys = [];
+  window.LOOPER.tracks.drums = [];
+  (window.PENDING?.keys||new Map()).clear?.();
+
+  // NEW: stop any notes that were being held by the loop
+  loopAllOff();
+
+  layersRefreshUI();
+  say('Loop cleared.','warn');
+};
+
 
   // init layer menu
   layersRefreshUI();
+}
+
+function loopAllOff(){
+  if(!Eng?.keyVoices) return;
+  for(const m of [...LOOP_HELD]){
+    // don't kill keys you are physically holding
+    if(!state.down.has(m)){
+      try{ Eng.noteOff(m); }catch(_){}
+      state.held.delete(m);
+      flashKey(state, m, false);
+    }
+    LOOP_HELD.delete(m);
+  }
 }
 
 

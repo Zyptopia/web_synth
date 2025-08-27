@@ -17,16 +17,17 @@
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji; }
-    .app { display: grid; grid-template-columns: 360px 1fr; grid-template-rows: auto 1fr; height: 100%; }
+    .app { display: grid; grid-template-columns: 380px 1fr; grid-template-rows: auto 1fr; height: 100%; }
     header { grid-column: 1 / -1; padding: 10px 14px; background: linear-gradient(90deg, #101827, #0e1622 50%, #0b0f14); border-bottom: 1px solid #1f2a37; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     header h1 { font-size: 16px; margin: 0; letter-spacing: 0.3px; font-weight: 600; }
     #stageWrap { position: relative; background: radial-gradient(1200px 1200px at 80% -10%, rgba(76, 201, 240, .1), transparent 60%), radial-gradient(1000px 800px at 20% 110%, rgba(168, 85, 247, .08), transparent 60%); overflow: hidden; }
-    .layerCanvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+    .layerCanvas, #bgCanvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+    #bgCanvas { z-index: 0; }
     aside { background: var(--panel); border-right: 1px solid #1f2a37; padding: 12px; overflow: auto; }
     aside h2 { font-size: 12px; font-weight: 800; margin: 14px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
     .col { display: grid; gap: 8px; }
-    button, select, input[type="range"], input[type="number"] { background: #0f172a; color: var(--text); border: 1px solid #263142; border-radius: 10px; padding: 8px 10px; font-size: 13px; }
+    button, select, input[type="range"], input[type="number"], input[type="color"] { background: #0f172a; color: var(--text); border: 1px solid #263142; border-radius: 10px; padding: 8px 10px; font-size: 13px; }
     button { cursor: pointer; }
     button.primary { background: #142136; border-color: #2a3b52; }
     button.good { border-color: #1e8a46; background: #09361c; }
@@ -46,6 +47,7 @@
     .takes .item { gap: 10px; }
     .takes .item label { display: flex; align-items: center; gap: 6px; }
     .transport .pill { background:#0b1423; }
+    .dim { opacity: .6 }
   </style>
 </head>
 <body>
@@ -67,11 +69,15 @@
       <div class="row">
         <button id="btnStartAudio" class="primary">Start Audio</button>
         <button id="btnConnectMIDI">Connect MIDI</button>
-        <button id="btnPanic" class="danger">Panic</button>
+        <button id="btnPanic" class="danger">HARD Panic</button>
       </div>
       <div class="row split">
         <label class="muted">MIDI Input</label>
         <select id="midiInputs"></select>
+      </div>
+      <div class="row split">
+        <label class="muted">Channel</label>
+        <select id="midiChannel"><option value="omni" selected>Omni</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option></select>
       </div>
       <div class="row">
         <label><input type="checkbox" id="useComputerKeys" checked /> Use computer keyboard (<span class="kbd">A W S E D F T G Y H U J K</span>)</label>
@@ -101,6 +107,10 @@
         <select id="layerSelect"></select>
       </div>
       <div class="row split">
+        <label class="muted">Layer Opacity</label>
+        <input id="layerOpacity" type="range" min="0.05" max="1" step="0.05" value="1" />
+      </div>
+      <div class="row split">
         <label class="muted">Blend</label>
         <select id="blend">
           <option value="source-over" selected>Normal</option>
@@ -110,6 +120,10 @@
           <option value="overlay">Overlay</option>
           <option value="color-dodge">Color Dodge</option>
         </select>
+      </div>
+      <div class="row split">
+        <label class="muted">Trail Fade</label>
+        <input id="trail" type="range" min="0" max="0.2" step="0.005" value="0" />
       </div>
       <div class="row">
         <button id="btnSavePNG">Save PNG</button>
@@ -140,6 +154,39 @@
         <button id="btnEraser">Eraser: Off</button>
       </div>
 
+      <h2>Colour</h2>
+      <div class="row split">
+        <label class="muted">Mode</label>
+        <select id="colorMode">
+          <option value="auto" selected>Auto (Pitch→Hue)</option>
+          <option value="fixed">Fixed Colour</option>
+          <option value="offset">Auto + Hue Offset</option>
+          <option value="vel">Velocity → Hue Shift</option>
+        </select>
+      </div>
+      <div class="row split" id="colorPickerRow">
+        <label class="muted">Pick</label>
+        <input id="colorPick" type="color" value="#7c3aed" />
+      </div>
+      <div class="row split">
+        <label class="muted">Hue Offset</label>
+        <input id="hueOffset" type="range" min="-180" max="180" step="1" value="0" />
+      </div>
+      <div class="row split">
+        <label class="muted">Saturation</label>
+        <input id="sat" type="range" min="0" max="100" step="1" value="85" />
+      </div>
+      <div class="row split">
+        <label class="muted">Lightness</label>
+        <input id="light" type="range" min="0" max="100" step="1" value="60" />
+      </div>
+
+      <h2>Background</h2>
+      <div class="row">
+        <input id="bgFile" type="file" accept="image/*" />
+        <button id="btnClearBG" class="tiny">Clear BG</button>
+      </div>
+
       <h2>Presets</h2>
       <div class="row split"><label class="muted">Mapping</label>
         <select id="preset">
@@ -152,7 +199,7 @@
 
       <h2>Notes</h2>
       <div class="list" id="noteList"></div>
-      <p class="muted" style="margin-top:8px">Pitch → hue, velocity → thickness. Chords steer the pen. Aftertouch/pressure → thickness; CC74 (MPE Y) → scatter; Mod‑wheel → opacity.</p>
+      <p class="muted" style="margin-top:8px">Pitch → hue (or fixed colour), velocity → thickness (and optional hue shift). Aftertouch/pressure → thickness; CC74 (MPE Y) → scatter; Mod‑wheel → opacity.</p>
 
       <h2>Takes / Overdubs</h2>
       <div class="list takes" id="takeList"></div>
@@ -167,7 +214,8 @@
       <p class="stat">Eraser <span class="kbd">E</span> • New layer <span class="kbd">N</span> • Clear layer <span class="kbd">C</span> • Play/Stop <span class="kbd">Space</span> • Rec <span class="kbd">R</span> • Panic <span class="kbd">P</span></p>
     </aside>
     <div id="stageWrap">
-      <!-- Canvases inserted here -->
+      <canvas id="bgCanvas"></canvas>
+      <!-- draw layers above bg -->
       <footer>
         Tip: Hold chords for complex paths. Quantize helps tight loops. Sustain toggles eraser; Pitch‑bend rotates the field.
       </footer>
@@ -177,6 +225,11 @@
 <script>
 (() => {
   const stageWrap = document.getElementById('stageWrap');
+  const bgCanvas = document.getElementById('bgCanvas');
+  const bgCtx = bgCanvas.getContext('2d');
+  const bgFile = document.getElementById('bgFile');
+  const btnClearBG = document.getElementById('btnClearBG');
+
   const midiStatus = document.getElementById('midiStatus');
   const audioStatus = document.getElementById('audioStatus');
   const fpsEl = document.getElementById('fps');
@@ -185,18 +238,26 @@
   const btnConnectMIDI = document.getElementById('btnConnectMIDI');
   const btnPanic = document.getElementById('btnPanic');
   const midiInputsSel = document.getElementById('midiInputs');
+  const midiChannelSel = document.getElementById('midiChannel');
   const useComputerKeys = document.getElementById('useComputerKeys');
   const btnAddLayer = document.getElementById('btnAddLayer');
   const btnDeleteLayer = document.getElementById('btnDeleteLayer');
   const btnClearLayer = document.getElementById('btnClearLayer');
   const layerSelect = document.getElementById('layerSelect');
+  const layerOpacity = document.getElementById('layerOpacity');
   const blendSel = document.getElementById('blend');
+  const trailRange = document.getElementById('trail');
   const btnSavePNG = document.getElementById('btnSavePNG');
   const brushScale = document.getElementById('brushScale');
   const opacityRange = document.getElementById('opacity');
   const scatterRange = document.getElementById('scatter');
   const brushTypeSel = document.getElementById('brushType');
   const presetSel = document.getElementById('preset');
+  const colorModeSel = document.getElementById('colorMode');
+  const colorPick = document.getElementById('colorPick');
+  const hueOffset = document.getElementById('hueOffset');
+  const satRange = document.getElementById('sat');
+  const lightRange = document.getElementById('light');
   const btnEraser = document.getElementById('btnEraser');
   const noteList = document.getElementById('noteList');
   const takeList = document.getElementById('takeList');
@@ -212,11 +273,12 @@
 
   // --- Audio ---
   let audioCtx = null;
+  let closedByPanic = false;
   const masterGain = { node: null, level: 0.2 };
   let analyser = null, fft = null;
 
   function ensureAudio() {
-    if (!audioCtx) {
+    if (!audioCtx || closedByPanic) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       masterGain.node = audioCtx.createGain();
       masterGain.node.gain.value = masterGain.level;
@@ -227,25 +289,27 @@
       analyser.connect(audioCtx.destination);
       audioStatus.textContent = 'Audio: ' + audioCtx.state;
       audioCtx.onstatechange = () => { audioStatus.textContent = 'Audio: ' + audioCtx.state; };
+      closedByPanic = false;
     }
   }
 
   btnStartAudio.addEventListener('click', async () => { ensureAudio(); if (audioCtx.state !== 'running') await audioCtx.resume(); });
 
-  // --- Voice management (robust against missed NoteOff) ---
+  // --- Voice management (extra robust) ---
   const activeOsc = new Map(); // note -> {osc, g, timer}
   const activeNotes = new Map(); // note -> {velocity, t, sustained, pressure}
   const heldCounts = new Map(); // note -> count of overlapping NoteOn
-  const AUTO_OFF_MS = 8000; // fail-safe in case NoteOff never arrives
+  const AUTO_OFF_MS = 2000; // fail-safe
 
   function midiToFreq(n) { return 440 * Math.pow(2, (n - 69) / 12); }
 
   function retriggerEnvelope(g, v) {
     const now = audioCtx.currentTime;
     g.gain.cancelScheduledValues(now);
-    g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), now);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, v), now + 0.01);
-    g.gain.exponentialRampToValueAtTime(v*0.7, now + 0.25);
+    const cur = Math.max(0.0001, g.gain.value);
+    g.gain.setValueAtTime(cur, now);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, v), now + 0.008);
+    g.gain.exponentialRampToValueAtTime(v*0.7, now + 0.18);
   }
 
   function startTone(note, velocity=100) {
@@ -264,8 +328,6 @@
       activeOsc.set(note, h);
     }
     retriggerEnvelope(h.g, v);
-
-    // refresh fail-safe timer
     if (h.timer) clearTimeout(h.timer);
     h.timer = setTimeout(() => forceStop(note), AUTO_OFF_MS);
   }
@@ -276,10 +338,10 @@
     if (h.timer) { clearTimeout(h.timer); h.timer = null; }
     const now = audioCtx.currentTime;
     h.g.gain.cancelScheduledValues(now);
-    if (fast) h.g.gain.linearRampToValueAtTime(0.0001, now + 0.03);
-    else h.g.gain.linearRampToValueAtTime(0.0001, now + 0.12);
-    try { h.osc.stop(now + 0.15); } catch {}
-    setTimeout(() => { try { h.osc.disconnect(); h.g.disconnect(); } catch {} activeOsc.delete(note); }, 200);
+    const t = fast ? 0.02 : 0.08;
+    h.g.gain.setTargetAtTime(0.0001, now, t);
+    try { h.osc.stop(now + 0.12); } catch {}
+    setTimeout(() => { try { h.osc.disconnect(); h.g.disconnect(); } catch {} activeOsc.delete(note); }, 180);
   }
 
   function forceStop(note) {
@@ -289,15 +351,28 @@
     refreshNoteList();
   }
 
-  function allNotesOff() {
-    // reset everything
-    heldCounts.clear();
-    activeNotes.clear();
-    for (const n of Array.from(activeOsc.keys())) stopTone(n, true);
-    sustainDown = false; pressure = 0; mpeScatter = 0;
-    downKeys.clear && downKeys.clear();
-    refreshNoteList();
+  // Watchdog: sweep dangling voices
+  setInterval(() => {
+    activeOsc.forEach((_, note) => {
+      const held = heldCounts.get(note) || 0;
+      const n = activeNotes.get(note);
+      const shouldBeOn = held > 0 || (n && n.sustained);
+      if (!shouldBeOn) stopTone(note, true);
+    });
+  }, 500);
+
+  async function hardPanic() {
+    // Kill voices & close context for guaranteed silence
+    try { activeOsc.forEach((_, n) => stopTone(n, true)); } catch {}
+    heldCounts.clear(); activeNotes.clear(); sustainDown = false; pressure = 0; mpeScatter = 0; refreshNoteList();
+    if (audioCtx) {
+      try { await audioCtx.close(); } catch {}
+      closedByPanic = true;
+      audioStatus.textContent = 'Audio: closed';
+    }
   }
+
+  function allNotesOff() { hardPanic(); }
 
   btnPanic.addEventListener('click', allNotesOff);
   window.addEventListener('blur', allNotesOff);
@@ -321,6 +396,13 @@
       midiStatus.textContent = 'MIDI: unavailable';
       console.warn('WebMIDI not available', e);
     }
+  }
+
+  function channelOk(status) {
+    const sel = midiChannelSel.value;
+    if (sel === 'omni') return true;
+    const msgCh = (status & 0x0F) + 1; // 1..16
+    return msgCh === parseInt(sel,10);
   }
 
   function populateMIDIInputs() {
@@ -354,6 +436,8 @@
   function onMIDIMessage(e) {
     const [status, d1, d2] = e.data;
     const cmd = status & 0xF0;
+    if (!channelOk(status)) return;
+
     if (cmd === 0x90) { // note on (or off if vel=0)
       if (d2 === 0) noteOff(d1);
       else noteOn(d1, d2, 'midi');
@@ -422,13 +506,13 @@
   function midiNoteName(n) { const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; const name = names[n % 12]; const oct = Math.floor(n/12) - 1; return name + oct; }
 
   // --- Layers ---
-  const layers = []; // {canvas, ctx, blend}
+  const layers = []; // {canvas, ctx, blend, opacity}
   let activeLayer = 0;
 
   function createLayer() {
-    const c = document.createElement('canvas'); c.className = 'layerCanvas'; stageWrap.appendChild(c);
+    const c = document.createElement('canvas'); c.className = 'layerCanvas'; c.style.zIndex = 1 + layers.length; stageWrap.appendChild(c);
     const ctx = c.getContext('2d'); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; resizeCanvas(c);
-    layers.push({canvas: c, ctx, blend: 'source-over'});
+    layers.push({canvas: c, ctx, blend: 'source-over', opacity: 1});
     updateLayerSelect(); selectLayer(layers.length - 1);
   }
 
@@ -436,9 +520,10 @@
     layerSelect.innerHTML = '';
     layers.forEach((_, i) => { const opt = document.createElement('option'); opt.value = String(i); opt.textContent = `Layer ${i+1}`; layerSelect.appendChild(opt); });
     layerSelect.value = String(activeLayer);
+    layerOpacity.value = String(layers[activeLayer].opacity);
   }
 
-  function selectLayer(i) { activeLayer = Math.max(0, Math.min(i, layers.length - 1)); updateLayerSelect(); blendSel.value = layers[activeLayer].blend; }
+  function selectLayer(i) { activeLayer = Math.max(0, Math.min(i, layers.length - 1)); updateLayerSelect(); blendSel.value = layers[activeLayer].blend; layerOpacity.value = layers[activeLayer].opacity; }
 
   function deleteLayer() {
     if (layers.length <= 1) return; const {canvas} = layers[activeLayer]; canvas.remove(); layers.splice(activeLayer, 1); selectLayer(Math.max(0, activeLayer - 1));
@@ -447,15 +532,44 @@
   function clearLayer() { const {canvas, ctx} = layers[activeLayer]; ctx.clearRect(0, 0, canvas.width, canvas.height); }
 
   function savePNG() {
-    const w = layers[0].canvas.width, h = layers[0].canvas.height; const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const tctx = tmp.getContext('2d'); layers.forEach(l => tctx.drawImage(l.canvas, 0, 0)); const a = document.createElement('a'); a.download = 'music-painter.png'; a.href = tmp.toDataURL('image/png'); a.click();
+    const w = layers[0].canvas.width, h = layers[0].canvas.height; const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const tctx = tmp.getContext('2d');
+    // draw background first
+    tctx.drawImage(bgCanvas, 0, 0);
+    layers.forEach(l => tctx.drawImage(l.canvas, 0, 0));
+    const a = document.createElement('a'); a.download = 'music-painter.png'; a.href = tmp.toDataURL('image/png'); a.click();
   }
 
   btnAddLayer.addEventListener('click', createLayer);
   btnDeleteLayer.addEventListener('click', deleteLayer);
   btnClearLayer.addEventListener('click', clearLayer);
   layerSelect.addEventListener('change', () => selectLayer(parseInt(layerSelect.value, 10)));
+  layerOpacity.addEventListener('input', () => { layers[activeLayer].opacity = parseFloat(layerOpacity.value); });
   btnSavePNG.addEventListener('click', savePNG);
   blendSel.addEventListener('change', () => { layers[activeLayer].blend = blendSel.value; });
+
+  // BG load/clear
+  function resizeCanvas(c) {
+    const dpr = Math.max(1, window.devicePixelRatio || 1); const rect = stageWrap.getBoundingClientRect(); c.width = Math.floor(rect.width * dpr); c.height = Math.floor(rect.height * dpr); c.style.width = rect.width + 'px'; c.style.height = rect.height + 'px'; const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function resizeAll() { resizeCanvas(bgCanvas); layers.forEach(l => resizeCanvas(l.canvas)); drawBGImage(); }
+  window.addEventListener('resize', resizeAll);
+  createLayer();
+
+  let bgImage = null;
+  function drawBGImage() {
+    if (!bgImage) { bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height); return; }
+    const rect = stageWrap.getBoundingClientRect();
+    bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);
+    const iw = bgImage.width, ih = bgImage.height; const ar = iw/ih; const tw = rect.width, th = rect.height; const tar = tw/th;
+    let dw, dh; if (ar > tar) { dh = th; dw = dh*ar; } else { dw = tw; dh = dw/ar; }
+    const dx = (tw - dw)/2, dy = (th - dh)/2; bgCtx.drawImage(bgImage, dx, dy, dw, dh);
+  }
+  bgFile.addEventListener('change', (e) => {
+    const file = e.target.files[0]; if (!file) return; const img = new Image(); img.onload = ()=>{ bgImage = img; resizeAll(); }; img.src = URL.createObjectURL(file);
+  });
+  btnClearBG.addEventListener('click', ()=>{ bgImage = null; drawBGImage(); });
+
+  function centerPen() { const rect = stageWrap.getBoundingClientRect(); pen.x = rect.width * 0.5; pen.y = rect.height * 0.5; pen.px = pen.x; pen.py = pen.y; }
 
   // --- Render / Brush engine ---
   const pen = { x: 0, y: 0, px: 0, py: 0 };
@@ -465,38 +579,49 @@
   function toggleEraser(force=null) { if (force === null) erasing = !erasing; else erasing = !!force; btnEraser.textContent = `Eraser: ${erasing ? 'On' : 'Off'}`; }
   btnEraser.addEventListener('click', () => toggleEraser());
 
-  function resizeCanvas(c) {
-    const dpr = Math.max(1, window.devicePixelRatio || 1); const rect = stageWrap.getBoundingClientRect(); c.width = Math.floor(rect.width * dpr); c.height = Math.floor(rect.height * dpr); c.style.width = rect.width + 'px'; c.style.height = rect.height + 'px'; const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  function colorHexToHsl(hex) {
+    // expects #RRGGBB
+    const r = parseInt(hex.slice(1,3),16)/255; const g = parseInt(hex.slice(3,5),16)/255; const b = parseInt(hex.slice(5,7),16)/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b); let h,s,l=(max+min)/2; if(max===min){h=s=0;} else { const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min); switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;} h/=6; } return {h: h*360, s: s*100, l: l*100};
   }
-  function resizeAll() { layers.forEach(l => resizeCanvas(l.canvas)); }
-  window.addEventListener('resize', resizeAll);
-  createLayer();
 
-  function centerPen() { const rect = stageWrap.getBoundingClientRect(); pen.x = rect.width * 0.5; pen.y = rect.height * 0.5; pen.px = pen.x; pen.py = pen.y; }
-  centerPen();
+  function computeHue(hueFromNotes, velocity) {
+    const mode = colorModeSel.value;
+    const base = colorHexToHsl(colorPick.value);
+    let h = hueFromNotes;
+    if (mode === 'fixed') h = base.h;
+    if (mode === 'offset') h = (hueFromNotes + parseFloat(hueOffset.value)) % 360;
+    if (mode === 'vel') h = (base.h + (velocity/127)*120) % 360; // up to +120° shift
+    h = (h + 360) % 360;
+    return h;
+  }
 
-  // Brush helpers
-  function drawStroke(ctx, x1, y1, x2, y2, width, hue, alpha) {
+  function resizeAndCenter() { resizeAll(); centerPen(); }
+  resizeAndCenter();
+
+  // Stroke renderer
+  function drawStroke(ctx, x1, y1, x2, y2, width, hue, sat, light, alpha) {
     ctx.globalCompositeOperation = erasing ? 'destination-out' : layers[activeLayer].blend;
-    if (brushTypeSel.value === 'glow') { ctx.shadowColor = `hsla(${hue}, 100%, 60%, ${alpha})`; ctx.shadowBlur = Math.min(60, width * 4); }
+    ctx.globalAlpha = layers[activeLayer].opacity; // per-layer opacity
+    if (brushTypeSel.value === 'glow') { ctx.shadowColor = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`; ctx.shadowBlur = Math.min(60, width * 4); }
     else { ctx.shadowBlur = 0; }
-    ctx.strokeStyle = `hsla(${hue}, 85%, ${erasing ? 50 : 60}%, ${alpha})`;
+    ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${erasing ? Math.max(10, light-10) : light}%, ${alpha})`;
     ctx.lineWidth = width;
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     if (brushTypeSel.value === 'particle') {
-      const r = width * 0.5; ctx.fillStyle = `hsla(${hue}, 90%, 60%, ${alpha*0.7})`; ctx.beginPath(); ctx.arc(x2, y2, r, 0, Math.PI*2); ctx.fill();
+      const r = width * 0.5; ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha*0.7})`; ctx.beginPath(); ctx.arc(x2, y2, r, 0, Math.PI*2); ctx.fill();
     } else if (brushTypeSel.value === 'stamp') {
-      const s = width * 1.6; ctx.fillStyle = `hsla(${hue}, 90%, 70%, ${alpha*0.6})`; ctx.fillRect(x2 - s/2, y2 - s/2, s, s);
+      const s = width * 1.6; ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light+5}%, ${alpha*0.6})`; ctx.fillRect(x2 - s/2, y2 - s/2, s, s);
     }
   }
 
   // Presets
   function applyPreset() {
     const p = presetSel.value;
-    if (p === 'syn') { blendSel.value = 'overlay'; layers[activeLayer].blend = 'overlay'; brushTypeSel.value = 'line'; opacityRange.value = 0.6; }
-    else if (p === 'ink') { blendSel.value = 'multiply'; layers[activeLayer].blend = 'multiply'; brushTypeSel.value = 'line'; opacityRange.value = 0.5; }
-    else if (p === 'neon') { blendSel.value = 'lighter'; layers[activeLayer].blend = 'lighter'; brushTypeSel.value = 'glow'; opacityRange.value = 0.7; }
-    else if (p === 'mono') { blendSel.value = 'source-over'; layers[activeLayer].blend = 'source-over'; brushTypeSel.value = 'line'; opacityRange.value = 0.8; }
+    if (p === 'syn') { blendSel.value = 'overlay'; layers[activeLayer].blend = 'overlay'; brushTypeSel.value = 'line'; opacityRange.value = 0.6; colorModeSel.value = 'auto'; }
+    else if (p === 'ink') { blendSel.value = 'multiply'; layers[activeLayer].blend = 'multiply'; brushTypeSel.value = 'line'; opacityRange.value = 0.5; colorModeSel.value = 'mono'; }
+    else if (p === 'neon') { blendSel.value = 'lighter'; layers[activeLayer].blend = 'lighter'; brushTypeSel.value = 'glow'; opacityRange.value = 0.7; colorModeSel.value = 'auto'; }
+    else if (p === 'mono') { blendSel.value = 'source-over'; layers[activeLayer].blend = 'source-over'; brushTypeSel.value = 'line'; opacityRange.value = 0.8; colorModeSel.value = 'fixed'; colorPick.value = '#3b82f6'; }
   }
   presetSel.addEventListener('change', applyPreset); applyPreset();
 
@@ -522,8 +647,8 @@
 
   function quantizeTime(t) {
     const q = parseInt(quantSel.value,10); if (!q) return t; // off
-    const step2 = secondsPerBeat() * (4 / q); // 1/q note length
-    return Math.round(t / step2) * step2;
+    const step = secondsPerBeat() * (4 / q); // 1/q note length
+    return Math.round(t / step) * step;
   }
 
   function recordEvent(ev) {
@@ -532,18 +657,9 @@
     armedTake.events.push({...ev, t: tQ});
   }
 
-  function startPlay() {
-    ensureAudio(); if (audioCtx.state !== 'running') audioCtx.resume();
-    loopStartTime = ctxNow(); isPlaying = true; startScheduler(); updateTransportButtons();
-  }
-  function stopPlay() {
-    isPlaying = false; stopScheduler(); updateTransportButtons(); counterEl.textContent = '1:1.0';
-  }
-  function toggleRec() {
-    if (!isPlaying) startPlay();
-    if (!isRecording) { armedTake = { id: Date.now(), name: `Take ${takes.length+1}`, events: [], muted: false }; takes.push(armedTake); renderTakes(); isRecording = true; btnRec.classList.add('warn'); }
-    else { isRecording = false; armedTake = null; btnRec.classList.remove('warn'); }
-  }
+  function startPlay() { ensureAudio(); if (audioCtx.state !== 'running') audioCtx.resume(); loopStartTime = ctxNow(); isPlaying = true; startScheduler(); updateTransportButtons(); }
+  function stopPlay() { isPlaying = false; stopScheduler(); updateTransportButtons(); counterEl.textContent = '1:1.0'; }
+  function toggleRec() { if (!isPlaying) startPlay(); if (!isRecording) { armedTake = { id: Date.now(), name: `Take ${takes.length+1}`, events: [], muted: false }; takes.push(armedTake); renderTakes(); isRecording = true; btnRec.classList.add('warn'); } else { isRecording = false; armedTake = null; btnRec.classList.remove('warn'); } }
 
   function startScheduler() { if (schedulerTimer) return; schedulerTimer = setInterval(schedulerTick, lookahead*1000); }
   function stopScheduler() { if (schedulerTimer) { clearInterval(schedulerTimer); schedulerTimer = null; } }
@@ -553,12 +669,7 @@
     for (const take of takes) {
       if (take.muted) continue;
       for (const ev of take.events) {
-        let t = loopStartTime + ev.t;
-        while (t < winStart) t += len;
-        if (t >= winStart && t < winEnd) {
-          if (ev.type === 'on') scheduleAt(t, () => noteOn(ev.note, ev.vel, 'playback'));
-          else if (ev.type === 'off') scheduleAt(t, () => noteOff(ev.note));
-        }
+        let t = loopStartTime + ev.t; while (t < winStart) t += len; if (t >= winStart && t < winEnd) { if (ev.type === 'on') scheduleAt(t, () => noteOn(ev.note, ev.vel, 'playback')); else if (ev.type === 'off') scheduleAt(t, () => noteOff(ev.note)); }
       }
     }
     const pos = ctxNowLoop(); const beatFloat = pos / secondsPerBeat(); const bar = Math.floor(beatFloat / BEATS_PER_BAR) + 1; const beat = (beatFloat % BEATS_PER_BAR) + 1; counterEl.textContent = `${bar}:${beat.toFixed(1)}`;
@@ -575,9 +686,7 @@
   btnDuplicatePattern.addEventListener('click', () => {
     const newBars = parseInt(barsSel.value,10); const oldBars = lastBars; if (newBars <= oldBars) { lastBars = newBars; return; }
     const oldLen = oldBars * BEATS_PER_BAR * secondsPerBeat(); const newLen = newBars * BEATS_PER_BAR * secondsPerBeat(); const copies = Math.floor(newLen / oldLen);
-    for (const take of takes) {
-      const orig = take.events.slice(); take.events.length = 0; for (let i=0;i<copies;i++){ for (const ev of orig){ take.events.push({...ev, t: Math.min(ev.t + i*oldLen, newLen - 0.0001)}); } }
-    }
+    for (const take of takes) { const orig = take.events.slice(); take.events.length = 0; for (let i=0;i<copies;i++){ for (const ev of orig){ take.events.push({...ev, t: Math.min(ev.t + i*oldLen, newLen - 0.0001)}); } } }
     lastBars = newBars; renderTakes();
   });
   barsSel.addEventListener('change', () => { lastBars = parseInt(barsSel.value,10); });
@@ -585,13 +694,7 @@
   function renderTakes() {
     takeList.innerHTML = '';
     if (!takes.length) { takeList.innerHTML = '<div class="item"><span class="muted">No takes yet. Arm Rec to overdub while loop plays.</span><span class="pill">—</span></div>'; return; }
-    takes.forEach((t, i) => {
-      const row = document.createElement('div'); row.className = 'item';
-      const chk = document.createElement('input'); chk.type='checkbox'; chk.checked = !t.muted; chk.addEventListener('change',()=>{ t.muted = !chk.checked; });
-      const span = document.createElement('span'); span.textContent = t.name + ` (${t.events.length} ev)`;
-      const del = document.createElement('button'); del.className='tiny danger'; del.textContent='Delete'; del.addEventListener('click',()=>{ const idx=takes.indexOf(t); if(idx>=0) takes.splice(idx,1); renderTakes(); });
-      row.appendChild(chk); row.appendChild(span); row.appendChild(del); takeList.appendChild(row);
-    });
+    takes.forEach((t) => { const row = document.createElement('div'); row.className = 'item'; const chk = document.createElement('input'); chk.type='checkbox'; chk.checked = !t.muted; chk.addEventListener('change',()=>{ t.muted = !chk.checked; }); const span = document.createElement('span'); span.textContent = t.name + ` (${t.events.length} ev)`; const del = document.createElement('button'); del.className='tiny danger'; del.textContent='Delete'; del.addEventListener('click',()=>{ const idx=takes.indexOf(t); if(idx>=0) takes.splice(idx,1); renderTakes(); }); row.appendChild(chk); row.appendChild(span); row.appendChild(del); takeList.appendChild(row); });
   }
 
   // --- Drawing loop ---
@@ -602,38 +705,49 @@
     const dt = Math.max(0.001, Math.min(0.05, (nowMs - last) / 1000)); last = nowMs;
     frames++; if (nowMs - lastFPS > 1000) { fpsEl.textContent = `${frames} fps`; frames = 0; lastFPS = nowMs; }
 
-    let dx = 0, dy = 0, weightSum = 0, hueNum = 0;
+    // Per-frame trail fade
+    const trail = parseFloat(trailRange.value);
+    if (trail > 0) {
+      for (const l of layers) { const ctx = l.ctx; ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = `rgba(0,0,0,${trail})`; ctx.fillRect(0,0,l.canvas.width,l.canvas.height); ctx.restore(); }
+    }
+
+    // Compute flow from active notes
+    let dx = 0, dy = 0, weightSum = 0, hueNum = 0, velAvg = 0;
     activeNotes.forEach((n, note) => {
       const wBase = n.velocity / 127;
       const press = (n.pressure ?? pressure) * 0.8;
       const w = wBase * (1 + press);
       const angle = (note * GOLDEN_ANGLE + flowPhase) % (Math.PI * 2);
-      dx += Math.cos(angle) * w; dy += Math.sin(angle) * w; hueNum += note * w * 7.0; weightSum += w;
+      dx += Math.cos(angle) * w; dy += Math.sin(angle) * w; hueNum += note * w * 7.0; weightSum += w; velAvg += n.velocity;
     });
+    if (activeNotes.size) velAvg /= activeNotes.size; else velAvg = 0;
 
+    // Spectral influence
     let low=0, mid=0; if (analyser) { analyser.getByteFrequencyData(fft); const n=fft.length; const nLow = Math.floor(n*0.1), nMid = Math.floor(n*0.3); for (let i=0;i<nLow;i++) low+=fft[i]; low/=Math.max(1,nLow*255); for (let i=nLow;i<nLow+nMid;i++) mid+=fft[i]; mid/=Math.max(1,nMid*255); }
 
     if (weightSum > 0) {
       const scatter = scatterRange.valueAsNumber + mpeScatter;
       const speed = 60 * dt * (0.6 + brushScale.valueAsNumber * 0.4) * (1 + mid*0.6);
+      const rect = stageWrap.getBoundingClientRect();
       pen.px = pen.x; pen.py = pen.y;
       const jitter = () => (Math.random()-0.5) * scatter;
-      pen.x += (dx * (1 + weightSum * 1.2) + jitter());
-      pen.y += (dy * (1 + weightSum * 1.2) + jitter());
+      pen.x = (pen.x + (dx * (1 + weightSum * 1.2) + jitter()));
+      pen.y = (pen.y + (dy * (1 + weightSum * 1.2) + jitter()));
 
-      const rect = stageWrap.getBoundingClientRect();
       if (pen.x < 0) { pen.x += rect.width; pen.px = pen.x; }
       if (pen.y < 0) { pen.y += rect.height; pen.py = pen.y; }
       if (pen.x > rect.width) { pen.x -= rect.width; pen.px = pen.x; }
       if (pen.y > rect.height) { pen.y -= rect.height; pen.py = pen.y; }
 
-      let hue = ((hueNum / Math.max(0.0001, weightSum)) % 360 + 360) % 360;
-      if (presetSel.value === 'mono') hue = 200;
+      let hueAuto = ((hueNum / Math.max(0.0001, weightSum)) % 360 + 360) % 360;
+      let hue = computeHue(hueAuto, velAvg);
+      const sat = parseInt(satRange.value,10);
+      const light = parseInt(lightRange.value,10);
       const alpha = Math.min(1, opacityRange.valueAsNumber * (0.7 + low*0.6));
       const width = 1 + (brushScale.valueAsNumber * (1 + weightSum * 6)) * (1 + (pressure*0.8));
 
       const { ctx } = layers[activeLayer];
-      drawStroke(ctx, pen.px, pen.py, pen.x, pen.y, width, hue.toFixed(1), alpha);
+      drawStroke(ctx, pen.px, pen.py, pen.x, pen.y, width, hue.toFixed(1), sat, light, alpha);
     }
 
     requestAnimationFrame(loop);
@@ -656,6 +770,7 @@
   let mediaRecorder = null, chunks = [];
   function startCapture() {
     try {
+      ensureAudio();
       const streamV = stageWrap.captureStream(60);
       const dest = audioCtx.createMediaStreamDestination(); masterGain.node.connect(dest);
       const mixed = new MediaStream([...streamV.getVideoTracks(), ...dest.stream.getAudioTracks()]);
@@ -670,9 +785,4 @@
   btnStopCapture.addEventListener('click', stopCapture);
 
   // transport UI state (small helper)
-  window.updateTransportButtons = function(){};
-
-})();
-</script>
-</body>
-</html>
+  window.updateTransportButtons = function(){};})
