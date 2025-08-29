@@ -335,6 +335,8 @@
       g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
       osc.connect(g).connect(masterGain.node);
       osc.start();
+      // clean mapping if the oscillator ends on its own
+      osc.onended = () => { const cur = activeOsc.get(note); if (cur && cur.osc === osc) activeOsc.delete(note); };
       h = { osc, g, timer: null };
       activeOsc.set(note, h);
     }
@@ -346,13 +348,15 @@
   function stopTone(note, fast=false) {
     const h = activeOsc.get(note);
     if (!h) return;
+    // allow immediate fresh start for the same pitch
+    activeOsc.delete(note);
     if (h.timer) { clearTimeout(h.timer); h.timer = null; }
     const now = audioCtx.currentTime;
     h.g.gain.cancelScheduledValues(now);
     const t = fast ? 0.01 : 0.06;
     h.g.gain.setTargetAtTime(0.0001, now, t);
     try { h.osc.stop(now + 0.1); } catch {}
-    setTimeout(() => { try { h.osc.disconnect(); h.g.disconnect(); } catch {} activeOsc.delete(note); }, 140);
+    setTimeout(() => { try { h.osc.disconnect(); h.g.disconnect(); } catch {} }, 160);
   }
 
   function forceStop(note) {
@@ -598,6 +602,31 @@
 
   function baseAngleFor(note){ return (note * 2.399963229728653 + flowPhase) % (Math.PI*2); } // golden-angle mapping
   function harmonicAngleFor(note){ return (((pc(note)*7)%12) * (2*Math.PI/12)); } // true circle-of-fifths ordering
+  // --- Stroke renderer (RESTORED) ---
+  function drawStroke(ctx, x1, y1, x2, y2, width, hue, sat, light, alpha) {
+    ctx.save();
+    ctx.globalCompositeOperation = erasing ? 'destination-out' : layers[activeLayer].blend;
+    ctx.globalAlpha = layers[activeLayer].opacity; // per-layer opacity
+    if (brushTypeSel.value === 'glow') {
+      ctx.shadowColor = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
+      ctx.shadowBlur = Math.min(60, width * 4);
+    } else {
+      ctx.shadowBlur = 0;
+    }
+    ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${erasing ? Math.max(10, light-10) : light}%, ${alpha})`;
+    ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (brushTypeSel.value === 'particle') {
+      const r = width * 0.5;
+      ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha*0.7})`;
+      ctx.beginPath(); ctx.arc(x2, y2, r, 0, Math.PI*2); ctx.fill();
+    } else if (brushTypeSel.value === 'stamp') {
+      const s = width * 1.6;
+      ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light+5}%, ${alpha*0.6})`;
+      ctx.fillRect(x2 - s/2, y2 - s/2, s, s);
+    }
+    ctx.restore();
+  }
 
   // --- Animation loop ---
   let last = performance.now(); let frames = 0, lastFPS = performance.now();
