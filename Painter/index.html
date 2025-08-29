@@ -7,9 +7,10 @@
   <style>
     :root {
       --bg: #0b0f14;
-      --panel: #121923;
+      --panel: #0f172a;
+      --panelEdge: #1f2a37;
       --text: #e8f0ff;
-      --muted: #97a3b6;
+      --muted: #9fb3d1;
       --accent: #4cc9f0;
       --good: #22c55e;
       --warn: #f59e0b;
@@ -17,30 +18,32 @@
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji; }
-    .app { display: grid; grid-template-columns: 360px 1fr; grid-template-rows: 1fr auto; height: 100%; }
 
-    /* Left panel */
-    aside { background: var(--panel); border-right: 1px solid #1f2a37; padding: 12px; overflow: auto; }
-    .section { background: #0e1622; border: 1px solid #223049; border-radius: 12px; padding: 10px; margin: 10px 0; }
+    /* Layout */
+    .app { display: grid; grid-template-rows: auto 1fr auto; height: 100%; }
+    .topbar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: linear-gradient(180deg, #121a2b, #0e1622); border-bottom: 1px solid var(--panelEdge); }
+    .topbar .spacer { flex: 1; }
+
+    #stageWrap { position: relative; background: radial-gradient(1200px 1200px at 80% -10%, rgba(76, 201, 240, .08), transparent 60%), radial-gradient(1000px 800px at 20% 110%, rgba(168, 85, 247, .06), transparent 60%); overflow: hidden; }
+    .layerCanvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+    footer.tip { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.08); padding: 6px 10px; border-radius: 10px; font-size: 12px; pointer-events: none; }
+
+    .dock { background: var(--panel); border-top: 1px solid var(--panelEdge); padding: 8px 10px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+    .tab { padding: 6px 10px; border-radius: 999px; border: 1px solid #263142; background: #0e1626; color: var(--muted); cursor: pointer; font-size: 12px; }
+    .tab.active { background: #17233a; color: var(--text); border-color: #2a3b52; }
+    .sections { display: grid; grid-template-columns: repeat(6, minmax(280px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 2px; }
+    .section { background: #0e1622; border: 1px solid #223049; border-radius: 12px; padding: 10px; min-width: 280px; }
     .section h2 { font-size: 12px; font-weight: 800; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; display:flex; align-items:center; justify-content:space-between; }
     .section h2 .hint{ font-weight:600; color:#9fb3d1; font-size:11px; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
     .rangeRow { display: grid; grid-template-columns: 1fr auto 44px; gap: 8px; align-items: center; }
     .split { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; }
-    .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #0c1423; border: 1px solid #243349; color: var(--muted); }
     .list { display: grid; gap: 8px; }
     .list .item { background: #0c1421; border: 1px solid #223049; border-radius: 12px; padding: 8px; display: flex; justify-content: space-between; align-items: center; }
+
+    .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #0c1423; border: 1px solid #243349; color: var(--muted); }
     .muted { color: var(--muted); }
-
-    /* Stage */
-    #stageWrap { position: relative; background: radial-gradient(1200px 1200px at 80% -10%, rgba(76, 201, 240, .1), transparent 60%), radial-gradient(1000px 800px at 20% 110%, rgba(168, 85, 247, .08), transparent 60%); overflow: hidden; }
-    .layerCanvas, #bgCanvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
-    #bgCanvas { z-index: 0; }
-    footer.tip { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.08); padding: 6px 10px; border-radius: 10px; font-size: 12px; pointer-events: none; }
-
-    /* Controls bottom bar */
-    .ctrlbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: linear-gradient(0deg, #0e1622, #101827); border-top: 1px solid #1f2a37; }
-    .ctrlbar .spacer { flex: 1; }
 
     button, select, input[type="range"], input[type="number"], input[type="color"] {
       background: #0f172a; color: var(--text); border: 1px solid #263142; border-radius: 10px; padding: 8px 10px; font-size: 13px;
@@ -56,176 +59,200 @@
 </head>
 <body>
   <div class="app">
-    <aside>
-      <div class="section" id="secLayers">
-        <h2>Canvas & Layers <span class="hint">Manage paint surfaces</span></h2>
-        <div class="row">
-          <button id="btnAddLayer" class="good">+ Layer</button>
-          <button id="btnDeleteLayer" class="danger">− Layer</button>
-          <button id="btnClearLayer" class="warn">Clear</button>
-          <button id="btnSavePNG" title="Export composite as PNG">Save PNG</button>
-        </div>
-        <div class="row split">
-          <label class="muted">Active Layer</label>
-          <select id="layerSelect"></select>
-        </div>
-        <div class="rangeRow">
-          <label class="muted">Layer Opacity</label>
-          <input id="layerOpacity" type="range" min="0.05" max="1" step="0.05" value="1" />
-          <output class="value" id="layerOpacityVal">1.00</output>
-        </div>
-        <div class="row split">
-          <label class="muted">Blend</label>
-          <select id="blend">
-            <option value="source-over" selected>Normal</option>
-            <option value="lighter">Lighter</option>
-            <option value="screen">Screen</option>
-            <option value="multiply">Multiply</option>
-            <option value="overlay">Overlay</option>
-            <option value="color-dodge">Color Dodge</option>
-          </select>
-        </div>
-        <div class="rangeRow">
-          <label class="muted">Trail Fade</label>
-          <input id="trail" type="range" min="0" max="0.2" step="0.005" value="0" />
-          <output class="value" id="trailVal">0.00</output>
-        </div>
-      </div>
-
-      <div class="section" id="secBrush">
-        <h2>Brush <span class="hint">Style & size</span></h2>
-        <div class="row split"><label class="muted">Type</label>
-          <select id="brushType">
-            <option value="line" selected>Line</option>
-            <option value="particle">Particles</option>
-            <option value="stamp">Stamp</option>
-            <option value="glow">Glow Ink</option>
-          </select>
-        </div>
-        <div class="rangeRow">
-          <label class="muted">Brush Scale</label>
-          <input type="range" id="brushScale" min="0.2" max="5" step="0.1" value="1.2"/>
-          <output class="value" id="brushScaleVal">1.2</output>
-        </div>
-        <div class="rangeRow">
-          <label class="muted">Opacity</label>
-          <input type="range" id="opacity" min="0.05" max="1" step="0.05" value="0.6"/>
-          <output class="value" id="opacityVal">0.60</output>
-        </div>
-        <div class="rangeRow">
-          <label class="muted">Scatter</label>
-          <input type="range" id="scatter" min="0" max="60" step="1" value="0"/>
-          <output class="value" id="scatterVal">0</output>
-        </div>
-        <div class="row">
-          <button id="btnEraser">Eraser: Off</button>
-        </div>
-      </div>
-
-      <div class="section" id="secColour">
-        <h2>Colour <span class="hint">Pick or auto-map</span></h2>
-        <div class="row split">
-          <label class="muted">Mode</label>
-          <select id="colorMode">
-            <option value="auto" selected>Auto (Pitch→Hue)</option>
-            <option value="fixed">Fixed Colour</option>
-            <option value="offset">Auto + Hue Offset</option>
-            <option value="vel">Velocity → Hue Shift</option>
-          </select>
-        </div>
-        <div class="row split">
-          <label class="muted">Pick</label>
-          <input id="colorPick" type="color" value="#7c3aed" />
-        </div>
-        <div class="rangeRow">
-          <label class="muted">Hue Offset</label>
-          <input id="hueOffset" type="range" min="-180" max="180" step="1" value="0" />
-          <output class="value" id="hueOffsetVal">0</output>
-        </div>
-        <div class="rangeRow">
-          <label class="muted">Saturation</label>
-          <input id="sat" type="range" min="0" max="100" step="1" value="85" />
-          <output class="value" id="satVal">85</output>
-        </div>
-        <div class="rangeRow">
-          <label class="muted">Lightness</label>
-          <input id="light" type="range" min="0" max="100" step="1" value="60" />
-          <output class="value" id="lightVal">60</output>
-        </div>
-      </div>
-
-      <div class="section" id="secFlow">
-        <h2>Flow <span class="hint">How notes steer</span></h2>
-        <div class="row split">
-          <label class="muted">Mode</label>
-          <select id="flowMode">
-            <option value="balanced" selected>Balanced</option>
-            <option value="harmonic">Harmonic</option>
-            <option value="melodic">Melodic Memory</option>
-          </select>
-        </div>
-        <div class="rangeRow">
-          <label class="muted">Smoothness</label>
-          <input id="flowSmooth" type="range" min="0" max="1" step="0.05" value="0.6" />
-          <output class="value" id="flowSmoothVal">0.60</output>
-        </div>
-        <div class="rangeRow">
-          <label class="muted">Consonance Bias</label>
-          <input id="consBias" type="range" min="0" max="1" step="0.05" value="0.6" />
-          <output class="value" id="consBiasVal">0.60</output>
-        </div>
-        <div class="row">
-          <button id="btnResetMem" class="tiny">Reset Melodic Memory</button>
-        </div>
-      </div>
-
-      <div class="section" id="secBG">
-        <h2>Background <span class="hint">Underlay image</span></h2>
-        <div class="row">
-          <input id="bgFile" type="file" accept="image/*" />
-          <button id="btnClearBG" class="tiny">Clear BG</button>
-        </div>
-      </div>
-
-      <div class="section" id="secNotes">
-        <h2>Notes <span class="hint">Active MIDI</span></h2>
-        <div class="list" id="noteList"></div>
-        <p class="muted" style="margin-top:8px">Pitch → hue (or fixed), velocity → thickness. Aftertouch → thickness; CC74 → scatter; Mod‑wheel → opacity. Consonant chords reduce jitter.</p>
-      </div>
-
-      <div class="section" id="secCapture">
-        <h2>Capture <span class="hint">Record video</span></h2>
-        <div class="row">
-          <button id="btnStartCapture" class="primary">Start Capture (WebM)</button>
-          <button id="btnStopCapture" class="warn">Stop & Save</button>
-        </div>
-      </div>
-
-    </aside>
-
-    <div id="stageWrap">
-      <canvas id="bgCanvas"></canvas>
-      <footer class="tip">Tip: Consonant intervals (3rds, 5ths) smooth curves. Pitch‑bend rotates the field. Sustain toggles eraser.</footer>
-    </div>
-
-    <div class="ctrlbar">
-      <button id="btnStartAudio" class="primary">Start Audio</button>
-      <button id="btnConnectMIDI">Connect MIDI</button>
-      <button id="btnPanic" class="danger">HARD Panic</button>
+    <!-- Top control bar -->
+    <div class="topbar">
+      <button id="btnStartAudio" class="primary" title="Required by browsers to start sound">Start Audio</button>
+      <button id="btnConnectMIDI" title="Connect your MIDI keyboard">Connect MIDI</button>
+      <button id="btnPanic" class="danger" title="Silence everything and reset audio">HARD Panic</button>
       <span class="spacer"></span>
       <span class="pill" id="midiStatus">MIDI: not connected</span>
       <span class="pill" id="audioStatus">Audio: suspended</span>
       <span class="pill" id="fps">0 fps</span>
     </div>
+
+    <!-- Stage -->
+    <div id="stageWrap">
+      <footer class="tip">Tip: Consonant intervals (3rds, 5ths) smooth curves • Pitch‑bend rotates flow • Sustain toggles eraser</footer>
+    </div>
+
+    <!-- Bottom dock (controls) -->
+    <div class="dock">
+      <div class="tabs" id="tabs"></div>
+      <div class="sections">
+        <div class="section" id="secLayers">
+          <h2>Canvas & Layers <span class="hint">Manage paint surfaces</span></h2>
+          <div class="row">
+            <button id="btnAddLayer" class="good">+ Layer</button>
+            <button id="btnDeleteLayer" class="danger">− Layer</button>
+            <button id="btnClearLayer" class="warn">Clear</button>
+            <button id="btnSavePNG" title="Export composite as PNG">Save PNG</button>
+          </div>
+          <div class="row split">
+            <label class="muted">Active Layer</label>
+            <select id="layerSelect"></select>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Layer Opacity</label>
+            <input id="layerOpacity" type="range" min="0.05" max="1" step="0.05" value="1" />
+            <output class="value" id="layerOpacityVal">1.00</output>
+          </div>
+          <div class="row split">
+            <label class="muted">Blend</label>
+            <select id="blend">
+              <option value="source-over" selected>Normal</option>
+              <option value="lighter">Lighter</option>
+              <option value="screen">Screen</option>
+              <option value="multiply">Multiply</option>
+              <option value="overlay">Overlay</option>
+              <option value="color-dodge">Color Dodge</option>
+            </select>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Trail Fade</label>
+            <input id="trail" type="range" min="0" max="0.2" step="0.005" value="0" />
+            <output class="value" id="trailVal">0.00</output>
+          </div>
+        </div>
+
+        <div class="section" id="secBrush">
+          <h2>Brush <span class="hint">Style & size</span></h2>
+          <div class="row split"><label class="muted">Type</label>
+            <select id="brushType">
+              <option value="line" selected>Line</option>
+              <option value="particle">Particles</option>
+              <option value="stamp">Stamp</option>
+              <option value="glow">Glow Ink</option>
+            </select>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Brush Scale</label>
+            <input type="range" id="brushScale" min="0.2" max="5" step="0.1" value="1.2"/>
+            <output class="value" id="brushScaleVal">1.2</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Opacity</label>
+            <input type="range" id="opacity" min="0.05" max="1" step="0.05" value="0.6"/>
+            <output class="value" id="opacityVal">0.60</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Scatter</label>
+            <input type="range" id="scatter" min="0" max="60" step="1" value="0"/>
+            <output class="value" id="scatterVal">0</output>
+          </div>
+          <div class="row">
+            <button id="btnEraser">Eraser: Off</button>
+          </div>
+        </div>
+
+        <div class="section" id="secColour">
+          <h2>Colour <span class="hint">Pick or auto-map</span></h2>
+          <div class="row split">
+            <label class="muted">Mode</label>
+            <select id="colorMode">
+              <option value="auto" selected>Auto (Pitch→Hue)</option>
+              <option value="fixed">Fixed Colour</option>
+              <option value="offset">Auto + Hue Offset</option>
+              <option value="vel">Velocity → Hue Shift</option>
+            </select>
+          </div>
+          <div class="row split">
+            <label class="muted">Pick</label>
+            <input id="colorPick" type="color" value="#7c3aed" />
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Hue Offset</label>
+            <input id="hueOffset" type="range" min="-180" max="180" step="1" value="0" />
+            <output class="value" id="hueOffsetVal">0</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Saturation</label>
+            <input id="sat" type="range" min="0" max="100" step="1" value="85" />
+            <output class="value" id="satVal">85</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Lightness</label>
+            <input id="light" type="range" min="0" max="100" step="1" value="60" />
+            <output class="value" id="lightVal">60</output>
+          </div>
+          <div class="row split">
+            <label class="muted">Palette Preset</label>
+            <select id="palette">
+              <option value="none" selected>—</option>
+              <option value="ocean">Ocean</option>
+              <option value="sunset">Sunset</option>
+              <option value="neon">Neon</option>
+              <option value="mono">Monochrome</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="section" id="secFlow">
+          <h2>Flow <span class="hint">How notes steer</span></h2>
+          <div class="row split">
+            <label class="muted">Mode</label>
+            <select id="flowMode">
+              <option value="balanced" selected>Balanced</option>
+              <option value="harmonic">Harmonic</option>
+              <option value="melodic">Melodic Memory</option>
+            </select>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Smoothness</label>
+            <input id="flowSmooth" type="range" min="0" max="1" step="0.05" value="0.6" />
+            <output class="value" id="flowSmoothVal">0.60</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Consonance Bias</label>
+            <input id="consBias" type="range" min="0" max="1" step="0.05" value="0.6" />
+            <output class="value" id="consBiasVal">0.60</output>
+          </div>
+          <div class="row">
+            <button id="btnResetMem" class="tiny">Reset Melodic Memory</button>
+          </div>
+        </div>
+
+        <div class="section" id="secFX">
+          <h2>FX <span class="hint">Fun extras</span></h2>
+          <div class="rangeRow">
+            <label class="muted">Symmetry</label>
+            <input id="symmetry" type="range" min="1" max="8" step="1" value="1" />
+            <output class="value" id="symmetryVal">1</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Center Gravity</label>
+            <input id="gravity" type="range" min="0" max="1" step="0.01" value="0" />
+            <output class="value" id="gravityVal">0.00</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Silence Fade</label>
+            <input id="silenceFade" type="range" min="0" max="0.2" step="0.005" value="0" />
+            <output class="value" id="silenceFadeVal">0.00</output>
+          </div>
+        </div>
+
+        <div class="section" id="secNotes">
+          <h2>Notes <span class="hint">Active MIDI</span></h2>
+          <div class="list" id="noteList"></div>
+          <p class="muted" style="margin-top:8px">Pitch → hue (or fixed), velocity → thickness. Aftertouch → thickness; CC74 → scatter; Mod‑wheel → opacity. Consonant chords reduce jitter.</p>
+        </div>
+
+        <div class="section" id="secCapture">
+          <h2>Capture <span class="hint">Record video</span></h2>
+          <div class="row">
+            <button id="btnStartCapture" class="primary">Start Capture (WebM)</button>
+            <button id="btnStopCapture" class="warn">Stop & Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
   </div>
 
 <script>
 (() => {
+  // ----- DOM refs -----
   const stageWrap = document.getElementById('stageWrap');
-  const bgCanvas = document.getElementById('bgCanvas');
-  const bgCtx = bgCanvas.getContext('2d');
-  const bgFile = document.getElementById('bgFile');
-  const btnClearBG = document.getElementById('btnClearBG');
+  const tabsEl = document.getElementById('tabs');
 
   const midiStatus = document.getElementById('midiStatus');
   const audioStatus = document.getElementById('audioStatus');
@@ -234,7 +261,7 @@
   const btnConnectMIDI = document.getElementById('btnConnectMIDI');
   const btnPanic = document.getElementById('btnPanic');
   const midiInputsSel = (()=>{ const sel=document.createElement('select'); sel.style.display='none'; document.body.appendChild(sel); return sel; })(); // hidden, we auto-pick first
-  const useComputerKeys = (()=>{ const chk=document.createElement('input'); chk.type='checkbox'; chk.checked=true; return chk; })();
+
   const btnAddLayer = document.getElementById('btnAddLayer');
   const btnDeleteLayer = document.getElementById('btnDeleteLayer');
   const btnClearLayer = document.getElementById('btnClearLayer');
@@ -260,6 +287,7 @@
   const satVal = document.getElementById('satVal');
   const lightRange = document.getElementById('light');
   const lightVal = document.getElementById('lightVal');
+  const paletteSel = document.getElementById('palette');
   const btnEraser = document.getElementById('btnEraser');
   const noteList = document.getElementById('noteList');
   const flowModeSel = document.getElementById('flowMode');
@@ -268,6 +296,29 @@
   const consBias = document.getElementById('consBias');
   const consBiasVal = document.getElementById('consBiasVal');
   const btnResetMem = document.getElementById('btnResetMem');
+  const symmetry = document.getElementById('symmetry');
+  const symmetryVal = document.getElementById('symmetryVal');
+  const gravity = document.getElementById('gravity');
+  const gravityVal = document.getElementById('gravityVal');
+  const silenceFade = document.getElementById('silenceFade');
+  const silenceFadeVal = document.getElementById('silenceFadeVal');
+
+  // Tabs (quick jump)
+  const order = [
+    {id:'secLayers', label:'Layers'},
+    {id:'secBrush', label:'Brush'},
+    {id:'secColour', label:'Colour'},
+    {id:'secFlow', label:'Flow'},
+    {id:'secFX', label:'FX'},
+    {id:'secNotes', label:'Notes'},
+    {id:'secCapture', label:'Capture'},
+  ];
+  order.forEach(({id,label},i)=>{
+    const b=document.createElement('button'); b.className='tab'+(i===0?' active':''); b.textContent=label; b.addEventListener('click',()=>{
+      document.getElementById(id).scrollIntoView({behavior:'smooth', inline:'start'});
+      tabsEl.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); b.classList.add('active');
+    }); tabsEl.appendChild(b);
+  });
 
   // live labels
   function bindRange(range, out, fmt=(v)=>v){ const update=()=>out.textContent=fmt(range.value); range.addEventListener('input',update); update(); }
@@ -281,6 +332,9 @@
   bindRange(lightRange, lightVal, v=>String(Math.round(Number(v))));
   bindRange(flowSmooth, flowSmoothVal, v=>Number(v).toFixed(2));
   bindRange(consBias, consBiasVal, v=>Number(v).toFixed(2));
+  bindRange(symmetry, symmetryVal, v=>String(Math.round(Number(v))));
+  bindRange(gravity, gravityVal, v=>Number(v).toFixed(2));
+  bindRange(silenceFade, silenceFadeVal, v=>Number(v).toFixed(3));
 
   // --- Audio ---
   let audioCtx = null;
@@ -309,7 +363,7 @@
   // --- Voice management (saturating hold; watchdog; hard panic) ---
   const activeOsc = new Map(); // note -> {osc, g, timer}
   const activeNotes = new Map(); // note -> {velocity, t, sustained, pressure}
-  const held = new Set(); // set of notes currently held (saturating)
+  const held = new Set(); // currently held notes
   const AUTO_OFF_MS = 1500; // fail-safe if NoteOff never arrives
 
   function midiToFreq(n) { return 440 * Math.pow(2, (n - 69) / 12); }
@@ -335,7 +389,6 @@
       g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
       osc.connect(g).connect(masterGain.node);
       osc.start();
-      // clean mapping if the oscillator ends on its own
       osc.onended = () => { const cur = activeOsc.get(note); if (cur && cur.osc === osc) activeOsc.delete(note); };
       h = { osc, g, timer: null };
       activeOsc.set(note, h);
@@ -348,8 +401,7 @@
   function stopTone(note, fast=false) {
     const h = activeOsc.get(note);
     if (!h) return;
-    // allow immediate fresh start for the same pitch
-    activeOsc.delete(note);
+    activeOsc.delete(note); // free to recreate immediately
     if (h.timer) { clearTimeout(h.timer); h.timer = null; }
     const now = audioCtx.currentTime;
     h.g.gain.cancelScheduledValues(now);
@@ -366,7 +418,7 @@
     refreshNoteList();
   }
 
-  // Watchdog: sweep dangling voices every 400ms
+  // Watchdog: sweep dangling voices
   setInterval(() => {
     activeOsc.forEach((_, note) => {
       const isHeld = held.has(note);
@@ -388,109 +440,50 @@
   document.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'p') hardPanic(); });
 
   // --- MIDI ---
-  let midi = null;
-  let midiInput = null;
-  let sustainDown = false;
-  let mpeScatter = 0; // via CC74
-  let pressure = 0; // channel pressure
+  let midi = null; let midiInput = null; let sustainDown = false; let mpeScatter = 0; let pressure = 0;
 
   async function connectMIDI() {
-    try {
-      midi = await navigator.requestMIDIAccess();
-      midiStatus.textContent = 'MIDI: available';
-      populateMIDIInputs();
-      midi.onstatechange = populateMIDIInputs;
-    } catch (e) {
-      midiStatus.textContent = 'MIDI: unavailable';
-      console.warn('WebMIDI not available', e);
-    }
+    try { midi = await navigator.requestMIDIAccess(); midiStatus.textContent = 'MIDI: available'; populateMIDIInputs(); midi.onstatechange = populateMIDIInputs; }
+    catch (e) { midiStatus.textContent = 'MIDI: unavailable'; console.warn('WebMIDI not available', e); }
   }
-
   function populateMIDIInputs() {
-    midiInputsSel.innerHTML = '';
-    if (!midi) return;
-    const inputs = Array.from(midi.inputs.values());
-    inputs.forEach((input, idx) => {
-      const opt = document.createElement('option');
-      opt.value = input.id; opt.textContent = input.name || (`Input ${idx+1}`); midiInputsSel.appendChild(opt);
-    });
-    if (inputs.length) { setMIDIInput(inputs[0]); }
+    midiInputsSel.innerHTML = ''; if (!midi) return; const inputs = Array.from(midi.inputs.values());
+    inputs.forEach((input, idx) => { const opt = document.createElement('option'); opt.value = input.id; opt.textContent = input.name || (`Input ${idx+1}`); midiInputsSel.appendChild(opt); });
+    if (inputs.length) setMIDIInput(inputs[0]);
   }
-
-  function setMIDIInput(input) {
-    if (midiInput) midiInput.onmidimessage = null;
-    midiInput = input;
-    if (midiInput) { midiInput.onmidimessage = onMIDIMessage; midiStatus.textContent = 'MIDI: ' + (midiInput.name || 'connected'); }
-  }
-
+  function setMIDIInput(input) { if (midiInput) midiInput.onmidimessage = null; midiInput = input; if (midiInput) { midiInput.onmidimessage = onMIDIMessage; midiStatus.textContent = 'MIDI: ' + (midiInput.name || 'connected'); } }
   btnConnectMIDI.addEventListener('click', connectMIDI);
 
   function onMIDIMessage(e) {
-    const [status, d1, d2] = e.data;
-    const cmd = status & 0xF0;
-
-    if (cmd === 0x90) { // note on (or off if vel=0)
-      if (d2 === 0) noteOff(d1);
-      else noteOn(d1, d2, 'midi');
-    } else if (cmd === 0x80) { // note off
-      noteOff(d1);
-    } else if (cmd === 0xB0) { // CC
+    const [status, d1, d2] = e.data; const cmd = status & 0xF0;
+    if (cmd === 0x90) { if (d2 === 0) noteOff(d1); else noteOn(d1, d2, 'midi'); }
+    else if (cmd === 0x80) { noteOff(d1); }
+    else if (cmd === 0xB0) {
       const cc = d1, val = d2;
-      if (cc === 1) { // mod wheel → opacity
-        const f = (val / 127);
-        opacityRange.value = (0.05 + 0.95 * f).toFixed(2); opacityVal.textContent = Number(opacityRange.value).toFixed(2);
-      } else if (cc === 64) { // sustain pedal
-        const was = sustainDown; sustainDown = val >= 64; if (!sustainDown && was) flushSustained(); toggleEraser(val >= 64);
-      } else if (cc === 74) { // MPE Y axis → scatter
-        mpeScatter = val / 127 * 60; // 0..60 px
-        scatterVal.textContent = String(Math.round(Number(scatterRange.valueAsNumber + mpeScatter)));
-      } else if (cc === 120 || cc === 123) { // all sound off / all notes off
-        hardPanic();
-      }
-    } else if (cmd === 0xE0) { // pitch bend
-      const bend = ((d2 << 7) + d1) - 8192; // -8192..+8191
-      flowPhase = bend / 8192 * Math.PI; // -pi..+pi
-    } else if ((status & 0xF0) === 0xD0) { // channel pressure
-      pressure = d1 / 127; // 0..1
-    } else if ((status & 0xF0) === 0xA0) { // poly aftertouch
-      const note = d1; const amt = d2/127; const n = activeNotes.get(note); if (n) { n.pressure = amt; }
+      if (cc === 1) { const f = (val / 127); opacityRange.value = (0.05 + 0.95 * f).toFixed(2); opacityVal.textContent = Number(opacityRange.value).toFixed(2); }
+      else if (cc === 64) { const was = sustainDown; sustainDown = val >= 64; if (!sustainDown && was) flushSustained(); toggleEraser(val >= 64); }
+      else if (cc === 74) { mpeScatter = val / 127 * 60; scatterVal.textContent = String(Math.round(Number(scatterRange.valueAsNumber + mpeScatter))); }
+      else if (cc === 120 || cc === 123) { hardPanic(); }
     }
+    else if (cmd === 0xE0) { const bend = ((d2 << 7) + d1) - 8192; flowPhase = bend / 8192 * Math.PI; }
+    else if ((status & 0xF0) === 0xD0) { pressure = d1 / 127; }
+    else if ((status & 0xF0) === 0xA0) { const note = d1; const amt = d2/127; const n = activeNotes.get(note); if (n) { n.pressure = amt; } }
   }
 
-  function noteOn(note, vel=100, source='live') {
-    held.add(note); // saturating
-    activeNotes.set(note, { velocity: vel, t: performance.now(), source, pressure: 0 });
-    startTone(note, vel);
-    refreshNoteList();
-  }
-
-  function noteOff(note) {
-    if (sustainDown) { const n = activeNotes.get(note); if (n) n.sustained = true; refreshNoteList(); return; }
-    held.delete(note);
-    activeNotes.delete(note);
-    stopTone(note);
-    refreshNoteList();
-  }
-
-  function flushSustained() {
-    const toStop = [];
-    activeNotes.forEach((val, key) => { if (val.sustained) toStop.push(key); });
-    toStop.forEach(k => { held.delete(k); activeNotes.delete(k); stopTone(k); });
-    refreshNoteList();
-  }
+  function noteOn(note, vel=100, source='live') { held.add(note); activeNotes.set(note, { velocity: vel, t: performance.now(), source, pressure: 0 }); startTone(note, vel); refreshNoteList(); }
+  function noteOff(note) { if (sustainDown) { const n = activeNotes.get(note); if (n) n.sustained = true; refreshNoteList(); return; } held.delete(note); activeNotes.delete(note); stopTone(note); refreshNoteList(); }
+  function flushSustained() { const toStop = []; activeNotes.forEach((val, key) => { if (val.sustained) toStop.push(key); }); toStop.forEach(k => { held.delete(k); activeNotes.delete(k); stopTone(k); }); refreshNoteList(); }
 
   function refreshNoteList() {
     noteList.innerHTML = '';
     if (!activeNotes.size) { noteList.innerHTML = '<div class="item"><span class="muted">No active notes</span><span class="pill">—</span></div>'; return; }
     activeNotes.forEach((n, note) => {
       const item = document.createElement('div'); item.className = 'item';
-      const name = midiNoteName(note);
-      const isHeld = held.has(note) ? 1 : 0;
+      const name = midiNoteName(note); const isHeld = held.has(note) ? 1 : 0;
       item.innerHTML = `<span>${name}</span><span class="pill">vel ${n.velocity} • held ${isHeld}${n.sustained ? ' • sus' : ''}</span>`;
       noteList.appendChild(item);
     });
   }
-
   function midiNoteName(n) { const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; const name = names[n % 12]; const oct = Math.floor(n/12) - 1; return name + oct; }
 
   // --- Layers ---
@@ -503,30 +496,11 @@
     layers.push({canvas: c, ctx, blend: 'source-over', opacity: 1});
     updateLayerSelect(); selectLayer(layers.length - 1);
   }
-
-  function updateLayerSelect() {
-    layerSelect.innerHTML = '';
-    layers.forEach((_, i) => { const opt = document.createElement('option'); opt.value = String(i); opt.textContent = `Layer ${i+1}`; layerSelect.appendChild(opt); });
-    layerSelect.value = String(activeLayer);
-    layerOpacity.value = String(layers[activeLayer].opacity);
-    layerOpacityVal.textContent = Number(layerOpacity.value).toFixed(2);
-  }
-
+  function updateLayerSelect() { layerSelect.innerHTML = ''; layers.forEach((_, i) => { const opt = document.createElement('option'); opt.value = String(i); opt.textContent = `Layer ${i+1}`; layerSelect.appendChild(opt); }); layerSelect.value = String(activeLayer); layerOpacity.value = String(layers[activeLayer].opacity); layerOpacityVal.textContent = Number(layerOpacity.value).toFixed(2); }
   function selectLayer(i) { activeLayer = Math.max(0, Math.min(i, layers.length - 1)); updateLayerSelect(); blendSel.value = layers[activeLayer].blend; layerOpacity.value = layers[activeLayer].opacity; layerOpacityVal.textContent = Number(layerOpacity.value).toFixed(2); }
-
-  function deleteLayer() {
-    if (layers.length <= 1) return; const {canvas} = layers[activeLayer]; canvas.remove(); layers.splice(activeLayer, 1); selectLayer(Math.max(0, activeLayer - 1));
-  }
-
+  function deleteLayer() { if (layers.length <= 1) return; const {canvas} = layers[activeLayer]; canvas.remove(); layers.splice(activeLayer, 1); selectLayer(Math.max(0, activeLayer - 1)); }
   function clearLayer() { const {canvas, ctx} = layers[activeLayer]; ctx.clearRect(0, 0, canvas.width, canvas.height); }
-
-  function savePNG() {
-    const w = layers[0].canvas.width, h = layers[0].canvas.height; const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const tctx = tmp.getContext('2d');
-    // draw background first
-    tctx.drawImage(bgCanvas, 0, 0);
-    layers.forEach(l => tctx.drawImage(l.canvas, 0, 0));
-    const a = document.createElement('a'); a.download = 'music-painter.png'; a.href = tmp.toDataURL('image/png'); a.click();
-  }
+  function savePNG() { const w = layers[0].canvas.width, h = layers[0].canvas.height; const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const tctx = tmp.getContext('2d'); tctx.fillStyle = '#0b0f14'; tctx.fillRect(0,0,w,h); layers.forEach(l => tctx.drawImage(l.canvas, 0, 0)); const a = document.createElement('a'); a.download = 'music-painter.png'; a.href = tmp.toDataURL('image/png'); a.click(); }
 
   btnAddLayer.addEventListener('click', createLayer);
   btnDeleteLayer.addEventListener('click', deleteLayer);
@@ -536,142 +510,114 @@
   btnSavePNG.addEventListener('click', savePNG);
   blendSel.addEventListener('change', () => { layers[activeLayer].blend = blendSel.value; });
 
-  // BG load/clear
-  function resizeCanvas(c) {
-    const dpr = Math.max(1, window.devicePixelRatio || 1); const rect = stageWrap.getBoundingClientRect(); c.width = Math.floor(rect.width * dpr); c.height = Math.floor(rect.height * dpr); c.style.width = rect.width + 'px'; c.style.height = rect.height + 'px'; const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  function resizeAll() { resizeCanvas(bgCanvas); layers.forEach(l => resizeCanvas(l.canvas)); drawBGImage(); }
+  // Resize
+  function resizeCanvas(c) { const dpr = Math.max(1, window.devicePixelRatio || 1); const rect = stageWrap.getBoundingClientRect(); c.width = Math.floor(rect.width * dpr); c.height = Math.floor(rect.height * dpr); c.style.width = rect.width + 'px'; c.style.height = rect.height + 'px'; const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  function resizeAll() { layers.forEach(l => resizeCanvas(l.canvas)); updateCenter(); }
   window.addEventListener('resize', resizeAll);
   createLayer();
 
-  let bgImage = null;
-  function drawBGImage() {
-    if (!bgImage) { bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height); return; }
-    const rect = stageWrap.getBoundingClientRect();
-    bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);
-    const iw = bgImage.width, ih = bgImage.height; const ar = iw/ih; const tw = rect.width, th = rect.height; const tar = tw/th;
-    let dw, dh; if (ar > tar) { dh = th; dw = dh*ar; } else { dw = tw; dh = dw/ar; }
-    const dx = (tw - dw)/2, dy = (th - dh)/2; bgCtx.drawImage(bgImage, dx, dy, dw, dh);
-  }
-  bgFile.addEventListener('change', (e) => {
-    const file = e.target.files[0]; if (!file) return; const img = new Image(); img.onload = ()=>{ bgImage = img; resizeAll(); }; img.src = URL.createObjectURL(file);
-  });
-  btnClearBG.addEventListener('click', ()=>{ bgImage = null; drawBGImage(); });
-
-  function centerPen() { const rect = stageWrap.getBoundingClientRect(); pen.x = rect.width * 0.5; pen.y = rect.height * 0.5; pen.px = pen.x; pen.py = pen.y; }
-
-  // --- Flow helpers ---
+  // Pen & flow
   const pen = { x: 0, y: 0, px: 0, py: 0 };
-  let flowPhase = 0; // modulated by pitch bend
-  let erasing = false;
-
+  let flowPhase = 0; let erasing = false;
   function toggleEraser(force=null) { if (force === null) erasing = !erasing; else erasing = !!force; btnEraser.textContent = `Eraser: ${erasing ? 'On' : 'Off'}`; }
   btnEraser.addEventListener('click', () => toggleEraser());
 
-  function colorHexToHsl(hex) {
-    const r = parseInt(hex.slice(1,3),16)/255; const g = parseInt(hex.slice(3,5),16)/255; const b = parseInt(hex.slice(5,7),16)/255;
-    const max = Math.max(r,g,b), min = Math.min(r,g,b); let h,s,l=(max+min)/2; if(max===min){h=s=0;} else { const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min); switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;} h/=6; } return {h: h*360, s: s*100, l: l*100};
-  }
+  function colorHexToHsl(hex) { const r = parseInt(hex.slice(1,3),16)/255; const g = parseInt(hex.slice(3,5),16)/255; const b = parseInt(hex.slice(5,7),16)/255; const max = Math.max(r,g,b), min = Math.min(r,g,b); let h,s,l=(max+min)/2; if(max===min){h=s=0;} else { const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min); switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;} h/=6; } return {h: h*360, s: s*100, l: l*100}; }
+  function computeHue(hueFromNotes, velocity) { const mode = colorModeSel.value; const base = colorHexToHsl(colorPick.value); let h = hueFromNotes; if (mode === 'fixed') h = base.h; if (mode === 'offset') h = (hueFromNotes + parseFloat(hueOffset.value)) % 360; if (mode === 'vel') h = (base.h + (velocity/127)*120) % 360; h = (h + 360) % 360; return h; }
 
-  function computeHue(hueFromNotes, velocity) {
-    const mode = colorModeSel.value; const base = colorHexToHsl(colorPick.value); let h = hueFromNotes;
-    if (mode === 'fixed') h = base.h; if (mode === 'offset') h = (hueFromNotes + parseFloat(hueOffset.value)) % 360; if (mode === 'vel') h = (base.h + (velocity/127)*120) % 360; h = (h + 360) % 360; return h;
-  }
-
-  const CONSONANT_PCS = new Set([0,3,4,5,7,8,9]); // unison/minor/major 3rd/4th/5th/6th
+  const CONSONANT_PCS = new Set([0,3,4,5,7,8,9]);
   function pc(n){ return ((n%12)+12)%12; }
-  function chordConsonance(notes){
-    const pcs = Array.from(notes).map(n=>pc(n));
-    let c=0, d=0; for(let i=0;i<pcs.length;i++) for(let j=i+1;j<pcs.length;j++){
-      const iv = Math.min((pcs[j]-pcs[i]+12)%12,(pcs[i]-pcs[j]+12)%12);
-      if (CONSONANT_PCS.has(iv)) c++; else d++;
-    }
-    const total = c+d; return total? (c/total): 0;
-  }
+  function chordConsonance(notes){ const pcs = Array.from(notes).map(n=>pc(n)); let c=0, d=0; for(let i=0;i<pcs.length;i++) for(let j=i+1;j<pcs.length;j++){ const iv = Math.min((pcs[j]-pcs[i]+12)%12,(pcs[i]-pcs[j]+12)%12); if (CONSONANT_PCS.has(iv)) c++; else d++; } const total = c+d; return total? (c/total): 0; }
 
-  function unit(a){ return {x: Math.cos(a), y: Math.sin(a)}; }
-  function add(v,a,w=1){ v.x += Math.cos(a)*w; v.y += Math.sin(a)*w; }
-  function scale(v,s){ v.x*=s; v.y*=s; return v; }
-  function norm(v){ const m=Math.hypot(v.x,v.y)||1e-6; v.x/=m; v.y/=m; return v; }
-  function lerpVec(a,b,t){ return {x: a.x*(1-t)+b.x*t, y: a.y*(1-t)+b.y*t}; }
-  function angle(v){ return Math.atan2(v.y,v.x); }
+  function baseAngleFor(note){ return (note * 2.399963229728653 + flowPhase) % (Math.PI*2); } // golden-angle mapping
+  function harmonicAngleFor(note){ return (((pc(note)*7)%12) * (2*Math.PI/12)); } // circle of fifths
 
-  // melodic memory
+  // Melodic memory
   let mem = {x:0,y:0};
   btnResetMem.addEventListener('click', ()=>{ mem={x:0,y:0}; });
 
-  function baseAngleFor(note){ return (note * 2.399963229728653 + flowPhase) % (Math.PI*2); } // golden-angle mapping
-  function harmonicAngleFor(note){ return (((pc(note)*7)%12) * (2*Math.PI/12)); } // true circle-of-fifths ordering
-  // --- Stroke renderer (RESTORED) ---
+  // Center & symmetry helpers
+  const stageSize = { w:0, h:0, cx:0, cy:0 };
+  function updateCenter(){ const rect = stageWrap.getBoundingClientRect(); stageSize.w = rect.width; stageSize.h = rect.height; stageSize.cx = rect.width/2; stageSize.cy = rect.height/2; }
+  function centerPen(){ updateCenter(); pen.x = stageSize.cx; pen.y = stageSize.cy; pen.px = pen.x; pen.py = pen.y; }
+  function rotPoint(x,y,cx,cy,a){ const s=Math.sin(a), c=Math.cos(a); x-=cx; y-=cy; const nx=x*c - y*s; const ny=x*s + y*c; return [nx+cx, ny+cy]; }
+
   function drawStroke(ctx, x1, y1, x2, y2, width, hue, sat, light, alpha) {
     ctx.save();
     ctx.globalCompositeOperation = erasing ? 'destination-out' : layers[activeLayer].blend;
-    ctx.globalAlpha = layers[activeLayer].opacity; // per-layer opacity
-    if (brushTypeSel.value === 'glow') {
-      ctx.shadowColor = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
-      ctx.shadowBlur = Math.min(60, width * 4);
-    } else {
-      ctx.shadowBlur = 0;
-    }
+    ctx.globalAlpha = layers[activeLayer].opacity;
+    if (brushTypeSel.value === 'glow') { ctx.shadowColor = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`; ctx.shadowBlur = Math.min(60, width * 4); } else { ctx.shadowBlur = 0; }
     ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${erasing ? Math.max(10, light-10) : light}%, ${alpha})`;
-    ctx.lineWidth = width;
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    if (brushTypeSel.value === 'particle') {
-      const r = width * 0.5;
-      ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha*0.7})`;
-      ctx.beginPath(); ctx.arc(x2, y2, r, 0, Math.PI*2); ctx.fill();
-    } else if (brushTypeSel.value === 'stamp') {
-      const s = width * 1.6;
-      ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light+5}%, ${alpha*0.6})`;
-      ctx.fillRect(x2 - s/2, y2 - s/2, s, s);
-    }
+    ctx.lineWidth = width; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (brushTypeSel.value === 'particle') { const r = width * 0.5; ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha*0.7})`; ctx.beginPath(); ctx.arc(x2, y2, r, 0, Math.PI*2); ctx.fill(); }
+    else if (brushTypeSel.value === 'stamp') { const s = width * 1.6; ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light+5}%, ${alpha*0.6})`; ctx.fillRect(x2 - s/2, y2 - s/2, s, s); }
     ctx.restore();
   }
 
-  // --- Animation loop ---
-  let last = performance.now(); let frames = 0, lastFPS = performance.now();
+  function drawSymmetry(ctx, x1,y1,x2,y2, width, hue, sat, light, alpha){
+    const n = Math.max(1, parseInt(symmetry.value,10));
+    if (n === 1) { drawStroke(ctx,x1,y1,x2,y2,width,hue,sat,light,alpha); return; }
+    const step = (2*Math.PI)/n;
+    for (let i=0;i<n;i++){
+      const a = i*step; const [rx1,ry1]=rotPoint(x1,y1,stageSize.cx,stageSize.cy,a); const [rx2,ry2]=rotPoint(x2,y2,stageSize.cx,stageSize.cy,a);
+      drawStroke(ctx, rx1,ry1,rx2,ry2,width,hue,sat,light,alpha);
+    }
+  }
 
+  // Animation
+  let last = performance.now(); let frames = 0, lastFPS = performance.now();
   function loop(nowMs) {
     const dt = Math.max(0.001, Math.min(0.05, (nowMs - last) / 1000)); last = nowMs;
     frames++; if (nowMs - lastFPS > 1000) { fpsEl.textContent = `${frames} fps`; frames = 0; lastFPS = nowMs; }
 
-    // trail fade
+    // Trail fade (always-on option)
     const trail = parseFloat(trailRange.value); if (trail > 0) { for (const l of layers) { const ctx = l.ctx; ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = `rgba(0,0,0,${trail})`; ctx.fillRect(0,0,l.canvas.width,l.canvas.height); ctx.restore(); } }
+
+    // Silence fade (only when no notes)
+    if (!activeNotes.size) {
+      const sf = parseFloat(silenceFade.value); if (sf > 0) { for (const l of layers) { const ctx = l.ctx; ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = `rgba(0,0,0,${sf})`; ctx.fillRect(0,0,l.canvas.width,l.canvas.height); ctx.restore(); } }
+    }
 
     // Build vectors from active notes
     let Vb = {x:0,y:0}, Vh = {x:0,y:0};
     let weightSum = 0, hueNum = 0, velAvg = 0; const actNotes = Array.from(activeNotes.keys());
     activeNotes.forEach((n, note) => {
       const wBase = n.velocity / 127; const press = (n.pressure ?? pressure) * 0.7; const w = wBase * (1 + press);
-      add(Vb, baseAngleFor(note), w);
-      add(Vh, harmonicAngleFor(note), w);
+      Vb.x += Math.cos(baseAngleFor(note)) * w; Vb.y += Math.sin(baseAngleFor(note)) * w;
+      Vh.x += Math.cos(harmonicAngleFor(note)) * w; Vh.y += Math.sin(harmonicAngleFor(note)) * w;
       hueNum += note * w * 7.0; weightSum += w; velAvg += n.velocity;
     });
     if (activeNotes.size) velAvg /= activeNotes.size; else velAvg = 0;
 
-    // Choose steering vector per mode (vector blends, not angle blends)
+    // Choose steering vector
     let V = {x:0,y:0};
     const mode = flowModeSel.value;
-    if (mode === 'harmonic') {
-      V = norm(Vh);
-    } else if (mode === 'melodic') {
-      const target = weightSum>0 ? norm({x:Vb.x, y:Vb.y}) : {x:0,y:0};
+    if (mode === 'harmonic') { const m=Math.hypot(Vh.x,Vh.y)||1; V = {x:Vh.x/m, y:Vh.y/m}; }
+    else if (mode === 'melodic') {
+      const target = weightSum>0 ? ( ()=>{ const m=Math.hypot(Vb.x,Vb.y)||1; return {x:Vb.x/m,y:Vb.y/m}; })() : {x:0,y:0};
       const smooth = parseFloat(flowSmooth.value);
-      // boost update if pitch set changed a lot
+      // change detector: respond faster if pitch-class average moved
       let delta = 0; if (actNotes.length) { const avgPc = actNotes.reduce((a,b)=>a+pc(b),0)/actNotes.length; delta = Math.abs(avgPc - (mem.avgPc||avgPc)); mem.avgPc = avgPc; }
-      const boost = Math.min(1, delta/3); // up to ~3 semitones => stronger snap
-      const alpha = Math.min(1, smooth*0.8 + boost*0.5);
-      mem = lerpVec(mem, target, alpha);
-      V = norm({x:mem.x||target.x, y:mem.y||target.y});
+      const alpha = Math.min(1, smooth*0.8 + Math.min(1, delta/3)*0.5);
+      mem = { x: mem.x*(1-alpha) + target.x*alpha, y: mem.y*(1-alpha) + target.y*alpha };
+      const m2 = Math.hypot(mem.x,mem.y)||1; V = {x:mem.x/m2, y:mem.y/m2};
     } else { // balanced
-      const t = 0.35; // slight bias to base
-      V = norm( lerpVec( norm(Vb), norm(Vh), t ) );
+      const nb = Math.hypot(Vb.x,Vb.y)||1, nh=Math.hypot(Vh.x,Vh.y)||1; const Bb={x:Vb.x/nb,y:Vb.y/nb}, Hh={x:Vh.x/nh,y:Vh.y/nh};
+      const t = 0.35; V = {x: Bb.x*(1-t) + Hh.x*t, y: Bb.y*(1-t) + Hh.y*t}; const m=Math.hypot(V.x,V.y)||1; V.x/=m; V.y/=m;
     }
 
-    // Consonance affects jitter (scatter) and subtle smoothing
+    // Consonance affects jitter & slight smoothing
     const cons = chordConsonance(actNotes);
     const baseScatter = scatterRange.valueAsNumber + mpeScatter;
     const scatterEff = baseScatter * (1 - cons * parseFloat(consBias.value));
+
+    // Center gravity
+    const gStr = parseFloat(gravity.value);
+    if (gStr > 0) {
+      const gx = (stageSize.cx - pen.x), gy = (stageSize.cy - pen.y);
+      const gm = Math.hypot(gx,gy)||1; V.x = (V.x + (gx/gm) * gStr*0.5); V.y = (V.y + (gy/gm) * gStr*0.5);
+      const m=Math.hypot(V.x,V.y)||1; V.x/=m; V.y/=m;
+    }
 
     if (weightSum > 0) {
       pen.px = pen.x; pen.py = pen.y;
@@ -694,44 +640,45 @@
       const width = 1 + (brushScale.valueAsNumber * (1 + weightSum * 6)) * (1 + (pressure*0.7));
 
       const { ctx } = layers[activeLayer];
-      drawStroke(ctx, pen.px, pen.py, pen.x, pen.y, width, hue.toFixed(1), sat, light, alpha);
+      drawSymmetry(ctx, pen.px, pen.py, pen.x, pen.y, width, hue.toFixed(1), sat, light, alpha);
     }
 
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
 
-  // --- Computer keyboard as fallback ---
+  // Keyboard as fallback
   const KEY_LAYOUT = { 'a': 60, 'w': 61, 's': 62, 'e': 63, 'd': 64, 'f': 65, 't': 66, 'g': 67, 'y': 68, 'h': 69, 'u': 70, 'j': 71, 'k': 72 };
   const downKeys = new Set();
-  window.addEventListener('keydown', (e) => {
-    const k = e.key.toLowerCase(); if (k === 'e') { toggleEraser(); e.preventDefault(); return; } if (k === 'n') { createLayer(); e.preventDefault(); return; } if (k === 'c') { clearLayer(); e.preventDefault(); return; }
-    const note = KEY_LAYOUT[k]; if (note !== undefined && !downKeys.has(k)) { downKeys.add(k); noteOn(note, 110, 'keys'); }
-  });
+  window.addEventListener('keydown', (e) => { const k = e.key.toLowerCase(); if (k === 'e') { toggleEraser(); e.preventDefault(); return; } if (k === 'n') { createLayer(); e.preventDefault(); return; } if (k === 'c') { clearLayer(); e.preventDefault(); return; } const note = KEY_LAYOUT[k]; if (note !== undefined && !downKeys.has(k)) { downKeys.add(k); noteOn(note, 110, 'keys'); } });
   window.addEventListener('keyup', (e) => { const k = e.key.toLowerCase(); const note = KEY_LAYOUT[k]; if (note !== undefined) { downKeys.delete(k); noteOff(note); } });
   stageWrap.addEventListener('pointerdown', () => { ensureAudio(); audioCtx && audioCtx.resume(); });
 
-  // --- Capture (canvas + audio → WebM) ---
+  // Capture (canvas + audio → WebM)
   let mediaRecorder = null, chunks = [];
   function startCapture() {
-    try {
-      ensureAudio();
-      const streamV = stageWrap.captureStream(60);
-      const dest = audioCtx.createMediaStreamDestination(); masterGain.node.connect(dest);
-      const mixed = new MediaStream([...streamV.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-      mediaRecorder = new MediaRecorder(mixed, { mimeType: 'video/webm;codecs=vp9,opus' });
-      chunks = []; mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-      mediaRecorder.onstop = () => { const blob = new Blob(chunks, {type:'video/webm'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'music-painter.webm'; a.click(); setTimeout(()=>URL.revokeObjectURL(url), 2000); };
-      mediaRecorder.start();
-    } catch (err) { alert('Capture failed: ' + err.message); }
+    try { ensureAudio(); const streamV = stageWrap.captureStream(60); const dest = audioCtx.createMediaStreamDestination(); masterGain.node.connect(dest); const mixed = new MediaStream([...streamV.getVideoTracks(), ...dest.stream.getAudioTracks()]); mediaRecorder = new MediaRecorder(mixed, { mimeType: 'video/webm;codecs=vp9,opus' }); chunks = []; mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); }; mediaRecorder.onstop = () => { const blob = new Blob(chunks, {type:'video/webm'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'music-painter.webm'; a.click(); setTimeout(()=>URL.revokeObjectURL(url), 2000); }; mediaRecorder.start(); }
+    catch (err) { alert('Capture failed: ' + err.message); }
   }
   function stopCapture() { if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); }
   document.getElementById('btnStartCapture').addEventListener('click', startCapture);
   document.getElementById('btnStopCapture').addEventListener('click', stopCapture);
 
+  // Palette presets
+  paletteSel.addEventListener('change', ()=>{
+    const p = paletteSel.value;
+    if (p==='ocean'){ colorPick.value = '#2dd4bf'; satRange.value='80'; lightRange.value='60'; colorModeSel.value='offset'; hueOffset.value='-40'; }
+    else if (p==='sunset'){ colorPick.value='#f97316'; satRange.value='90'; lightRange.value='55'; colorModeSel.value='offset'; hueOffset.value='20'; }
+    else if (p==='neon'){ colorPick.value='#a21caf'; satRange.value='100'; lightRange.value='60'; colorModeSel.value='vel'; }
+    else if (p==='mono'){ colorPick.value='#9ca3af'; satRange.value='0'; lightRange.value='70'; colorModeSel.value='fixed'; }
+    // update readouts
+    satVal.textContent=satRange.value; lightVal.textContent=lightRange.value; hueOffsetVal.textContent=hueOffset.value; }
+  );
+
   // defaults
   scatterRange.value = '0'; scatterVal.textContent = '0';
-  centerPen();
+  centerPen(); updateCenter();
+  // Build tabs once content is laid out
 })();
 </script>
 </body>
