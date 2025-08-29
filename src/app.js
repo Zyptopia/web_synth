@@ -7,7 +7,7 @@ import {Clock} from './clock.js';
 import {Looper} from './looper.js';
 import {Recorder} from './recorder.js';
 
-const $ = (s)=>document.querySelector(s);
+const $  = (s)=>document.querySelector(s);
 const $$ = (s)=>Array.from(document.querySelectorAll(s));
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 const fmtMs=v=>`${Math.round(v)}ms`, fmtHz=v=>v>=1000?(v/1000).toFixed(1)+'k':Math.round(v);
@@ -77,7 +77,6 @@ window.__lastErr='—';
 window.addEventListener('error',e=>{window.__lastErr=e.message; diag()});
 window.addEventListener('unhandledrejection',e=>{window.__lastErr=String(e.reason?.message||e.reason||'Promise'); diag()});
 
-
 function applyEngineFromUI(){
   if(!Eng?.started) return;
   try{
@@ -103,23 +102,17 @@ window.Eng=Eng;
 // ---------- Looper helpers (durations, overdub, layers) ----------
 let COACH;
 let CLOCK, LOOPER, REC;
-const LOOP_HELD = new Set(); // MIDI notes currently sounding because of the looper
-
+const LOOP_HELD = new Set();                 // notes sounding due to looper
+const PENDING   = { timers:new Set(), keys:new Map() }; // timers + pending key ons
 
 // overdub toggle + current layer id
 window.__looperOD = true;
 window.__layerId = 1;
 
-// track pending note-ons (to compute duration on release)
-const PENDING = { keys:new Map() }; // midi -> { idx, startSec }
-
 // quick timing helpers
 const secPerBeat = ()=> 60/(window.CLOCK?.bpm || 120);
 const loopBeats  = ()=> (window.LOOPER?.lenBars || 4) * 4;
-const quantStepBeats = ()=>{
-  const q = window.LOOPER?.quant || '1/16';
-  return q==='1/8'?0.5 : q==='1/4'?1 : 0.25;
-};
+const quantStepBeats = ()=>{ const q=window.LOOPER?.quant||'1/16'; return q==='1/8'?0.5 : q==='1/4'?1 : 0.25; };
 
 function installTransportUI(){
   if(document.querySelector('#transport')) return;
@@ -165,31 +158,22 @@ function installTransportUI(){
     LOOPER=new Looper(CLOCK);
     LOOPER.setLength(4);
 
-    // After LOOPER.setLength(n):
-    const beats = LOOPER.lenBars * 4;
-    for (const evs of Object.values(LOOPER.tracks)) {
-    for (const ev of evs) ev.t = ((ev.t % beats) + beats) % beats;
-    }
-
-    // schedule at exact AudioContext time; respect note duration if present
+    // schedule at exact AudioContext time; respect ON/OFF events
     const schedule=(at, ev, track)=>{
-  if(!Eng?.ctx) return;
-  const ms = Math.max(0, (at - Eng.ctx.currentTime) * 1000);
-  const run = (fn)=> setTimeout(fn, ms);
-  const EPS = 1e-5; // you may already have this guard in your window test
+      if(!Eng?.ctx) return;
+      const ms = Math.max(0, (at - Eng.ctx.currentTime) * 1000);
+      const addTimer=(fn)=>{ const id=setTimeout(()=>{ PENDING.timers.delete(id); fn(); }, ms); PENDING.timers.add(id); };
 
-  if(track==='keys'){
-    if(ev.type==='on'){
-      LOOP_HELD.add(ev.midi);
-      run(()=>Eng.noteOn(ev.midi, (ev.vel||100)/127));
-    }else if(ev.type==='off'){
-      run(()=>{ Eng.noteOff(ev.midi); LOOP_HELD.delete(ev.midi); });
-    }
-  } else if(track==='drums'){
-    if(ev.type==='on') run(()=>Eng.triggerDrum(ev.midi, (ev.vel||110)/127));
-  }
-};
-
+      if(track==='keys'){
+        if(ev.type==='on'){
+          addTimer(()=>{ LOOP_HELD.add(ev.midi); Eng.noteOn(ev.midi, (ev.vel||100)/127); });
+        } else if(ev.type==='off'){
+          addTimer(()=>{ Eng.noteOff(ev.midi); LOOP_HELD.delete(ev.midi); });
+        }
+      } else if(track==='drums'){
+        if(ev.type==='on'){ addTimer(()=>Eng.triggerDrum(ev.midi, (ev.vel||110)/127)); }
+      }
+    };
     LOOPER.play(schedule);
 
     // LED + loop position counter
@@ -197,10 +181,8 @@ function installTransportUI(){
     const posEl = wrap.querySelector('#tPos');
     let tickCounter=0;
     CLOCK.on('tick', ({when})=>{
-      // flash on quarters (every 4 x 16th)
       if((tickCounter++ % 4) === 0){ led?.classList.add('on'); setTimeout(()=>led?.classList.remove('on'), 70); }
 
-      // compute position: Bar X/Y • Beat B/4 • S.s to restart
       const bpm = CLOCK?.bpm || 120;
       const spb = 60/bpm;
       const bars = LOOPER?.lenBars || 4;
@@ -208,7 +190,7 @@ function installTransportUI(){
       const loopSec = loopBeats*spb;
 
       const totalBeats = when/spb;
-      const beatInLoop = ((totalBeats % loopBeats) + loopBeats) % loopBeats; // 0..loopBeats-1
+      const beatInLoop = ((totalBeats % loopBeats) + loopBeats) % loopBeats;
       const bar = Math.floor(beatInLoop/4)+1;
       const beat = Math.floor(beatInLoop%4)+1;
 
@@ -255,16 +237,13 @@ function installTransportUI(){
     say('Transport: Play','ok');
   };
 
-tStop.onclick=()=>{
-  CLOCK?.stop(); tPlay.classList.remove('active');
-
-  // NEW: ensure nothing drones after stopping
-  loopAllOff();
-
-  if(tRec.classList.contains('active')){ try{ REC.stop(); }catch{} tRec.classList.remove('active'); }
-  say('Transport: Stop','ok');
-};
-
+  tStop.onclick=()=>{
+    CLOCK?.stop(); tPlay.classList.remove('active');
+    cancelPending();
+    loopAllOff();
+    if(tRec.classList.contains('active')){ try{ REC.stop(); }catch{} tRec.classList.remove('active'); }
+    say('Transport: Stop','ok');
+  };
 
   tRec.onclick =()=>{
     if(!tRec.classList.contains('active')){
@@ -278,7 +257,11 @@ tStop.onclick=()=>{
 
   tBpm.oninput =()=>{ const v=+tBpm.value||120; CLOCK?.setBpm(v); };
   tLoop.onchange=()=>{ CLOCK?.enableLoop(tLoop.checked); };
-  tLen.onchange =()=>{ LOOPER?.setLength(+tLen.value||4); };
+  tLen.onchange =()=>{ 
+    const n = +tLen.value||4; 
+    LOOPER?.setLength(n); 
+    cancelPending(); // drop queued ONs from old length
+  };
   tRecSrc.onchange=()=>{};
 
   // overdub toggle
@@ -296,53 +279,46 @@ tStop.onclick=()=>{
   };
 
   // delete selected layer
-tDel.onclick = ()=>{
-  const id = parseInt(tLayerSel.value,10);
-  if(!window.LOOPER || !id) return;
-  for(const tr of ['keys','drums']){
-    window.LOOPER.tracks[tr] = (window.LOOPER.tracks[tr]||[]).filter(ev=>ev.layer!==id);
-  }
-
-  // NEW: if that layer had a sustaining note, its OFF just vanished — stop it now
-  loopAllOff();
-
-  layersRefreshUI();
-  say('Deleted layer '+id,'warn');
-};
-
+  tDel.onclick = ()=>{
+    const id = parseInt(tLayerSel.value,10);
+    if(!window.LOOPER || !id) return;
+    for(const tr of ['keys','drums']){
+      window.LOOPER.tracks[tr] = (window.LOOPER.tracks[tr]||[]).filter(ev=>ev.layer!==id);
+    }
+    cancelPending();
+    loopAllOff();
+    layersRefreshUI();
+    say('Deleted layer '+id,'warn');
+  };
 
   // clear all layers/events
   tClr.onclick = ()=>{
-  if(!window.LOOPER) return;
-  window.LOOPER.tracks.keys = [];
-  window.LOOPER.tracks.drums = [];
-  (window.PENDING?.keys||new Map()).clear?.();
-
-  // NEW: stop any notes that were being held by the loop
-  loopAllOff();
-
-  layersRefreshUI();
-  say('Loop cleared.','warn');
-};
-
+    if(!window.LOOPER) return;
+    window.LOOPER.tracks.keys = [];
+    window.LOOPER.tracks.drums = [];
+    PENDING.keys.clear();
+    cancelPending();
+    loopAllOff();
+    layersRefreshUI();
+    say('Loop cleared.','warn');
+  };
 
   // init layer menu
   layersRefreshUI();
 }
 
+function cancelPending(){ for(const id of PENDING.timers) clearTimeout(id); PENDING.timers.clear(); }
+
 function loopAllOff(){
   if(!Eng?.keyVoices) return;
   for(const m of [...LOOP_HELD]){
-    // don't kill keys you are physically holding
-    if(!state.down.has(m)){
-      try{ Eng.noteOff(m); }catch(_){}
+    if(!state.down.has(m)){ try{ Eng.noteOff(m); }catch(_){}
       state.held.delete(m);
       flashKey(state, m, false);
     }
     LOOP_HELD.delete(m);
   }
 }
-
 
 // Coach (metronome, arp, scale, velocity, composer)
 const state={ base:60, held:new Set(), down:new Set(), transpose:0, octave:0, ch:1, padMode:'drum', drumKit:'standard' };
@@ -353,23 +329,17 @@ function rawNoteOn(m,vel=100){ const mv=eff(m); Eng.noteOn(mv,vel/127); state.he
 function rawNoteOff(m){
   const mv=eff(m);
   if(!state.held.has(mv)){flashKey(state,mv,false); return}
-  if(Eng.sustain){flashKey(state,mv,false); return}
-  // key physically up
   state.down.delete(mv);
-  if(!state.held.has(mv)){ flashKey(state,mv,false); return }
-  // while sustain is ON we don’t send noteOff here; we’ll flush when CC64 goes low
-  if(Eng.sustain){ flashKey(state,mv,false); return }
+  if(Eng.sustain){ flashKey(state,mv,false); return } // sustain will release later
   Eng.noteOff(mv);
   state.held.delete(mv);
-  flashKey(state,mv,false)
+  flashKey(state,mv,false);
 }
 
 // Coach-aware wrappers + looper capture with durations/layers
 function playOn(m,vel=100){
-  // record into looper only if overdub is ON
   if(window.LOOPER && Eng?.ctx && window.__looperOD){
     window.LOOPER.recordNoteOn(m, vel, Eng.ctx.currentTime, 'keys');
-    // tag event with current layer + start timing for duration
     const arr = window.LOOPER.tracks.keys;
     if(arr && arr.length){
       const idx = arr.length-1;
@@ -381,7 +351,6 @@ function playOn(m,vel=100){
 }
 
 function playOff(m){
-  // finalize duration for any pending recorded note
   if(window.LOOPER && Eng?.ctx && PENDING.keys.has(m)){
     const p = PENDING.keys.get(m);
     const ev = window.LOOPER.tracks.keys?.[p.idx];
@@ -389,7 +358,6 @@ function playOff(m){
       let durBeats = (Eng.ctx.currentTime - p.startSec) / secPerBeat();
       const step = quantStepBeats();
       durBeats = Math.max(step, Math.round(durBeats/step)*step);
-      // clamp to loop length to avoid crossing wrap ambiguity
       durBeats = Math.min(durBeats, loopBeats() - 1e-3);
       ev.durBeats = durBeats;
     }
@@ -409,14 +377,12 @@ async function handlePadHit(idx, midi, vel){
   if(state.padMode==='drum'){
     Eng.setDrumKit(state.drumKit);
     Eng.triggerDrum(midi, (vel||110)/127, gain);
-    // drums are one-shot; record only timestamp (no duration needed)
     if(window.LOOPER && Eng?.ctx && window.__looperOD){
       window.LOOPER.recordNoteOn(midi, vel||110, Eng.ctx.currentTime, 'drums');
       const arr = window.LOOPER.tracks.drums;
       if(arr && arr.length){ arr[arr.length-1].layer = window.__layerId||1; }
     }
   } else if(state.padMode==='instrument'){
-    // instrument pads act like keys (duration captured via playOn/playOff)
     playOn(midi, Math.round((vel||110)*gain));
   }
 }
@@ -445,8 +411,7 @@ function hookSlider(param,fmt,on){
   };
 
   el.addEventListener('input',()=>{ applyUI(); applyEngine(); });
-  applyUI();             // UI shows values right away
-  // (engine gets set later by applyEngineFromUI after Start)
+  applyUI(); // UI shows values right away
 }
 
 function loadPresets(){ const sel=$('#preset'); if(!sel) return; sel.innerHTML=''; for(const p of PRESETS){ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o) } sel.value='piano'; applyPreset('piano'); sel.onchange=()=>applyPreset(sel.value) }
@@ -455,8 +420,6 @@ const ensurePresets=()=>{ const sel=$('#preset'); if(sel && sel.options.length==
 const applyPreset=(id)=>{
   const p=PRESETS.find(x=>x.id===id)||PRESETS[0];
   Eng.setPreset(p.id,p);
-
-  // reflect on the UI and engine
   if(p.env){ 
     $('#attack').value=p.env.a; 
     $('#decay').value=p.env.d; 
@@ -498,17 +461,17 @@ function bindMIDI(){
     if(ccLearnParam){ MapState.setCC(ccLearnParam, cc); renderCCTable(); saveAll(); say(`Mapped CC${cc} → ${ccLearnParam}`,'ok'); endLearns(); return }
     MapState.markCCMode(cc,val);
     if(cc===64){
-    const on = val>=64;
-    Eng.setSustain(on);
-    lcd('Sustain', on?'On':'Off');
-    if(!on){
-      // Sustain released: turn off any notes that are sounding only because of sustain
-      for(const mv of [...state.held]){
-        if(!state.down.has(mv)){ Eng.noteOff(mv); state.held.delete(mv); flashKey(state,mv,false); }
+      const on = val>=64;
+      Eng.setSustain(on);
+      lcd('Sustain', on?'On':'Off');
+      if(!on){
+        // sustain released → turn off any notes not physically held
+        for(const mv of [...state.held]){
+          if(!state.down.has(mv)){ Eng.noteOff(mv); state.held.delete(mv); flashKey(state,mv,false); }
+        }
       }
+      return;
     }
-    return;
-  }
     if(cc===1){ if(!MapState.paramByCC(1) && !MapState.paramByCC(cc)) Eng.setModDepth?.(val/127); }
     const target = MapState.paramByCC(cc); if(!target){ return }
     const mode = MapState.ccMode[cc]||'absolute';
@@ -522,9 +485,10 @@ function setParamByNorm(param, x){ MapState.setParamNorm(param, x); const r=PARA
 function renderCCTable(){
   const params=MapState.ccParams(); const table=$('#ccTable'); if(!table) return;
   table.innerHTML=`<tr><th>Parameter</th><th>CC#</th><th>Mode</th><th>Learn</th></tr>`+
-    params.map(p=>{ const cc=MapState.ccMap[p]??''; const mode=cc!=='' && MapState.ccMode[cc]?MapState.ccMode[cc]:''.
-      replace?.(/.*/,m=>m) || (MapState.ccMode[cc]||''); // harmless, ensure string
-      return `<tr><td>${p}</td><td><input data-cc-param="${p}" class="ccNum" type="number" min="0" max="127" value="${cc}"></td><td>${mode}</td><td><button class="learnCC" data-param="${p}">●</button></td></tr>`
+    params.map(p=>{
+      const cc=MapState.ccMap[p]??'';
+      const mode = (cc !== '' && MapState.ccMode[cc]) ? String(MapState.ccMode[cc]) : '';
+      return `<tr><td>${p}</td><td><input data-cc-param="${p}" class="ccNum" type="number" min="0" max="127" value="${cc}"></td><td>${mode}</td><td><button class="learnCC" data-param="${p}">●</button></td></tr>`;
     }).join('');
   table.querySelectorAll('.ccNum').forEach(inp=>{ inp.onchange=()=>{ MapState.setCC(inp.dataset.ccParam, clamp(parseInt(inp.value,10)||0,0,127)); saveAll(); updateInlineBadges(); }; });
   table.querySelectorAll('.learnCC').forEach(btn=>{ btn.onclick=()=>{ startCCLearn(btn.dataset.param, btn); }; });
@@ -535,7 +499,7 @@ function renderPadTable(){
     MapState.padNotes.map((m,i)=>{
       const opts=DRUM_CHOICES.map(([name,n])=>`<option value="${n}" ${n===m?'selected':''}>${n} — ${name}</option>`).join('');
       const vol=(MapState.padGain?.[i]??1);
-      return `<tr><td>Pad ${i+1}</td><td><select data-pad-idx="${i}" class="padSel">${opts}</select></td><td>${m} (${midiName(m)})</td><td><input type="range" min="0" max="1" step="0.01" value="${vol}" class="padVol" data-pad-idx="${i}"><span class="pv">${Math.round(vol*100)}%</span></td><td><button class="learnPad" data-idx="${i}">●</button></td></tr>`
+      return `<tr><td>Pad ${i+1}</td><td><select data-pad-idx="${i}" class="padSel">${opts}</select></td><td>${m} (${midiName(m)})</td><td><input type="range" min="0" max="1" step="0.01" value="${vol}" class="padVol" data-pad-idx="${i}"><span class="pv">${Math.round(vol*100)}%</span></td><td><button class="learnPad" data-idx="${i}">●</button></td></tr>`;
     }).join('');
   table.querySelectorAll('.padSel').forEach(sel=>{ sel.onchange=()=>{ const idx=+sel.dataset.padIdx; MapState.padNotes[idx]=parseInt(sel.value,10); saveAll(); updateInlineBadges(); }; });
   table.querySelectorAll('.padVol').forEach(sl=>{ sl.oninput=()=>{ const idx=+sl.dataset.padIdx; const v=parseFloat(sl.value)||0; if(!MapState.padGain) MapState.padGain=[1,1,1,1,1,1,1,1]; MapState.padGain[idx]=Math.max(0,Math.min(1,v)); sl.parentElement.querySelector('.pv').textContent=`${Math.round(MapState.padGain[idx]*100)}%`; saveAll(); }; });
@@ -547,7 +511,6 @@ function saveAll(){ localStorage.setItem('axiom.map.v2', JSON.stringify({ccMap:M
 function loadAll(){ try{ const s=localStorage.getItem('axiom.map.v2'); if(s){ const o=JSON.parse(s); if(o.ccMap) MapState.ccMap=o.ccMap; if(o.ccMode) MapState.ccMode=o.ccMode; if(o.padNotes) MapState.padNotes=o.padNotes; if(o.padGain) MapState.padGain=o.padGain; if(o.padMode) state.padMode=o.padMode; if(o.drumKit) state.drumKit=o.drumKit; } }catch(_){} }
 
 function bindConfig(){
-  // Export/Import
   $('#exportBtn').onclick=()=>{ const obj={ ccMap:MapState.ccMap, ccMode:MapState.ccMode, padNotes:MapState.padNotes, padGain:MapState.padGain, padMode:state.padMode, drumKit:state.drumKit }; const txt=JSON.stringify(obj,null,2); navigator.clipboard?.writeText(txt); const pb=$('#pastebox'); pb.value = (pb.value ? pb.value + '\n' : '') + txt; };
   $('#importBtn').onclick=()=>{ const txt=prompt('Paste exported JSON'); if(!txt) return; try{ const obj=JSON.parse(txt); if(obj.ccMap) MapState.ccMap=obj.ccMap; if(obj.ccMode) MapState.ccMode=obj.ccMode; if(obj.padNotes) MapState.padNotes=obj.padNotes; if(obj.padGain) MapState.padGain=obj.padGain; if(obj.padMode) state.padMode=obj.padMode; if(obj.drumKit) state.drumKit=obj.drumKit; saveAll(); renderCCTable(); renderPadTable(); updateInlineBadges(); updatePadModeUI(); say('Imported.','ok') }catch(e){ say('Import failed: '+e.message,'bad') } };
   $('#clearBtn').onclick=()=>{ localStorage.removeItem('axiom.map.v2'); loadAll(); renderCCTable(); renderPadTable(); updateInlineBadges(); updatePadModeUI(); say('Local settings cleared.','ok') };
@@ -615,11 +578,13 @@ function bindUI(){
   const dk=$('#drumKit'); if(dk) dk.onchange=()=>{ state.drumKit=$('#drumKit').value; Eng.setDrumKit(state.drumKit); updatePadModeUI(); saveAll(); say('Drum kit: '+state.drumKit,'ok') };
 
   // Panic
-    $('#panic').onclick=()=>{ 
-    allOff(); 
-    state.down.clear(); 
-    say('All notes off','warn'); 
- };
+  $('#panic').onclick=()=>{ 
+    cancelPending();
+    loopAllOff();
+    allOff();
+    state.down?.clear?.();
+    say('All notes off','warn');
+  };
 
   // CC quick learn UI
   const ccSel=$('#ccLearnParam'); if(ccSel){ ccSel.innerHTML = MapState.ccParams().map(p=>`<option value="${p}">${p}</option>`).join(''); }
@@ -643,7 +608,6 @@ function bindKeyMouse(){
 window.addEventListener('blur',  ()=> allOff());
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) allOff(); });
 
-
 // ---------------- Boot ----------------
 buildKeyboard(state);
 buildPads();
@@ -660,7 +624,8 @@ bindConfig();
 updateInlineBadges();
 
 // Coach mount
-COACH = new Coach({ noteOnRaw:(m,v)=>rawNoteOn(m,v), noteOffRaw:(m)=>rawNoteOff(m), getKBEl:()=>document.querySelector('#kb') });
+let COACH_INST = new Coach({ noteOnRaw:(m,v)=>rawNoteOn(m,v), noteOffRaw:(m)=>rawNoteOff(m), getKBEl:()=>document.querySelector('#kb') });
+COACH = COACH_INST;
 window.COACH=COACH; COACH.mount();
 
 // Initial diag/presets
