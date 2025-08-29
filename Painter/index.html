@@ -55,6 +55,18 @@
     button.danger { border-color: #8a1e1e; background: #3c0b0b; }
     button.tiny { padding: 6px 8px; font-size: 12px; }
     .value { font-size: 12px; color: var(--muted); width:44px; text-align:right; }
+    /* Compact dock & tabbed sections */
+    .tabs { display:flex; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap; }
+    .tabs .spacer { flex:1; }
+    .dock { padding:6px 8px; }
+    .sections { display:block; }
+    .sections .section { display:none; }
+    .sections .section.active { display:block; }
+    .dock.collapsed .sections { display:none; }
+    .dock.collapsed .tabs { margin-bottom:0; }
+    .section { padding:8px; min-width:260px; }
+    .rangeRow { grid-template-columns: 1fr auto 40px; }
+    .tab { font-size:11px; padding:4px 8px; }
   </style>
 </head>
 <body>
@@ -76,7 +88,7 @@
     </div>
 
     <!-- Bottom dock (controls) -->
-    <div class="dock">
+    <div class="dock" id="dock">
       <div class="tabs" id="tabs"></div>
       <div class="sections">
         <div class="section" id="secLayers">
@@ -253,6 +265,7 @@
   // ----- DOM refs -----
   const stageWrap = document.getElementById('stageWrap');
   const tabsEl = document.getElementById('tabs');
+  const dockEl = document.getElementById('dock');
 
   const midiStatus = document.getElementById('midiStatus');
   const audioStatus = document.getElementById('audioStatus');
@@ -313,12 +326,26 @@
     {id:'secNotes', label:'Notes'},
     {id:'secCapture', label:'Capture'},
   ];
-  order.forEach(({id,label},i)=>{
-    const b=document.createElement('button'); b.className='tab'+(i===0?' active':''); b.textContent=label; b.addEventListener('click',()=>{
-      document.getElementById(id).scrollIntoView({behavior:'smooth', inline:'start'});
-      tabsEl.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); b.classList.add('active');
-    }); tabsEl.appendChild(b);
+  const initialActiveId = 'secBrush';
+  function activateSection(id, btnEl){
+    document.querySelectorAll('.sections .section').forEach(s => s.classList.remove('active'));
+    tabsEl.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    const sec = document.getElementById(id);
+    if (sec) sec.classList.add('active');
+    if (btnEl) btnEl.classList.add('active');
+  }
+  order.forEach(({id,label})=>{
+    const b=document.createElement('button'); b.className='tab'; b.textContent=label; b.addEventListener('click',()=>activateSection(id,b)); tabsEl.appendChild(b);
   });
+  // add spacer and collapse toggle
+  const spacer=document.createElement('div'); spacer.className='spacer'; tabsEl.appendChild(spacer);
+  const btnToggleDock=document.createElement('button'); btnToggleDock.id='btnToggleDock'; btnToggleDock.className='tiny'; btnToggleDock.textContent='▾ Collapse';
+  btnToggleDock.addEventListener('click',()=>{ dockEl.classList.toggle('collapsed'); btnToggleDock.textContent = dockEl.classList.contains('collapsed') ? '▴ Expand' : '▾ Collapse'; });
+  tabsEl.appendChild(btnToggleDock);
+  // initial active
+  const initIdx = order.findIndex(o=>o.id===initialActiveId);
+  const initBtn = tabsEl.querySelectorAll('.tab')[Math.max(0, initIdx)];
+  activateSection(order[Math.max(0, initIdx)].id, initBtn);
 
   // live labels
   function bindRange(range, out, fmt=(v)=>v){ const update=()=>out.textContent=fmt(range.value); range.addEventListener('input',update); update(); }
@@ -664,21 +691,43 @@
   document.getElementById('btnStartCapture').addEventListener('click', startCapture);
   document.getElementById('btnStopCapture').addEventListener('click', stopCapture);
 
-  // Palette presets
-  paletteSel.addEventListener('change', ()=>{
+   // Palette presets
+  paletteSel.addEventListener('change', () => {
     const p = paletteSel.value;
-    if (p==='ocean'){ colorPick.value = '#2dd4bf'; satRange.value='80'; lightRange.value='60'; colorModeSel.value='offset'; hueOffset.value='-40'; }
-    else if (p==='sunset'){ colorPick.value='#f97316'; satRange.value='90'; lightRange.value='55'; colorModeSel.value='offset'; hueOffset.value='20'; }
-    else if (p==='neon'){ colorPick.value='#a21caf'; satRange.value='100'; lightRange.value='60'; colorModeSel.value='vel'; }
-    else if (p==='mono'){ colorPick.value='#9ca3af'; satRange.value='0'; lightRange.value='70'; colorModeSel.value='fixed'; }
+    if (p === 'ocean') {
+      colorPick.value = '#2dd4bf';
+      satRange.value = '80';
+      lightRange.value = '60';
+      colorModeSel.value = 'offset';
+      hueOffset.value = '-40';
+    } else if (p === 'sunset') {
+      colorPick.value = '#f97316';
+      satRange.value = '90';
+      lightRange.value = '55';
+      colorModeSel.value = 'offset';
+      hueOffset.value = '20';
+    } else if (p === 'neon') {
+      colorPick.value = '#a21caf';
+      satRange.value = '100';
+      lightRange.value = '60';
+      colorModeSel.value = 'vel';
+    } else if (p === 'mono') {
+      colorPick.value = '#9ca3af';
+      satRange.value = '0';
+      lightRange.value = '70';
+      colorModeSel.value = 'fixed';
+    }
     // update readouts
-    satVal.textContent=satRange.value; lightVal.textContent=lightRange.value; hueOffsetVal.textContent=hueOffset.value; }
-  );
+    satVal.textContent = satRange.value;
+    lightVal.textContent = lightRange.value;
+    hueOffsetVal.textContent = hueOffset.value;
+  });
 
   // defaults
-  scatterRange.value = '0'; scatterVal.textContent = '0';
-  centerPen(); updateCenter();
-  // Build tabs once content is laid out
+  scatterRange.value = '0';
+  scatterVal.textContent = '0';
+  centerPen();
+  updateCenter();
 })();
 </script>
 </body>
