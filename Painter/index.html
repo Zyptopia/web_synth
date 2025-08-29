@@ -18,11 +18,14 @@
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji; }
     .app { display: grid; grid-template-columns: 360px 1fr; grid-template-rows: 1fr auto; height: 100%; }
+
     /* Left panel */
     aside { background: var(--panel); border-right: 1px solid #1f2a37; padding: 12px; overflow: auto; }
-    aside h2 { font-size: 12px; font-weight: 800; margin: 14px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
+    .section { background: #0e1622; border: 1px solid #223049; border-radius: 12px; padding: 10px; margin: 10px 0; }
+    .section h2 { font-size: 12px; font-weight: 800; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; display:flex; align-items:center; justify-content:space-between; }
+    .section h2 .hint{ font-weight:600; color:#9fb3d1; font-size:11px; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
-    .rangeRow { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    .rangeRow { display: grid; grid-template-columns: 1fr auto 44px; gap: 8px; align-items: center; }
     .split { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; }
     .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #0c1423; border: 1px solid #243349; color: var(--muted); }
     .list { display: grid; gap: 8px; }
@@ -48,128 +51,154 @@
     button.warn { border-color: #8a6a1e; background: #3c2c09; }
     button.danger { border-color: #8a1e1e; background: #3c0b0b; }
     button.tiny { padding: 6px 8px; font-size: 12px; }
+    .value { font-size: 12px; color: var(--muted); width:44px; text-align:right; }
   </style>
 </head>
 <body>
   <div class="app">
     <aside>
-      <h2>Canvas & Layers</h2>
-      <div class="row">
-        <button id="btnAddLayer" class="good">+ Layer</button>
-        <button id="btnDeleteLayer" class="danger">− Layer</button>
-        <button id="btnClearLayer" class="warn">Clear</button>
-      </div>
-      <div class="row split">
-        <label class="muted">Active Layer</label>
-        <select id="layerSelect"></select>
-      </div>
-      <div class="row split">
-        <label class="muted">Layer Opacity</label>
-        <input id="layerOpacity" type="range" min="0.05" max="1" step="0.05" value="1" />
-      </div>
-      <div class="row split">
-        <label class="muted">Blend</label>
-        <select id="blend">
-          <option value="source-over" selected>Normal</option>
-          <option value="lighter">Lighter</option>
-          <option value="screen">Screen</option>
-          <option value="multiply">Multiply</option>
-          <option value="overlay">Overlay</option>
-          <option value="color-dodge">Color Dodge</option>
-        </select>
-      </div>
-      <div class="row split">
-        <label class="muted">Trail Fade</label>
-        <input id="trail" type="range" min="0" max="0.2" step="0.005" value="0" />
-      </div>
-      <div class="row">
-        <button id="btnSavePNG">Save PNG</button>
-      </div>
-
-      <h2>Brush</h2>
-      <div class="row split"><label class="muted">Type</label>
-        <select id="brushType">
-          <option value="line" selected>Line</option>
-          <option value="particle">Particles</option>
-          <option value="stamp">Stamp</option>
-          <option value="glow">Glow Ink</option>
-        </select>
-      </div>
-      <div class="rangeRow">
-        <label class="muted">Brush scale</label>
-        <input type="range" id="brushScale" min="0.2" max="5" step="0.1" value="1.2"/>
-      </div>
-      <div class="rangeRow">
-        <label class="muted">Opacity</label>
-        <input type="range" id="opacity" min="0.05" max="1" step="0.05" value="0.6"/>
-      </div>
-      <div class="rangeRow">
-        <label class="muted">Scatter</label>
-        <input type="range" id="scatter" min="0" max="60" step="1" value="8"/>
-      </div>
-      <div class="row">
-        <button id="btnEraser">Eraser: Off</button>
+      <div class="section" id="secLayers">
+        <h2>Canvas & Layers <span class="hint">Manage paint surfaces</span></h2>
+        <div class="row">
+          <button id="btnAddLayer" class="good">+ Layer</button>
+          <button id="btnDeleteLayer" class="danger">− Layer</button>
+          <button id="btnClearLayer" class="warn">Clear</button>
+          <button id="btnSavePNG" title="Export composite as PNG">Save PNG</button>
+        </div>
+        <div class="row split">
+          <label class="muted">Active Layer</label>
+          <select id="layerSelect"></select>
+        </div>
+        <div class="rangeRow">
+          <label class="muted">Layer Opacity</label>
+          <input id="layerOpacity" type="range" min="0.05" max="1" step="0.05" value="1" />
+          <output class="value" id="layerOpacityVal">1.00</output>
+        </div>
+        <div class="row split">
+          <label class="muted">Blend</label>
+          <select id="blend">
+            <option value="source-over" selected>Normal</option>
+            <option value="lighter">Lighter</option>
+            <option value="screen">Screen</option>
+            <option value="multiply">Multiply</option>
+            <option value="overlay">Overlay</option>
+            <option value="color-dodge">Color Dodge</option>
+          </select>
+        </div>
+        <div class="rangeRow">
+          <label class="muted">Trail Fade</label>
+          <input id="trail" type="range" min="0" max="0.2" step="0.005" value="0" />
+          <output class="value" id="trailVal">0.00</output>
+        </div>
       </div>
 
-      <h2>Colour</h2>
-      <div class="row split">
-        <label class="muted">Mode</label>
-        <select id="colorMode">
-          <option value="auto" selected>Auto (Pitch→Hue)</option>
-          <option value="fixed">Fixed Colour</option>
-          <option value="offset">Auto + Hue Offset</option>
-          <option value="vel">Velocity → Hue Shift</option>
-        </select>
-      </div>
-      <div class="row split">
-        <label class="muted">Pick</label>
-        <input id="colorPick" type="color" value="#7c3aed" />
-      </div>
-      <div class="row split">
-        <label class="muted">Hue Offset</label>
-        <input id="hueOffset" type="range" min="-180" max="180" step="1" value="0" />
-      </div>
-      <div class="row split">
-        <label class="muted">Saturation</label>
-        <input id="sat" type="range" min="0" max="100" step="1" value="85" />
-      </div>
-      <div class="row split">
-        <label class="muted">Lightness</label>
-        <input id="light" type="range" min="0" max="100" step="1" value="60" />
-      </div>
-
-      <h2>Flow</h2>
-      <div class="row split">
-        <label class="muted">Mode</label>
-        <select id="flowMode">
-          <option value="balanced" selected>Balanced</option>
-          <option value="harmonic">Harmonic</option>
-          <option value="melodic">Melodic Memory</option>
-        </select>
-      </div>
-      <div class="row split">
-        <label class="muted">Smoothness</label>
-        <input id="flowSmooth" type="range" min="0" max="1" step="0.05" value="0.5" />
-      </div>
-      <div class="row split">
-        <label class="muted">Consonance Bias</label>
-        <input id="consBias" type="range" min="0" max="1" step="0.05" value="0.6" />
+      <div class="section" id="secBrush">
+        <h2>Brush <span class="hint">Style & size</span></h2>
+        <div class="row split"><label class="muted">Type</label>
+          <select id="brushType">
+            <option value="line" selected>Line</option>
+            <option value="particle">Particles</option>
+            <option value="stamp">Stamp</option>
+            <option value="glow">Glow Ink</option>
+          </select>
+        </div>
+        <div class="rangeRow">
+          <label class="muted">Brush Scale</label>
+          <input type="range" id="brushScale" min="0.2" max="5" step="0.1" value="1.2"/>
+          <output class="value" id="brushScaleVal">1.2</output>
+        </div>
+        <div class="rangeRow">
+          <label class="muted">Opacity</label>
+          <input type="range" id="opacity" min="0.05" max="1" step="0.05" value="0.6"/>
+          <output class="value" id="opacityVal">0.60</output>
+        </div>
+        <div class="rangeRow">
+          <label class="muted">Scatter</label>
+          <input type="range" id="scatter" min="0" max="60" step="1" value="0"/>
+          <output class="value" id="scatterVal">0</output>
+        </div>
+        <div class="row">
+          <button id="btnEraser">Eraser: Off</button>
+        </div>
       </div>
 
-      <h2>Background</h2>
-      <div class="row">
-        <input id="bgFile" type="file" accept="image/*" />
-        <button id="btnClearBG" class="tiny">Clear BG</button>
+      <div class="section" id="secColour">
+        <h2>Colour <span class="hint">Pick or auto-map</span></h2>
+        <div class="row split">
+          <label class="muted">Mode</label>
+          <select id="colorMode">
+            <option value="auto" selected>Auto (Pitch→Hue)</option>
+            <option value="fixed">Fixed Colour</option>
+            <option value="offset">Auto + Hue Offset</option>
+            <option value="vel">Velocity → Hue Shift</option>
+          </select>
+        </div>
+        <div class="row split">
+          <label class="muted">Pick</label>
+          <input id="colorPick" type="color" value="#7c3aed" />
+        </div>
+        <div class="rangeRow">
+          <label class="muted">Hue Offset</label>
+          <input id="hueOffset" type="range" min="-180" max="180" step="1" value="0" />
+          <output class="value" id="hueOffsetVal">0</output>
+        </div>
+        <div class="rangeRow">
+          <label class="muted">Saturation</label>
+          <input id="sat" type="range" min="0" max="100" step="1" value="85" />
+          <output class="value" id="satVal">85</output>
+        </div>
+        <div class="rangeRow">
+          <label class="muted">Lightness</label>
+          <input id="light" type="range" min="0" max="100" step="1" value="60" />
+          <output class="value" id="lightVal">60</output>
+        </div>
       </div>
 
-      <h2>Notes</h2>
-      <div class="list" id="noteList"></div>
-      <p class="muted" style="margin-top:8px">Pitch → hue (or fixed), velocity → thickness. Aftertouch → thickness; CC74 → scatter; Mod‑wheel → opacity. Consonant chords smooth and steer the path.</p>
+      <div class="section" id="secFlow">
+        <h2>Flow <span class="hint">How notes steer</span></h2>
+        <div class="row split">
+          <label class="muted">Mode</label>
+          <select id="flowMode">
+            <option value="balanced" selected>Balanced</option>
+            <option value="harmonic">Harmonic</option>
+            <option value="melodic">Melodic Memory</option>
+          </select>
+        </div>
+        <div class="rangeRow">
+          <label class="muted">Smoothness</label>
+          <input id="flowSmooth" type="range" min="0" max="1" step="0.05" value="0.6" />
+          <output class="value" id="flowSmoothVal">0.60</output>
+        </div>
+        <div class="rangeRow">
+          <label class="muted">Consonance Bias</label>
+          <input id="consBias" type="range" min="0" max="1" step="0.05" value="0.6" />
+          <output class="value" id="consBiasVal">0.60</output>
+        </div>
+        <div class="row">
+          <button id="btnResetMem" class="tiny">Reset Melodic Memory</button>
+        </div>
+      </div>
 
-      <h2>Capture</h2>
-      <div class="row">
-        <button id="btnStartCapture" class="primary">Start Capture (WebM)</button>
-        <button id="btnStopCapture" class="warn">Stop & Save</button>
+      <div class="section" id="secBG">
+        <h2>Background <span class="hint">Underlay image</span></h2>
+        <div class="row">
+          <input id="bgFile" type="file" accept="image/*" />
+          <button id="btnClearBG" class="tiny">Clear BG</button>
+        </div>
+      </div>
+
+      <div class="section" id="secNotes">
+        <h2>Notes <span class="hint">Active MIDI</span></h2>
+        <div class="list" id="noteList"></div>
+        <p class="muted" style="margin-top:8px">Pitch → hue (or fixed), velocity → thickness. Aftertouch → thickness; CC74 → scatter; Mod‑wheel → opacity. Consonant chords reduce jitter.</p>
+      </div>
+
+      <div class="section" id="secCapture">
+        <h2>Capture <span class="hint">Record video</span></h2>
+        <div class="row">
+          <button id="btnStartCapture" class="primary">Start Capture (WebM)</button>
+          <button id="btnStopCapture" class="warn">Stop & Save</button>
+        </div>
       </div>
 
     </aside>
@@ -211,23 +240,47 @@
   const btnClearLayer = document.getElementById('btnClearLayer');
   const layerSelect = document.getElementById('layerSelect');
   const layerOpacity = document.getElementById('layerOpacity');
+  const layerOpacityVal = document.getElementById('layerOpacityVal');
   const blendSel = document.getElementById('blend');
   const trailRange = document.getElementById('trail');
+  const trailVal = document.getElementById('trailVal');
   const btnSavePNG = document.getElementById('btnSavePNG');
   const brushScale = document.getElementById('brushScale');
+  const brushScaleVal = document.getElementById('brushScaleVal');
   const opacityRange = document.getElementById('opacity');
+  const opacityVal = document.getElementById('opacityVal');
   const scatterRange = document.getElementById('scatter');
+  const scatterVal = document.getElementById('scatterVal');
   const brushTypeSel = document.getElementById('brushType');
   const colorModeSel = document.getElementById('colorMode');
   const colorPick = document.getElementById('colorPick');
   const hueOffset = document.getElementById('hueOffset');
+  const hueOffsetVal = document.getElementById('hueOffsetVal');
   const satRange = document.getElementById('sat');
+  const satVal = document.getElementById('satVal');
   const lightRange = document.getElementById('light');
+  const lightVal = document.getElementById('lightVal');
   const btnEraser = document.getElementById('btnEraser');
   const noteList = document.getElementById('noteList');
   const flowModeSel = document.getElementById('flowMode');
   const flowSmooth = document.getElementById('flowSmooth');
+  const flowSmoothVal = document.getElementById('flowSmoothVal');
   const consBias = document.getElementById('consBias');
+  const consBiasVal = document.getElementById('consBiasVal');
+  const btnResetMem = document.getElementById('btnResetMem');
+
+  // live labels
+  function bindRange(range, out, fmt=(v)=>v){ const update=()=>out.textContent=fmt(range.value); range.addEventListener('input',update); update(); }
+  bindRange(layerOpacity, layerOpacityVal, v=>Number(v).toFixed(2));
+  bindRange(trailRange, trailVal, v=>Number(v).toFixed(3));
+  bindRange(brushScale, brushScaleVal, v=>Number(v).toFixed(1));
+  bindRange(opacityRange, opacityVal, v=>Number(v).toFixed(2));
+  bindRange(scatterRange, scatterVal, v=>String(Math.round(Number(v))));
+  bindRange(hueOffset, hueOffsetVal, v=>String(Math.round(Number(v))));
+  bindRange(satRange, satVal, v=>String(Math.round(Number(v))));
+  bindRange(lightRange, lightVal, v=>String(Math.round(Number(v))));
+  bindRange(flowSmooth, flowSmoothVal, v=>Number(v).toFixed(2));
+  bindRange(consBias, consBiasVal, v=>Number(v).toFixed(2));
 
   // --- Audio ---
   let audioCtx = null;
@@ -253,11 +306,11 @@
 
   btnStartAudio.addEventListener('click', async () => { ensureAudio(); if (audioCtx.state !== 'running') await audioCtx.resume(); });
 
-  // --- Voice management (robust) ---
+  // --- Voice management (saturating hold; watchdog; hard panic) ---
   const activeOsc = new Map(); // note -> {osc, g, timer}
   const activeNotes = new Map(); // note -> {velocity, t, sustained, pressure}
-  const heldCounts = new Map(); // note -> count of overlapping NoteOn
-  const AUTO_OFF_MS = 1800; // fail-safe in case NoteOff never arrives
+  const held = new Set(); // set of notes currently held (saturating)
+  const AUTO_OFF_MS = 1500; // fail-safe if NoteOff never arrives
 
   function midiToFreq(n) { return 440 * Math.pow(2, (n - 69) / 12); }
 
@@ -266,8 +319,8 @@
     g.gain.cancelScheduledValues(now);
     const cur = Math.max(0.0001, g.gain.value);
     g.gain.setValueAtTime(cur, now);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, v), now + 0.008);
-    g.gain.exponentialRampToValueAtTime(v*0.7, now + 0.18);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, v), now + 0.006);
+    g.gain.exponentialRampToValueAtTime(v*0.7, now + 0.14);
   }
 
   function startTone(note, velocity=100) {
@@ -286,8 +339,6 @@
       activeOsc.set(note, h);
     }
     retriggerEnvelope(h.g, v);
-
-    // refresh fail-safe timer (kills voice if no NoteOff for a while)
     if (h.timer) clearTimeout(h.timer);
     h.timer = setTimeout(() => forceStop(note), AUTO_OFF_MS);
   }
@@ -298,32 +349,32 @@
     if (h.timer) { clearTimeout(h.timer); h.timer = null; }
     const now = audioCtx.currentTime;
     h.g.gain.cancelScheduledValues(now);
-    const t = fast ? 0.02 : 0.08;
+    const t = fast ? 0.01 : 0.06;
     h.g.gain.setTargetAtTime(0.0001, now, t);
-    try { h.osc.stop(now + 0.12); } catch {}
-    setTimeout(() => { try { h.osc.disconnect(); h.g.disconnect(); } catch {} activeOsc.delete(note); }, 180);
+    try { h.osc.stop(now + 0.1); } catch {}
+    setTimeout(() => { try { h.osc.disconnect(); h.g.disconnect(); } catch {} activeOsc.delete(note); }, 140);
   }
 
   function forceStop(note) {
-    heldCounts.delete(note);
+    held.delete(note);
     activeNotes.delete(note);
     stopTone(note, true);
     refreshNoteList();
   }
 
-  // Watchdog: sweep dangling voices every 500ms
+  // Watchdog: sweep dangling voices every 400ms
   setInterval(() => {
     activeOsc.forEach((_, note) => {
-      const held = heldCounts.get(note) || 0;
+      const isHeld = held.has(note);
       const n = activeNotes.get(note);
-      const shouldBeOn = held > 0 || (n && n.sustained);
+      const shouldBeOn = isHeld || (n && n.sustained);
       if (!shouldBeOn) stopTone(note, true);
     });
-  }, 500);
+  }, 400);
 
   async function hardPanic() {
     try { activeOsc.forEach((_, n) => stopTone(n, true)); } catch {}
-    heldCounts.clear(); activeNotes.clear(); sustainDown = false; pressure = 0; mpeScatter = 0; refreshNoteList();
+    held.clear(); activeNotes.clear(); sustainDown = false; pressure = 0; mpeScatter = 0; refreshNoteList();
     if (audioCtx) { try { await audioCtx.close(); } catch {}; closedByPanic = true; audioStatus.textContent = 'Audio: closed'; }
   }
 
@@ -383,11 +434,12 @@
       const cc = d1, val = d2;
       if (cc === 1) { // mod wheel → opacity
         const f = (val / 127);
-        opacityRange.value = (0.05 + 0.95 * f).toFixed(2);
+        opacityRange.value = (0.05 + 0.95 * f).toFixed(2); opacityVal.textContent = Number(opacityRange.value).toFixed(2);
       } else if (cc === 64) { // sustain pedal
         const was = sustainDown; sustainDown = val >= 64; if (!sustainDown && was) flushSustained(); toggleEraser(val >= 64);
       } else if (cc === 74) { // MPE Y axis → scatter
         mpeScatter = val / 127 * 60; // 0..60 px
+        scatterVal.textContent = String(Math.round(Number(scatterRange.valueAsNumber + mpeScatter)));
       } else if (cc === 120 || cc === 123) { // all sound off / all notes off
         hardPanic();
       }
@@ -402,7 +454,7 @@
   }
 
   function noteOn(note, vel=100, source='live') {
-    const cnt = (heldCounts.get(note) || 0) + 1; heldCounts.set(note, cnt);
+    held.add(note); // saturating
     activeNotes.set(note, { velocity: vel, t: performance.now(), source, pressure: 0 });
     startTone(note, vel);
     refreshNoteList();
@@ -410,9 +462,7 @@
 
   function noteOff(note) {
     if (sustainDown) { const n = activeNotes.get(note); if (n) n.sustained = true; refreshNoteList(); return; }
-    const cnt = (heldCounts.get(note) || 0) - 1;
-    if (cnt > 0) { heldCounts.set(note, cnt); return; }
-    heldCounts.delete(note);
+    held.delete(note);
     activeNotes.delete(note);
     stopTone(note);
     refreshNoteList();
@@ -421,7 +471,7 @@
   function flushSustained() {
     const toStop = [];
     activeNotes.forEach((val, key) => { if (val.sustained) toStop.push(key); });
-    toStop.forEach(k => { heldCounts.delete(k); activeNotes.delete(k); stopTone(k); });
+    toStop.forEach(k => { held.delete(k); activeNotes.delete(k); stopTone(k); });
     refreshNoteList();
   }
 
@@ -431,8 +481,8 @@
     activeNotes.forEach((n, note) => {
       const item = document.createElement('div'); item.className = 'item';
       const name = midiNoteName(note);
-      const held = heldCounts.get(note) || 0;
-      item.innerHTML = `<span>${name}</span><span class="pill">vel ${n.velocity} • held ${held}${n.sustained ? ' • sus' : ''}</span>`;
+      const isHeld = held.has(note) ? 1 : 0;
+      item.innerHTML = `<span>${name}</span><span class="pill">vel ${n.velocity} • held ${isHeld}${n.sustained ? ' • sus' : ''}</span>`;
       noteList.appendChild(item);
     });
   }
@@ -455,9 +505,10 @@
     layers.forEach((_, i) => { const opt = document.createElement('option'); opt.value = String(i); opt.textContent = `Layer ${i+1}`; layerSelect.appendChild(opt); });
     layerSelect.value = String(activeLayer);
     layerOpacity.value = String(layers[activeLayer].opacity);
+    layerOpacityVal.textContent = Number(layerOpacity.value).toFixed(2);
   }
 
-  function selectLayer(i) { activeLayer = Math.max(0, Math.min(i, layers.length - 1)); updateLayerSelect(); blendSel.value = layers[activeLayer].blend; layerOpacity.value = layers[activeLayer].opacity; }
+  function selectLayer(i) { activeLayer = Math.max(0, Math.min(i, layers.length - 1)); updateLayerSelect(); blendSel.value = layers[activeLayer].blend; layerOpacity.value = layers[activeLayer].opacity; layerOpacityVal.textContent = Number(layerOpacity.value).toFixed(2); }
 
   function deleteLayer() {
     if (layers.length <= 1) return; const {canvas} = layers[activeLayer]; canvas.remove(); layers.splice(activeLayer, 1); selectLayer(Math.max(0, activeLayer - 1));
@@ -477,7 +528,7 @@
   btnDeleteLayer.addEventListener('click', deleteLayer);
   btnClearLayer.addEventListener('click', clearLayer);
   layerSelect.addEventListener('change', () => selectLayer(parseInt(layerSelect.value, 10)));
-  layerOpacity.addEventListener('input', () => { layers[activeLayer].opacity = parseFloat(layerOpacity.value); });
+  layerOpacity.addEventListener('input', () => { layers[activeLayer].opacity = parseFloat(layerOpacity.value); layerOpacityVal.textContent = Number(layerOpacity.value).toFixed(2); });
   btnSavePNG.addEventListener('click', savePNG);
   blendSel.addEventListener('change', () => { layers[activeLayer].blend = blendSel.value; });
 
@@ -505,7 +556,7 @@
 
   function centerPen() { const rect = stageWrap.getBoundingClientRect(); pen.x = rect.width * 0.5; pen.y = rect.height * 0.5; pen.px = pen.x; pen.py = pen.y; }
 
-  // --- Render / Flow engine ---
+  // --- Flow helpers ---
   const pen = { x: 0, y: 0, px: 0, py: 0 };
   let flowPhase = 0; // modulated by pitch bend
   let erasing = false;
@@ -523,42 +574,32 @@
     if (mode === 'fixed') h = base.h; if (mode === 'offset') h = (hueFromNotes + parseFloat(hueOffset.value)) % 360; if (mode === 'vel') h = (base.h + (velocity/127)*120) % 360; h = (h + 360) % 360; return h;
   }
 
-  // Harmonic helpers
-  const FIFTH_ANGLE = (2*Math.PI) * (7/12); // circle of fifths step
   const CONSONANT_PCS = new Set([0,3,4,5,7,8,9]); // unison/minor/major 3rd/4th/5th/6th
   function pc(n){ return ((n%12)+12)%12; }
-  function fifthAngleFor(n){ return pc(n) * FIFTH_ANGLE; }
   function chordConsonance(notes){
     const pcs = Array.from(notes).map(n=>pc(n));
-    let c=0, d=0; // consonant, dissonant pair counts
-    for(let i=0;i<pcs.length;i++) for(let j=i+1;j<pcs.length;j++){
+    let c=0, d=0; for(let i=0;i<pcs.length;i++) for(let j=i+1;j<pcs.length;j++){
       const iv = Math.min((pcs[j]-pcs[i]+12)%12,(pcs[i]-pcs[j]+12)%12);
       if (CONSONANT_PCS.has(iv)) c++; else d++;
     }
     const total = c+d; return total? (c/total): 0;
   }
 
-  let dirMem = {x:0,y:0}; // melodic memory
-  const recentPitches = []; // for melodic direction
-  function pushRecent(note){ recentPitches.push({note, t: performance.now()}); if (recentPitches.length>64) recentPitches.shift(); }
+  function unit(a){ return {x: Math.cos(a), y: Math.sin(a)}; }
+  function add(v,a,w=1){ v.x += Math.cos(a)*w; v.y += Math.sin(a)*w; }
+  function scale(v,s){ v.x*=s; v.y*=s; return v; }
+  function norm(v){ const m=Math.hypot(v.x,v.y)||1e-6; v.x/=m; v.y/=m; return v; }
+  function lerpVec(a,b,t){ return {x: a.x*(1-t)+b.x*t, y: a.y*(1-t)+b.y*t}; }
+  function angle(v){ return Math.atan2(v.y,v.x); }
 
-  // Stroke renderer
-  function drawStroke(ctx, x1, y1, x2, y2, width, hue, sat, light, alpha) {
-    ctx.globalCompositeOperation = erasing ? 'destination-out' : layers[activeLayer].blend;
-    ctx.globalAlpha = layers[activeLayer].opacity; // per-layer opacity
-    if (brushTypeSel.value === 'glow') { ctx.shadowColor = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`; ctx.shadowBlur = Math.min(60, width * 4); } else { ctx.shadowBlur = 0; }
-    ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${erasing ? Math.max(10, light-10) : light}%, ${alpha})`;
-    ctx.lineWidth = width;
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    if (brushTypeSel.value === 'particle') { const r = width * 0.5; ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha*0.7})`; ctx.beginPath(); ctx.arc(x2, y2, r, 0, Math.PI*2); ctx.fill(); }
-    else if (brushTypeSel.value === 'stamp') { const s = width * 1.6; ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light+5}%, ${alpha*0.6})`; ctx.fillRect(x2 - s/2, y2 - s/2, s, s); }
-  }
+  // melodic memory
+  let mem = {x:0,y:0};
+  btnResetMem.addEventListener('click', ()=>{ mem={x:0,y:0}; });
 
-  function resizeAndCenter() { resizeAll(); const rect = stageWrap.getBoundingClientRect(); pen.x = rect.width * 0.5; pen.y = rect.height * 0.5; pen.px = pen.x; pen.py = pen.y; }
-  resizeAndCenter();
+  function baseAngleFor(note){ return (note * 2.399963229728653 + flowPhase) % (Math.PI*2); } // golden-angle mapping
+  function harmonicAngleFor(note){ return (((pc(note)*7)%12) * (2*Math.PI/12)); } // true circle-of-fifths ordering
 
   // --- Animation loop ---
-  const GOLDEN_ANGLE = 2.399963229728653;
   let last = performance.now(); let frames = 0, lastFPS = performance.now();
 
   function loop(nowMs) {
@@ -568,51 +609,47 @@
     // trail fade
     const trail = parseFloat(trailRange.value); if (trail > 0) { for (const l of layers) { const ctx = l.ctx; ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = `rgba(0,0,0,${trail})`; ctx.fillRect(0,0,l.canvas.width,l.canvas.height); ctx.restore(); } }
 
-    // flow calc
-    let dx = 0, dy = 0, weightSum = 0, hueNum = 0, velAvg = 0; const actNotes = Array.from(activeNotes.keys());
+    // Build vectors from active notes
+    let Vb = {x:0,y:0}, Vh = {x:0,y:0};
+    let weightSum = 0, hueNum = 0, velAvg = 0; const actNotes = Array.from(activeNotes.keys());
     activeNotes.forEach((n, note) => {
-      const wBase = n.velocity / 127; const press = (n.pressure ?? pressure) * 0.8; const w = wBase * (1 + press);
-      // Base direction: golden-angle spiral by pitch
-      const angleBase = (note * GOLDEN_ANGLE + flowPhase) % (Math.PI * 2);
-      // Harmonic direction: circle-of-fifths field
-      const angleH = fifthAngleFor(note);
-      const bias = parseFloat(consBias.value);
-      let a;
-      const mode = flowModeSel.value;
-      if (mode === 'harmonic') a = angleH;
-      else if (mode === 'melodic') a = Math.atan2(dirMem.y || Math.sin(angleBase), dirMem.x || Math.cos(angleBase));
-      else a = (1-bias)*angleBase + (bias)*angleH; // balanced blend
-      dx += Math.cos(a) * w; dy += Math.sin(a) * w; hueNum += note * w * 7.0; weightSum += w; velAvg += n.velocity;
+      const wBase = n.velocity / 127; const press = (n.pressure ?? pressure) * 0.7; const w = wBase * (1 + press);
+      add(Vb, baseAngleFor(note), w);
+      add(Vh, harmonicAngleFor(note), w);
+      hueNum += note * w * 7.0; weightSum += w; velAvg += n.velocity;
     });
     if (activeNotes.size) velAvg /= activeNotes.size; else velAvg = 0;
 
-    // consonance-driven smoothing / scatter
-    let cons = chordConsonance(actNotes);
-    const baseScatter = scatterRange.valueAsNumber + mpeScatter;
-    const consFactor = 1 - cons * parseFloat(consBias.value); // lower jitter if consonant
-    const scatterEff = baseScatter * consFactor;
-
-    // melodic memory update
-    if (actNotes.length) {
-      // target direction follows current vector sum
-      const target = {x: dx, y: dy};
-      const mag = Math.hypot(target.x, target.y) || 1e-6; target.x/=mag; target.y/=mag;
+    // Choose steering vector per mode (vector blends, not angle blends)
+    let V = {x:0,y:0};
+    const mode = flowModeSel.value;
+    if (mode === 'harmonic') {
+      V = norm(Vh);
+    } else if (mode === 'melodic') {
+      const target = weightSum>0 ? norm({x:Vb.x, y:Vb.y}) : {x:0,y:0};
       const smooth = parseFloat(flowSmooth.value);
-      dirMem.x = dirMem.x*(1-smooth) + target.x*smooth;
-      dirMem.y = dirMem.y*(1-smooth) + target.y*smooth;
-    } else {
-      // decay memory slowly
-      dirMem.x *= 0.95; dirMem.y *= 0.95;
+      // boost update if pitch set changed a lot
+      let delta = 0; if (actNotes.length) { const avgPc = actNotes.reduce((a,b)=>a+pc(b),0)/actNotes.length; delta = Math.abs(avgPc - (mem.avgPc||avgPc)); mem.avgPc = avgPc; }
+      const boost = Math.min(1, delta/3); // up to ~3 semitones => stronger snap
+      const alpha = Math.min(1, smooth*0.8 + boost*0.5);
+      mem = lerpVec(mem, target, alpha);
+      V = norm({x:mem.x||target.x, y:mem.y||target.y});
+    } else { // balanced
+      const t = 0.35; // slight bias to base
+      V = norm( lerpVec( norm(Vb), norm(Vh), t ) );
     }
 
-    // spectrum glow influence
-    let low=0, mid=0; if (analyser) { analyser.getByteFrequencyData(fft); const n=fft.length; const nLow = Math.floor(n*0.1), nMid = Math.floor(n*0.3); for (let i=0;i<nLow;i++) low+=fft[i]; low/=Math.max(1,nLow*255); for (let i=nLow;i<nLow+nMid;i++) mid+=fft[i]; mid/=Math.max(1,nMid*255); }
+    // Consonance affects jitter (scatter) and subtle smoothing
+    const cons = chordConsonance(actNotes);
+    const baseScatter = scatterRange.valueAsNumber + mpeScatter;
+    const scatterEff = baseScatter * (1 - cons * parseFloat(consBias.value));
 
     if (weightSum > 0) {
       pen.px = pen.x; pen.py = pen.y;
       const jitter = () => (Math.random()-0.5) * scatterEff;
-      pen.x += (dx * (1 + weightSum * 1.2) + jitter());
-      pen.y += (dy * (1 + weightSum * 1.2) + jitter());
+      const mag = 1 + weightSum * 1.1;
+      pen.x += (V.x * mag + jitter());
+      pen.y += (V.y * mag + jitter());
 
       const rect = stageWrap.getBoundingClientRect();
       if (pen.x < 0) { pen.x += rect.width; pen.px = pen.x; }
@@ -621,11 +658,11 @@
       if (pen.y > rect.height) { pen.y -= rect.height; pen.py = pen.y; }
 
       let hueAuto = ((hueNum / Math.max(0.0001, weightSum)) % 360 + 360) % 360;
-      let hue = computeHue(hueAuto, velAvg);
+      const hue = computeHue(hueAuto, velAvg);
       const sat = parseInt(satRange.value,10);
       const light = parseInt(lightRange.value,10);
-      const alpha = Math.min(1, opacityRange.valueAsNumber * (0.7 + low*0.6));
-      const width = 1 + (brushScale.valueAsNumber * (1 + weightSum * 6)) * (1 + (pressure*0.8));
+      const alpha = Math.min(1, opacityRange.valueAsNumber);
+      const width = 1 + (brushScale.valueAsNumber * (1 + weightSum * 6)) * (1 + (pressure*0.7));
 
       const { ctx } = layers[activeLayer];
       drawStroke(ctx, pen.px, pen.py, pen.x, pen.y, width, hue.toFixed(1), sat, light, alpha);
@@ -663,6 +700,9 @@
   document.getElementById('btnStartCapture').addEventListener('click', startCapture);
   document.getElementById('btnStopCapture').addEventListener('click', stopCapture);
 
+  // defaults
+  scatterRange.value = '0'; scatterVal.textContent = '0';
+  centerPen();
 })();
 </script>
 </body>
