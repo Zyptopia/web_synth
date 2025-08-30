@@ -163,12 +163,12 @@
           </div>
           <div class="rangeRow">
             <label class="muted" title="Higher = smoother long arcs">Smoothness</label>
-            <input id="flowSmooth" type="range" min="0" max="1" step="0.05" value="0.6" />
+            <input id="flowSmooth" type="range" title="Higher = smoother long arcs" min="0" max="1" step="0.05" value="0.6" />
             <output class="value" id="flowSmoothVal">0.60</output>
           </div>
           <div class="rangeRow">
             <label class="muted" title="Higher = less jitter for consonant chords">Consonance Bias</label>
-            <input id="consBias" type="range" min="0" max="1" step="0.05" value="0.6" />
+            <input id="consBias" type="range" title="Higher = less jitter for consonant chords" min="0" max="1" step="0.05" value="0.6" />
             <output class="value" id="consBiasVal">0.60</output>
           </div>
           <div class="row">
@@ -239,8 +239,9 @@
         <div class="section" id="secCapture">
           <h2>Capture <span class="hint">Record video</span></h2>
           <div class="row">
-            <button id="btnStartCapture" class="primary">Start Capture (WebM)</button>
-            <button id="btnStopCapture" class="warn">Stop & Save</button>
+            <button id="btnRecord" class="primary">Record</button>
+            <button id="btnStopRec" class="warn">Stop</button>
+            <button id="btnScreenshot">Screenshot PNG</button>
           </div>
         </div>
 
@@ -252,6 +253,13 @@
 (() => {
   // ----- DOM refs -----
   const stageWrap = document.getElementById('stageWrap');
+  // base (frozen) canvas behind layers so old art isn't affected by new fades
+  const baseCanvas = document.createElement('canvas');
+  baseCanvas.className = 'layerCanvas';
+  baseCanvas.style.zIndex = 0;
+  stageWrap.prepend(baseCanvas);
+  const baseCtx = baseCanvas.getContext('2d');
+  function resizeBase(){ const dpr=Math.max(1, window.devicePixelRatio||1); const rect=stageWrap.getBoundingClientRect(); const prev=document.createElement('canvas'); prev.width=baseCanvas.width; prev.height=baseCanvas.height; prev.getContext('2d').drawImage(baseCanvas,0,0); baseCanvas.width=Math.floor(rect.width*dpr); baseCanvas.height=Math.floor(rect.height*dpr); baseCanvas.style.width=rect.width+'px'; baseCanvas.style.height=rect.height+'px'; baseCtx.setTransform(dpr,0,0,dpr,0,0); try{ baseCtx.drawImage(prev,0,0, prev.width, prev.height, 0,0, baseCanvas.width, baseCanvas.height);}catch{} }
   const tabsEl = document.getElementById('tabs');
   const dockEl = document.getElementById('dock');
 
@@ -345,6 +353,9 @@
   bindRange(symmetry, symmetryVal, v=>String(Math.round(Number(v))));
   bindRange(gravity, gravityVal, v=>Number(v).toFixed(2));
   bindRange(silenceFade, silenceFadeVal, v=>Number(v).toFixed(3));
+  // freeze old art when fade settings change so past strokes stay unchanged
+  trailRange.addEventListener('change', freezeArtwork);
+  silenceFade.addEventListener('change', freezeArtwork);
 
   // --- Audio ---
   let audioCtx = null;
@@ -501,7 +512,28 @@
   function selectLayer(i) { activeLayer = Math.max(0, Math.min(i, layers.length - 1)); updateLayerSelect(); blendSel.value = layers[activeLayer].blend; layerOpacity.value = layers[activeLayer].opacity; layerOpacityVal.textContent = Number(layerOpacity.value).toFixed(2); }
   function deleteLayer() { if (layers.length <= 1) return; const {canvas} = layers[activeLayer]; canvas.remove(); layers.splice(activeLayer, 1); selectLayer(Math.max(0, activeLayer - 1)); }
   function clearLayer() { const {canvas, ctx} = layers[activeLayer]; ctx.clearRect(0, 0, canvas.width, canvas.height); }
-  function savePNG() { const w = layers[0].canvas.width, h = layers[0].canvas.height; const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const tctx = tmp.getContext('2d'); tctx.fillStyle = '#0b0f14'; tctx.fillRect(0,0,w,h); layers.forEach(l => tctx.drawImage(l.canvas, 0, 0)); const a = document.createElement('a'); a.download = 'music-painter.png'; a.href = tmp.toDataURL('image/png'); a.click(); }
+  function compositeTo(ctx){
+    ctx.save();
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.fillStyle = '#0b0f14';
+    ctx.fillRect(0,0,ctx.canvas.width, ctx.canvas.height);
+    ctx.drawImage(baseCanvas, 0, 0);
+    layers.forEach(l => ctx.drawImage(l.canvas, 0, 0));
+    ctx.restore();
+  }
+  function savePNG() {
+    const w = layers[0].canvas.width, h = layers[0].canvas.height; const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const tctx = tmp.getContext('2d');
+    compositeTo(tctx);
+    const a = document.createElement('a'); a.download = 'music-painter.png'; a.href = tmp.toDataURL('image/png'); a.click();
+  }
+  function freezeArtwork(){
+    // move current visible layers into the base (frozen) canvas, then clear layers
+    const prevBlend = baseCtx.globalCompositeOperation;
+    baseCtx.globalCompositeOperation = 'source-over';
+    layers.forEach(l => baseCtx.drawImage(l.canvas, 0, 0));
+    baseCtx.globalCompositeOperation = prevBlend;
+    layers.forEach(l => l.ctx.clearRect(0,0,l.canvas.width,l.canvas.height));
+  }
 
   btnAddLayer.addEventListener('click', createLayer);
   btnDeleteLayer.addEventListener('click', deleteLayer);
@@ -513,7 +545,7 @@
 
   // Resize
   function resizeCanvas(c) { const dpr = Math.max(1, window.devicePixelRatio || 1); const rect = stageWrap.getBoundingClientRect(); c.width = Math.floor(rect.width * dpr); c.height = Math.floor(rect.height * dpr); c.style.width = rect.width + 'px'; c.style.height = rect.height + 'px'; const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
-  function resizeAll() { layers.forEach(l => resizeCanvas(l.canvas)); updateCenter(); }
+  function resizeAll() { resizeBase(); layers.forEach(l => resizeCanvas(l.canvas)); updateCenter(); }
   window.addEventListener('resize', resizeAll);
   createLayer();
 
@@ -600,7 +632,7 @@
   }
 
   // Animation
-  let last = performance.now(); let frames = 0, lastFPS = performance.now();
+  let last = performance.now(); let frames = 0, lastFPS = performance.now(); let isRecording = false;
   function loop(nowMs) {
     const dt = Math.max(0.001, Math.min(0.05, (nowMs - last) / 1000)); last = nowMs;
     frames++; if (nowMs - lastFPS > 1000) { fpsEl.textContent = `${frames} fps`; frames = 0; lastFPS = nowMs; }
@@ -646,10 +678,13 @@
     const scatterEff = baseScatter * (1 - cons * parseFloat(consBias.value));
 
     // Stronger center gravity
-    const gStr = parseFloat(gravity.value);
-    if (gStr > 0) {
+    const gRaw = parseFloat(gravity.value);
+    const gEff = 0.9 * (gRaw*gRaw*(3-2*gRaw)); // smoothstep for gentler curve
+    if (gEff > 0) {
       const gx = (stageSize.cx - pen.x), gy = (stageSize.cy - pen.y);
-      const gm = Math.hypot(gx,gy)||1; V.x = (V.x*(1-gStr)) + (gx/gm) * (gStr*1.5); V.y = (V.y*(1-gStr)) + (gy/gm) * (gStr*1.5);
+      const gm = Math.hypot(gx,gy)||1;
+      V.x = V.x*(1-gEff) + (gx/gm) * gEff;
+      V.y = V.y*(1-gEff) + (gy/gm) * gEff;
       const m=Math.hypot(V.x,V.y)||1; V.x/=m; V.y/=m;
     }
 
@@ -683,6 +718,7 @@
       drawSymmetry(ctx, pen.px, pen.py, pen.x, pen.y, width, hue.toFixed(1), sat, light, alpha);
     }
 
+    if (isRecording && recCtx) { compositeTo(recCtx); }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
@@ -694,32 +730,53 @@
   window.addEventListener('keyup', (e) => { const k = e.key.toLowerCase(); const note = KEY_LAYOUT[k]; if (note !== undefined) { downKeys.delete(k); noteOff(note); } });
   stageWrap.addEventListener('pointerdown', () => { ensureAudio(); audioCtx && audioCtx.resume(); });
 
-  // Capture (canvas + audio → WebM)
+  // Capture / Record (composited → WebM via hidden canvas)
+  const recCanvas = document.createElement('canvas');
+  let recCtx = recCanvas.getContext('2d');
+  function resizeRec(){ const dpr=Math.max(1, window.devicePixelRatio||1); const rect=stageWrap.getBoundingClientRect(); recCanvas.width=Math.floor(rect.width*dpr); recCanvas.height=Math.floor(rect.height*dpr); recCtx.setTransform(1,0,0,1,0,0); }
+  resizeRec(); window.addEventListener('resize', resizeRec);
+
   let mediaRecorder = null, chunks = [];
-  function startCapture() {
-    try { ensureAudio(); const streamV = stageWrap.captureStream(60); const dest = audioCtx.createMediaStreamDestination(); masterGain.node.connect(dest); const mixed = new MediaStream([...streamV.getVideoTracks(), ...dest.stream.getAudioTracks()]); mediaRecorder = new MediaRecorder(mixed, { mimeType: 'video/webm;codecs=vp9,opus' }); chunks = []; mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); }; mediaRecorder.onstop = () => { const blob = new Blob(chunks, {type:'video/webm'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'music-painter.webm'; a.click(); setTimeout(()=>URL.revokeObjectURL(url), 2000); }; mediaRecorder.start(); }
-    catch (err) { alert('Capture failed: ' + err.message); }
+  function startRecord(){
+    try {
+      ensureAudio(); resizeRec();
+      const streamV = recCanvas.captureStream(60);
+      const dest = audioCtx.createMediaStreamDestination();
+      masterGain.node.connect(dest);
+      const mixed = new MediaStream([...streamV.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+      mediaRecorder = new MediaRecorder(mixed, { mimeType: 'video/webm;codecs=vp9,opus' });
+      chunks = [];
+      mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, {type:'video/webm'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'music-painter.webm'; a.click();
+        setTimeout(()=>URL.revokeObjectURL(url), 2000);
+      };
+      mediaRecorder.start();
+      isRecording = true;
+    } catch (err) { alert('Capture failed: ' + err.message); }
   }
-  function stopCapture() { if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); }
-  document.getElementById('btnStartCapture').addEventListener('click', startCapture);
-  document.getElementById('btnStopCapture').addEventListener('click', stopCapture);
+  function stopRecord(){ if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); isRecording = false; }
+  document.getElementById('btnRecord').addEventListener('click', startRecord);
+  document.getElementById('btnStopRec').addEventListener('click', stopRecord);
+  document.getElementById('btnScreenshot').addEventListener('click', savePNG);
 
   // Palette presets
   paletteSel.addEventListener('change', () => {
     monoMode = false;
     const p = paletteSel.value;
     if (p === 'ocean'){
-      colorPick.value = '#1de2ff'; satRange.value='90'; lightRange.value='60'; colorModeSel.value='offset'; hueOffset.value='-40';
+      colorPick.value = '#1de2ff'; satRange.value='90'; lightRange.value='60'; colorModeSel.value='offset'; hueOffset.value='-40'; brushTypeSel.value='line';
     } else if (p === 'sunset'){
-      colorPick.value='#ff7a18'; satRange.value='95'; lightRange.value='58'; colorModeSel.value='offset'; hueOffset.value='20';
+      colorPick.value='#ff7a18'; satRange.value='95'; lightRange.value='58'; colorModeSel.value='offset'; hueOffset.value='20'; brushTypeSel.value='line';
     } else if (p === 'neon'){
-      colorPick.value='#00ffd5'; satRange.value='100'; lightRange.value='65'; colorModeSel.value='vel';
+      colorPick.value='#00fff0'; satRange.value='100'; lightRange.value='65'; colorModeSel.value='vel'; brushTypeSel.value='glow';
     } else if (p === 'mono'){
-      monoMode = true; colorPick.value='#9ca3af'; satRange.value='0'; lightRange.value='60'; colorModeSel.value='fixed';
+      monoMode = true; colorPick.value='#9ca3af'; satRange.value='0'; lightRange.value='60'; colorModeSel.value='fixed'; brushTypeSel.value='line';
     } else { // reset defaults
-      colorPick.value='#7c3aed'; colorModeSel.value='auto'; hueOffset.value='0'; satRange.value='85'; lightRange.value='60';
+      colorPick.value='#7c3aed'; colorModeSel.value='auto'; hueOffset.value='0'; satRange.value='85'; lightRange.value='60'; brushTypeSel.value='line';
     }
-    // update readouts
     satVal.textContent=satRange.value; lightVal.textContent=lightRange.value; hueOffsetVal.textContent=hueOffset.value;
   });
 
