@@ -723,89 +723,103 @@
       mem={ x:mem.x*(1-alpha)+target.x*alpha, y:mem.y*(1-alpha)+target.y*alpha };
       const m2=Math.hypot(mem.x,mem.y)||1; V={x:mem.x/m2,y:mem.y/m2};
     } else { // balanced
-      const nb=Math.hypot(Vb.x,Vb.y)||1, nh=Math.hypot(Vh.x,Vh.y)||1;
-      const Bb={x:Vb.x/nb,y:Vb.y/nb}, Hh={x:Vh.x/nh,y:Vh.y/nh};
-      const t=0.35; V={x:Bb.x*(1-t)+Hh.x*t, y:Bb.y*(1-t)+Hh.y*t}; const m=Math.hypot(V.x,V.y)||1; V.x/=m; V.y/=m;
+      const nb = Math.hypot(Vb.x, Vb.y) || 1;
+      const nh = Math.hypot(Vh.x, Vh.y) || 1;
+      const Bb = { x: Vb.x/nb, y: Vb.y/nb };
+      const Hh = { x: Vh.x/nh, y: Vh.y/nh };
+      const t = 0.35; // blend
+      V = { x: Bb.x*(1-t) + Hh.x*t, y: Bb.y*(1-t) + Hh.y*t };
+      const m = Math.hypot(V.x, V.y) || 1; V.x /= m; V.y /= m;
     }
 
-    const cons = chordConsonance(act);
-    const baseSc = scatterRange.valueAsNumber + mpeScatter + drumInfluence.scatter;
+    // Scatter & gravity
+    const cons = chordConsonance(actNotes);
+    const baseSc = scatterRange.valueAsNumber + mpeScatter;
     const scatterEff = baseSc * (1 - cons * parseFloat(consBias.value));
-
-    const gRaw = parseFloat(gravity.value) + drumInfluence.center;
-    const gEff = Math.pow(Math.min(1,gRaw),1.8) * 0.45;
-    if (gEff>0){
-      const gx=(stageSize.cx-pen.x), gy=(stageSize.cy-pen.y), gm=Math.hypot(gx,gy)||1;
+    const gEff = Math.pow(parseFloat(gravity.value), 1.8) * 0.45;
+    if (gEff > 0) {
+      const gx = (stageSize.cx - pen.x), gy = (stageSize.cy - pen.y), gm = Math.hypot(gx, gy) || 1;
       V.x = V.x*(1-gEff) + (gx/gm)*gEff;
       V.y = V.y*(1-gEff) + (gy/gm)*gEff;
     }
-    if (Math.abs(drumInfluence.ybias)>0.0001) V.y += drumInfluence.ybias;
 
-    const mV=Math.hypot(V.x,V.y)||1; V.x/=mV; V.y/=mV;
+    // Draw continuously while notes are held
+    if (weightSum > 0) {
+      pen.px = pen.x; pen.py = pen.y;
+      const jitter = () => (Math.random() - 0.5) * scatterEff;
+      const mag = 1 + weightSum * 1.1;
+      pen.x += (V.x * mag + jitter());
+      pen.y += (V.y * mag + jitter());
 
-    if (weight>0){
-      pen.px=pen.x; pen.py=pen.y;
-      const jitter=()=> (Math.random()-0.5)*scatterEff;
-      const mag = 1 + weight*1.1;
-      pen.x += (V.x*mag + jitter());
-      pen.y += (V.y*mag + jitter());
+      // Wrap edges
+      const rect = stageWrap.getBoundingClientRect();
+      if (pen.x < 0) { pen.x += rect.width;  pen.px = pen.x; }
+      if (pen.y < 0) { pen.y += rect.height; pen.py = pen.y; }
+      if (pen.x > rect.width)  { pen.x -= rect.width;  pen.px = pen.x; }
+      if (pen.y > rect.height) { pen.y -= rect.height; pen.py = pen.y; }
 
-      const rect=stageWrap.getBoundingClientRect();
-      if (pen.x<0){ pen.x+=rect.width; pen.px=pen.x; }
-      if (pen.y<0){ pen.y+=rect.height; pen.py=pen.y; }
-      if (pen.x>rect.width){ pen.x-=rect.width; pen.px=pen.x; }
-      if (pen.y>rect.height){ pen.y-=rect.height; pen.py=pen.y; }
-
-      let hueAuto=((hueNum/Math.max(0.0001,weight))%360+360)%360;
-      let sat=parseInt(satRange.value,10), light=parseInt(lightRange.value,10);
-      if (paletteSel.value==='mono'){ const avgPc=act.reduce((a,b)=>a+((b%12+12)%12),0)/Math.max(1,act.length); light=Math.round(25+(avgPc/11)*55); sat=0; }
-      const hue=computeHue(hueAuto, velAvg);
-      const width = 1 + (brushScale.valueAsNumber * (1 + weight*6)) * (1 + (pressure*0.7));
+      // Colour & width
+      let hueAuto = ((hueNum / Math.max(0.0001, weightSum)) % 360 + 360) % 360;
+      let sat = parseInt(satRange.value, 10);
+      let light = parseInt(lightRange.value, 10);
+      if (monoMode) {
+        const avgPc = actNotes.reduce((a,b)=>a+pc(b),0) / Math.max(1, actNotes.length);
+        light = Math.round(25 + (avgPc/11) * 55); sat = 0;
+      }
+      const hue = computeHue(hueAuto, velAvg);
+      const width = 1 + (brushScale.valueAsNumber * (1 + weightSum*6)) * (1 + (pressure*0.7));
       const alpha = Math.min(1, 0.9);
 
       const ctx = layers[activeLayer].ctx;
       drawSymmetry(ctx, pen.px, pen.py, pen.x, pen.y, width, hue.toFixed(1), sat, light, alpha);
     }
 
-    drawEffects(dt);
+    // If recording, composite current frame to the recording canvas
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      compositeTo(recCtx);
+    }
 
-    if (isRecording && recCtx) { compositeTo(recCtx); }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
 
-  // ===== Keyboard mapping (piano + pads) =====
+  // --- Computer keyboard mapping (piano) ---
   const KEY_LAYOUT = { 'a':60,'w':61,'s':62,'e':63,'d':64,'f':65,'t':66,'g':67,'y':68,'h':69,'u':70,'j':71,'k':72 };
-  const KEY_DRUMS_NOTE = { '1':40,'2':41,'3':42,'4':43,'5':36,'6':37,'7':38,'8':39 };
-  const downKeys=new Set();
+  const downKeys = new Set();
 
-  window.addEventListener('keydown',(e)=>{
-    const raw=e.key; const k=raw.length===1? raw.toLowerCase() : raw;
-    if (raw==='Shift'){ shiftErase=true; updateEraser(); e.preventDefault(); return; }
-    if (k==='n'){ createLayer(); e.preventDefault(); return; }
-    if (k==='c'){ clearLayer(); e.preventDefault(); return; }
-
-    if (KEY_DRUMS_NOTE[k]!==undefined && !downKeys.has(k)){
-      downKeys.add(k); const n=KEY_DRUMS_NOTE[k]; const type=PAD_TO_TYPE[n]; triggerPad(type,115); return;
-    }
-    const note=KEY_LAYOUT[k];
-    if (note!==undefined && !downKeys.has(k)){ downKeys.add(k); noteOn(note,110,'keys'); }
+  window.addEventListener('keydown', (e) => {
+    const raw = e.key;
+    const k = raw.length === 1 ? raw.toLowerCase() : raw;
+    if (raw === 'Shift') { erasing = true; btnEraser.textContent = 'Eraser: On'; e.preventDefault(); return; }
+    if (k === 'n') { createLayer(); e.preventDefault(); return; }
+    if (k === 'c') { clearLayer();  e.preventDefault(); return; }
+    const note = KEY_LAYOUT[k];
+    if (note !== undefined && !downKeys.has(k)) { downKeys.add(k); noteOn(note, 110, 'keys'); }
   });
-  window.addEventListener('keyup',(e)=>{
-    const raw=e.key; const k=raw.length===1? raw.toLowerCase() : raw;
-    if (raw==='Shift'){ shiftErase=false; updateEraser(); return; }
-    if (KEY_DRUMS_NOTE[k]!==undefined){ downKeys.delete(k); return; }
-    const note=KEY_LAYOUT[k]; if (note!==undefined){ downKeys.delete(k); noteOff(note); }
+  window.addEventListener('keyup', (e) => {
+    const raw = e.key;
+    const k = raw.length === 1 ? raw.toLowerCase() : raw;
+    if (raw === 'Shift') { erasing = false; btnEraser.textContent = 'Eraser: Off'; return; }
+    const note = KEY_LAYOUT[k];
+    if (note !== undefined) { downKeys.delete(k); noteOff(note); }
   });
 
-  stageWrap.addEventListener('pointerdown',()=>{ ensureAudio(); if (audioCtx) audioCtx.resume(); });
+  // Kick audio awake on first pointer (browser policy)
+  stageWrap.addEventListener('pointerdown', () => { ensureAudio(); if (audioCtx && audioCtx.state !== 'running') audioCtx.resume(); });
 
-  // ===== Capture (composited → WebM) + screenshot =====
-  const recCanvas=document.createElement('canvas'); let recCtx=recCanvas.getContext('2d');
-  function resizeRec(){ const dpr=Math.max(1,window.devicePixelRatio||1); const r=stageWrap.getBoundingClientRect(); recCanvas.width=Math.floor(r.width*dpr); recCanvas.height=Math.floor(r.height*dpr); recCtx.setTransform(1,0,0,1,0,0); }
-  resizeRec(); window.addEventListener('resize', resizeRec);
+  // --- Capture (WebM) + Screenshot ---
+  const recCanvas = document.createElement('canvas');
+  const recCtx = recCanvas.getContext('2d');
+  function resizeRec(){
+    const dpr = Math.max(1, window.devicePixelRatio||1);
+    const r = stageWrap.getBoundingClientRect();
+    recCanvas.width  = Math.floor(r.width * dpr);
+    recCanvas.height = Math.floor(r.height * dpr);
+    recCtx.setTransform(1,0,0,1,0,0);
+  }
+  window.addEventListener('resize', resizeRec); resizeRec();
 
-  let mediaRecorder=null, chunks=[];
+  let mediaRecorder = null, chunks = [];
   function startRecord(){
     try{
       ensureAudio(); resizeRec();
@@ -814,81 +828,65 @@
       const dest = audioCtx.createMediaStreamDestination();
       masterGain.node.connect(dest);
       const mixed = new MediaStream([...streamV.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-      mediaRecorder = new MediaRecorder(mixed, { mimeType:'video/webm;codecs=vp9,opus' });
-      chunks=[];
+      mediaRecorder = new MediaRecorder(mixed, { mimeType: 'video/webm;codecs=vp9,opus' });
+      chunks = [];
       mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunks, {type:'video/webm'});
         const url = URL.createObjectURL(blob);
-        const a=document.createElement('a'); a.href=url; a.download='music-painter.webm'; a.click();
+        const a = document.createElement('a'); a.href = url; a.download = 'music-painter.webm'; a.click();
         setTimeout(()=>URL.revokeObjectURL(url), 1500);
-        recBadge.style.display='none'; btnRecord.disabled=false; btnRecord.textContent='Record'; btnRecord.classList.add('primary'); btnRecord.classList.remove('danger'); btnStopRec.disabled=true;
+        recBadge.style.display='none'; btnRecord.disabled=false; btnRecord.textContent='Record'; btnStopRec.disabled=true;
       };
       mediaRecorder.start();
-      isRecording=true; recBadge.style.display='inline-block'; btnRecord.disabled=true; btnRecord.textContent='Recording…'; btnRecord.classList.remove('primary'); btnRecord.classList.add('danger'); btnStopRec.disabled=false;
-    }catch(err){ alert('Capture failed: '+err.message); }
+      recBadge.style.display='inline-block'; btnRecord.disabled=true; btnRecord.textContent='Recording…'; btnStopRec.disabled=false;
+    } catch (err) { alert('Capture failed: ' + err.message); }
   }
-  function stopRecord(){ if (mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop(); isRecording=false; }
+  function stopRecord(){ if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); }
   document.getElementById('btnRecord').addEventListener('click', startRecord);
   document.getElementById('btnStopRec').addEventListener('click', stopRecord);
   document.getElementById('btnScreenshot').addEventListener('click', savePNG);
 
-  // ===== Help popovers =====
+  // --- Keys popover ---
   function renderKeysPop(){
-    const KB_ROWS=[ ['1','2','3','4','5','6','7','8','9','0'], ['Q','W','E','R','T','Y','U','I','O','P'], ['A','S','D','F','G','H','J','K','L'], ['Z','X','C','V','B','N','M'] ];
-    const cells = KB_ROWS.map(row=>{
-      return `<div class="kb-row">` + row.map(k=>{
-        const kl=k.toLowerCase(); const n=KEY_LAYOUT[kl]; const pad=KEY_DRUMS_NOTE[k];
-        const mapped = (n!==undefined) || (pad!==undefined);
-        const sharp = (n!==undefined) && (['C#','D#','F#','G#','A#'].some(s=> (['C#','D#','F#','G#','A#'].includes(s)) && (['C#','D#','F#','G#','A#'].indexOf(s)>=0) ) ) ? false : (n!==undefined && ['1','3','6','8','10'].includes(String(n%12))) ; // harmless, visual only
-        const title = pad!==undefined ? `${k} → Pad ${pad}` : (n!==undefined ? `${k} → ${midiNoteName(n)}` : `${k} (not mapped)`);
-        const line2 = pad!==undefined ? `<span class="note">Pad ${pad}</span>` : (n!==undefined ? `<span class="note">${midiNoteName(n)}</span>` : '');
-        return `<div class="keycap${mapped?' mapped':''}${sharp?' sharp':''}" title="${title}"><span class="label">${k}</span>${line2}</div>`;
-      }).join('') + `</div>`;
-    }).join('');
-    keysPop.innerHTML = `<div style="margin-bottom:6px"><strong>Computer keyboard</strong></div><div class="keys-grid">${cells}</div><div class="muted" style="margin-top:6px">Shortcuts: <span class="kbd">Shift</span> hold eraser • <span class="kbd">N</span> new layer • <span class="kbd">C</span> clear layer</div>`;
-    const barRect=document.querySelector('.topbar').getBoundingClientRect(); const btnRect=btnKeys.getBoundingClientRect();
-    keysPop.style.left=(btnRect.left - barRect.left)+'px'; keysPop.style.display='block';
+    const rows = [
+      ['Q','W','E','R','T','Y','U','I','O','P'],
+      ['A','S','D','F','G','H','J','K','L'],
+      ['Z','X','C','V','B','N','M']
+    ];
+    const html = rows.map(r =>
+      `<div class="kb-row">` + r.map(k => {
+        const kl = k.toLowerCase(); const n = KEY_LAYOUT[kl]; const mapped = (n !== undefined);
+        const title = mapped ? `${k} → ${midiNoteName(n)}` : `${k} (not mapped)`;
+        const line2 = mapped ? `<span class="note">${midiNoteName(n)}</span>` : '';
+        return `<div class="keycap${mapped?' mapped':''}" title="${title}"><span class="label">${k}</span>${line2}</div>`;
+      }).join('') + `</div>`
+    ).join('');
+    keysPop.innerHTML = `<div style="margin-bottom:6px"><strong>Computer keyboard</strong></div><div class="keys-grid">${html}</div><div class="muted" style="margin-top:6px">Shortcuts: <span class="kbd">Shift</span> hold eraser • <span class="kbd">N</span> new layer • <span class="kbd">C</span> clear layer</div>`;
+    keysPop.style.display='block';
   }
-  btnKeys.addEventListener('click',(e)=>{ e.stopPropagation(); keysPop.style.display = keysPop.style.display==='block' ? 'none' : 'block'; if (keysPop.style.display==='block') renderKeysPop(); });
-  document.addEventListener('click',(e)=>{ if (!keysPop.contains(e.target) && e.target!==btnKeys) keysPop.style.display='none'; });
+  btnKeys.addEventListener('click', (e) => { e.stopPropagation(); keysPop.style.display = keysPop.style.display==='block' ? 'none' : 'block'; if (keysPop.style.display==='block') renderKeysPop(); });
+  document.addEventListener('click', (e) => { if (!keysPop.contains(e.target) && e.target !== btnKeys) keysPop.style.display='none'; });
 
-  function renderFlowPop(){
-    flowPop.innerHTML = `<div style='margin-bottom:6px'><strong>Flow modes</strong></div>
-      <div><b>Balanced</b>: mix of melodic path + harmonic pull.</div>
-      <div><b>Harmonic</b>: follows chord shapes; consonant intervals steer straighter.</div>
-      <div><b>Melodic Memory</b>: continues the direction of your phrase.</div>
-      <hr style='border-color:#263142'>
-      <div><b>Smoothness</b>: higher = longer arcs.</div>
-      <div><b>Consonance Bias</b>: higher = less jitter when notes fit together.</div>`;
-    const secRect=document.getElementById('secFlow').getBoundingClientRect();
-    const btnRect=btnFlowHelp.getBoundingClientRect();
-    flowPop.style.left=(btnRect.left - secRect.left)+'px';
-    flowPop.style.display='block';
+  // --- Palette presets (neon & mono) ---
+  function paletteDefaults(){
+    colorPick.value='#7c3aed'; colorModeSel.value='auto';
+    hueOffset.value='0'; satRange.value='85'; lightRange.value='60'; monoMode=false;
+    satVal.textContent=satRange.value; lightVal.textContent=lightRange.value; hueOffsetVal.textContent=hueOffset.value;
   }
-  btnFlowHelp.addEventListener('click',(e)=>{ e.stopPropagation(); flowPop.style.display = flowPop.style.display==='block' ? 'none' : 'block'; if (flowPop.style.display==='block') renderFlowPop(); });
-  document.addEventListener('click',(e)=>{ if (!flowPop.contains(e.target) && e.target!==btnFlowHelp) flowPop.style.display='none'; });
-
-  // ===== Init =====
-  const paletteDefaults = ()=>{ colorPick.value='#7c3aed'; colorModeSel.value='auto'; hueOffset.value='0'; satRange.value='85'; lightRange.value='60'; brushTypeSel.value='line'; satVal.textContent=satRange.value; lightVal.textContent=lightRange.value; hueOffsetVal.textContent=hueOffset.value; };
-  paletteSel.addEventListener('change',()=>{
-    const p=paletteSel.value;
-    if (p==='ocean'){ colorPick.value='#1de2ff'; satRange.value='90'; lightRange.value='60'; colorModeSel.value='offset'; hueOffset.value='-40'; brushTypeSel.value='line'; }
-    else if (p==='sunset'){ colorPick.value='#ff7a18'; satRange.value='95'; lightRange.value='58'; colorModeSel.value='offset'; hueOffset.value='20'; brushTypeSel.value='line'; }
-    else if (p==='neon'){ colorPick.value='#00fff0'; satRange.value='100'; lightRange.value='65'; colorModeSel.value='vel'; brushTypeSel.value='glow'; }
-    else if (p==='mono'){ colorPick.value='#9ca3af'; satRange.value='0'; lightRange.value='60'; colorModeSel.value='fixed'; brushTypeSel.value='line'; }
+  paletteSel.addEventListener('change', ()=>{
+    const p = paletteSel.value;
+    if (p==='ocean'){ colorPick.value='#1de2ff'; satRange.value='90'; lightRange.value='60'; colorModeSel.value='offset'; hueOffset.value='-40'; monoMode=false; }
+    else if (p==='sunset'){ colorPick.value='#ff7a18'; satRange.value='95'; lightRange.value='58'; colorModeSel.value='offset'; hueOffset.value='20'; monoMode=false; }
+    else if (p==='neon'){ colorPick.value='#00fff0'; satRange.value='100'; lightRange.value='65'; colorModeSel.value='vel'; monoMode=false; }
+    else if (p==='mono'){ colorPick.value='#9ca3af'; satRange.value='0'; lightRange.value='60'; colorModeSel.value='fixed'; monoMode=true; }
     else { paletteDefaults(); }
     satVal.textContent=satRange.value; lightVal.textContent=lightRange.value; hueOffsetVal.textContent=hueOffset.value;
   });
 
-  function resizeAllAndCenter(){ resizeAll(); centerPen(); }
-  function centerPen(){ const r=stageWrap.getBoundingClientRect(); pen.x=r.width/2; pen.y=r.height/2; pen.px=pen.x; pen.py=pen.y; }
-  resizeAllAndCenter();
-
-  // ===== Utility =====
-  function midiNoteName(n){ const names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; return names[n%12] + (Math.floor(n/12)-1); }
+  // First sizing + center pen
+  resizeAll(); centerPen();
 
 })();</script>
 </body>
 </html>
-<!-- ----- end 2----- -->
