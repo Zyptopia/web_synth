@@ -26,6 +26,7 @@
 
     #stageWrap { position: relative; background: radial-gradient(1200px 1200px at 80% -10%, rgba(76, 201, 240, .08), transparent 60%), radial-gradient(1000px 800px at 20% 110%, rgba(168, 85, 247, .06), transparent 60%); overflow: hidden; }
     .layerCanvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+    #fxCanvas { position:absolute; inset:0; display:block; width:100%; height:100%; pointer-events:none; z-index:10; }
     footer.tip { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.08); padding: 6px 10px; border-radius: 10px; font-size: 12px; pointer-events: none; }
 
     .dock { background: var(--panel); border-top: 1px solid var(--panelEdge); padding: 6px 8px; }
@@ -56,23 +57,23 @@
     .tab.active { background: #17233a; color: var(--text); border-color: #2a3b52; }
     .value { font-size: 12px; color: var(--muted); width:40px; text-align:right; }
 
-    /* Keys visual layout */
-.keys-grid{ display:inline-block; padding:6px; }
-.kb-row{ display:flex; gap:6px; margin:4px 0; }
-.keycap{
-  min-width:28px; padding:6px 8px; border-radius:6px;
-  background:#0c1423; border:1px solid #243349;
-  text-align:center; line-height:1;
-}
-.keycap .label{ font-weight:700; font-size:12px; color:var(--text); }
-.keycap .note{ display:block; font-size:11px; color:#9fb3d1; margin-top:2px; }
-.keycap.mapped{ background:#17233a; border-color:#2a3b52; }
-.keycap.sharp .note{ color:#ffd166; }  /* colour for C# / D# etc. */
-
     /* Popovers/help */
-    .popover { position:absolute; top:100%; left:12px; margin-top:6px; background:#0e1626; border:1px solid #263142; border-radius:8px; padding:8px 10px; font-size:12px; color:var(--muted); z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,.35); max-width:420px; display:none; }
+    .popover { position:absolute; top:100%; left:12px; margin-top:6px; background:#0e1626; border:1px solid #263142; border-radius:8px; padding:8px 10px; font-size:12px; color:var(--muted); z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,.35); max-width:520px; display:none; }
     .popover.small{ max-width:360px; }
     .popover .kbd{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#0c1423; padding:2px 6px; border-radius:6px; border:1px solid #243349; color:var(--text); }
+
+    /* Keys visual layout */
+    .keys-grid{ display:inline-block; padding:6px; }
+    .kb-row{ display:flex; gap:6px; margin:4px 0; }
+    .keycap{
+      min-width:28px; padding:6px 8px; border-radius:6px;
+      background:#0c1423; border:1px solid #243349;
+      text-align:center; line-height:1;
+    }
+    .keycap .label{ font-weight:700; font-size:12px; color:var(--text); }
+    .keycap .note{ display:block; font-size:11px; color:#9fb3d1; margin-top:2px; }
+    .keycap.mapped{ background:#17233a; border-color:#2a3b52; }
+    .keycap.sharp .note{ color:#ffd166; }
   </style>
 </head>
 <body>
@@ -93,7 +94,8 @@
 
     <!-- Stage -->
     <div id="stageWrap">
-      <footer class="tip">Tip: Consonant intervals (3rds, 5ths) smooth curves • Pitch-bend rotates flow • Hold <b>Shift</b> = eraser • Sustain pedal = eraser</footer>
+      <canvas id="fxCanvas"></canvas>
+      <footer class="tip">Tip: Consonant intervals smooth curves • Pitch-bend rotates flow • Hold <b>Shift</b> = eraser • Sustain pedal = eraser</footer>
     </div>
 
     <!-- Bottom dock (controls) -->
@@ -271,18 +273,24 @@
       </div>
     </div>
   </div>
-
+<!-- ----- end 1----- -->
 <!-- ----- start 2 ----- -->
 <script>
 (() => {
   // ----- DOM refs -----
   const stageWrap = document.getElementById('stageWrap');
+
   // base (frozen) canvas behind layers so old art isn't affected by new fades
   const baseCanvas = document.createElement('canvas');
   baseCanvas.className = 'layerCanvas';
   baseCanvas.style.zIndex = 0;
   stageWrap.prepend(baseCanvas);
   const baseCtx = baseCanvas.getContext('2d');
+
+  // FX overlay canvas (for drum bursts etc.)
+  const fxCanvas = document.getElementById('fxCanvas');
+  const fxCtx = fxCanvas.getContext('2d');
+
   function resizeBase(){
     const dpr=Math.max(1, window.devicePixelRatio||1);
     const rect=stageWrap.getBoundingClientRect();
@@ -295,6 +303,15 @@
     baseCtx.setTransform(dpr,0,0,dpr,0,0);
     try{ baseCtx.drawImage(prev,0,0, prev.width, prev.height, 0,0, baseCanvas.width, baseCanvas.height);}catch{}
   }
+  function resizeFx(){
+    const dpr=Math.max(1, window.devicePixelRatio||1);
+    const rect=stageWrap.getBoundingClientRect();
+    fxCanvas.width=Math.floor(rect.width*dpr);
+    fxCanvas.height=Math.floor(rect.height*dpr);
+    fxCanvas.style.width=rect.width+'px'; fxCanvas.style.height=rect.height+'px';
+    fxCtx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
   const tabsEl = document.getElementById('tabs');
   const dockEl = document.getElementById('dock');
 
@@ -311,7 +328,8 @@
   const btnFlowHelp = document.getElementById('btnFlowHelp');
   const flowPop = document.getElementById('flowPop');
   const btnPanic = document.getElementById('btnPanic');
-  const midiInputsSel = (()=>{ const sel=document.createElement('select'); sel.style.display='none'; document.body.appendChild(sel); return sel; })(); // hidden, we auto-pick first
+
+  const midiInputsSel = (()=>{ const sel=document.createElement('select'); sel.style.display='none'; document.body.appendChild(sel); return sel; })(); // hidden auto-pick
 
   const btnAddLayer = document.getElementById('btnAddLayer');
   const btnDeleteLayer = document.getElementById('btnDeleteLayer');
@@ -398,17 +416,15 @@
   // freeze old art when fade settings change so past strokes stay unchanged
   trailRange.addEventListener('change', freezeArtwork);
   silenceFade.addEventListener('change', freezeArtwork);
-  // also freeze as the sliders move so past work isn't affected
   let lastTrail = parseFloat(trailRange.value), lastSilence = parseFloat(silenceFade.value);
   trailRange.addEventListener('input', ()=>{ const v=parseFloat(trailRange.value); if (v!==lastTrail){ freezeArtwork(); lastTrail=v; } });
   silenceFade.addEventListener('input', ()=>{ const v=parseFloat(silenceFade.value); if (v!==lastSilence){ freezeArtwork(); lastSilence=v; } });
-  // record UI initial state
   if (btnStopRec) btnStopRec.disabled = true;
 
   // --- Audio ---
   let audioCtx = null;
   let closedByPanic = false;
-  const masterGain = { node: null, level: 0.2 };
+  const masterGain = { node: null, level: 0.22 };
   let analyser = null, fft = null;
 
   function ensureAudio() {
@@ -429,7 +445,121 @@
 
   btnStartAudio.addEventListener('click', async () => { ensureAudio(); if (audioCtx.state !== 'running') await audioCtx.resume(); });
 
-  // --- Voice management (saturating hold; watchdog; hard panic) ---
+  // ---- DRUM SYNTHS ----
+  function envGain(t0, a=0.001, d=0.15){ const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(1.0, t0 + a); g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d); return g; }
+  function mkNoiseBuffer(){ const len = audioCtx.sampleRate * 2; const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate); const d = buf.getChannelData(0); for (let i=0;i<len;i++) d[i] = Math.random()*2-1; return buf; }
+  let noiseBuf=null; function getNoise(){ if(!noiseBuf) noiseBuf = mkNoiseBuffer(); return noiseBuf; }
+
+  function playKick(vel=100){
+    ensureAudio();
+    const t = audioCtx.currentTime;
+    const v = Math.max(0.0001, vel/127);
+    const osc = audioCtx.createOscillator(); osc.type='sine';
+    const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001,t);
+    osc.frequency.setValueAtTime(120 + 60*v, t);
+    osc.frequency.exponentialRampToValueAtTime(50, t + 0.18);
+    g.gain.exponentialRampToValueAtTime(1.2*v, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    osc.connect(g).connect(masterGain.node); osc.start(t); osc.stop(t+0.25);
+  }
+
+  function playSnare(vel=100){
+    ensureAudio();
+    const t=audioCtx.currentTime;
+    const v = vel/127;
+    const nsrc = audioCtx.createBufferSource(); nsrc.buffer = getNoise();
+    const bpf = audioCtx.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value = 1800; bpf.Q.value = 0.8;
+    const hg = envGain(t, 0.001, 0.18); hg.gain.value = 0.5 + v*0.8;
+    nsrc.connect(bpf).connect(hg).connect(masterGain.node);
+    const tone = audioCtx.createOscillator(); tone.type='triangle'; tone.frequency.setValueAtTime(190, t); tone.frequency.exponentialRampToValueAtTime(150, t+0.1);
+    const tg = envGain(t, 0.001, 0.11); tg.gain.value = 0.2 + v*0.5;
+    tone.connect(tg).connect(masterGain.node);
+    nsrc.start(t); nsrc.stop(t+0.22); tone.start(t); tone.stop(t+0.16);
+  }
+
+  function playHat(vel=100, open=false){
+    ensureAudio();
+    const t=audioCtx.currentTime; const v = vel/127;
+    const nsrc = audioCtx.createBufferSource(); nsrc.buffer = getNoise();
+    const hpf = audioCtx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value = 6000; hpf.Q.value = 0.7;
+    const dur = open ? 0.5 : 0.07;
+    const g = envGain(t, 0.0005, dur); g.gain.value = (open?0.35:0.25) + v*0.4;
+    nsrc.connect(hpf).connect(g).connect(masterGain.node);
+    nsrc.start(t); nsrc.stop(t+dur+0.05);
+  }
+
+  function playTom(vel=100){
+    ensureAudio();
+    const t=audioCtx.currentTime; const v=vel/127;
+    const osc = audioCtx.createOscillator(); osc.type='sine';
+    const g = envGain(t, 0.001, 0.25); g.gain.value = 0.9*v;
+    osc.frequency.setValueAtTime(180, t);
+    osc.frequency.exponentialRampToValueAtTime(110, t+0.25);
+    osc.connect(g).connect(masterGain.node); osc.start(t); osc.stop(t+0.3);
+  }
+
+  function playCrash(vel=100){
+    ensureAudio();
+    const t=audioCtx.currentTime; const v=vel/127;
+    const nsrc = audioCtx.createBufferSource(); nsrc.buffer = getNoise();
+    const hpf = audioCtx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value = 2000; hpf.Q.value = 0.6;
+    const g = envGain(t, 0.001, 1.0); g.gain.value = 0.4 + v*0.7;
+    nsrc.connect(hpf).connect(g).connect(masterGain.node);
+    nsrc.start(t); nsrc.stop(t+1.1);
+  }
+
+  // ---- DRUM FX (visual) ----
+  const effects = [];
+  function fxKick(x,y,vel){ effects.push({type:'ring', x, y, r:8, a:0.9*(vel/127), grow:2.8, fade:0.015}); }
+  function fxSnare(x,y,vel){ const n=24; for(let i=0;i<n;i++){ const ang=(i/n)*Math.PI*2; const sp=2+Math.random()*3; effects.push({type:'spark', x,y, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp, life:0.4, a:0.9*(vel/127)}); } }
+  function fxHat(x,y,vel,open){ const n=open?20:10; for(let i=0;i<n;i++){ const ang=Math.random()*Math.PI*2; const sp=open?(2+Math.random()*2):(1+Math.random()*1.5); effects.push({type:'glint', x,y, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp, life:open?0.35:0.12, a:0.7*(vel/127)}); } }
+  function fxTom(x,y,vel){ effects.push({type:'swoop', x, y, t:0, a:0.8*(vel/127)}); }
+  function fxCrash(x,y,vel){ effects.push({type:'splash', x,y, r:10, a:0.7*(vel/127), grow:3.0, fade:0.008}); }
+
+  function drawEffects(dt){
+    // gentle fade of FX canvas each frame
+    fxCtx.save();
+    fxCtx.globalCompositeOperation='destination-out';
+    fxCtx.fillStyle = `rgba(0,0,0,${0.12*dt*60})`;
+    fxCtx.fillRect(0,0,fxCanvas.width,fxCanvas.height);
+    fxCtx.restore();
+
+    effects.forEach((e, idx)=>{
+      if (e.type==='ring' || e.type==='splash'){
+        e.r += e.grow * (dt*60);
+        e.a -= e.fade * (dt*60);
+        if (e.a <= 0) { effects.splice(idx,1); return; }
+        fxCtx.save();
+        fxCtx.globalCompositeOperation='lighter';
+        fxCtx.strokeStyle=`hsla(200,100%,70%,${e.a})`;
+        fxCtx.lineWidth=3;
+        fxCtx.beginPath(); fxCtx.arc(e.x,e.y,e.r,0,Math.PI*2); fxCtx.stroke();
+        fxCtx.restore();
+      } else if (e.type==='spark' || e.type==='glint'){
+        e.x += e.vx * (dt*60);
+        e.y += e.vy * (dt*60);
+        e.life -= dt;
+        if (e.life <= 0) { effects.splice(idx,1); return; }
+        fxCtx.save();
+        fxCtx.globalCompositeOperation='lighter';
+        fxCtx.fillStyle=`hsla(45,100%,80%,${e.a})`;
+        fxCtx.fillRect(e.x-1, e.y-1, 2, 2);
+        fxCtx.restore();
+      } else if (e.type==='swoop'){
+        e.t += dt*3;
+        if (e.t >= 1){ effects.splice(idx,1); return; }
+        const yy = e.y + Math.sin(e.t*Math.PI)*60;
+        fxCtx.save();
+        fxCtx.globalCompositeOperation='lighter';
+        fxCtx.strokeStyle=`hsla(280,90%,70%,${e.a*(1-e.t)})`;
+        fxCtx.lineWidth=2;
+        fxCtx.beginPath(); fxCtx.moveTo(e.x-40, e.y); fxCtx.quadraticCurveTo(e.x, yy, e.x+40, e.y); fxCtx.stroke();
+        fxCtx.restore();
+      }
+    });
+  }
+
+  // --- Voice management (synth for pitched notes) ---
   const activeOsc = new Map(); // note -> {osc, g}
   const activeNotes = new Map(); // note -> {velocity, sustained, pressure}
   const held = new Set(); // currently held notes
@@ -514,10 +644,16 @@
   function setMIDIInput(input) { if (midiInput) midiInput.onmidimessage = null; midiInput = input; if (midiInput) { midiInput.onmidimessage = onMIDIMessage; midiStatus.textContent = 'MIDI: ' + (midiInput.name || 'connected'); } }
   btnConnectMIDI.addEventListener('click', connectMIDI);
 
+  // Drum mapping (GM-ish)
+  const PAD_MAP = { 36:'kick', 38:'snare', 42:'ch', 46:'oh', 45:'tom', 49:'crash' };
+
   function onMIDIMessage(e) {
     const [status, d1, d2] = e.data; const cmd = status & 0xF0;
-    if (cmd === 0x90) { if (d2 === 0) noteOff(d1); else noteOn(d1, d2, 'midi'); }
-    else if (cmd === 0x80) { noteOff(d1); }
+    if (cmd === 0x90) {
+      if (d2 === 0) { maybePadOff(d1); noteOff(d1); }
+      else { if (!maybePadOn(d1,d2)) noteOn(d1, d2, 'midi'); }
+    }
+    else if (cmd === 0x80) { maybePadOff(d1); noteOff(d1); }
     else if (cmd === 0xB0) {
       const cc = d1, val = d2;
       if (cc === 1) { const f = (val / 127); opacityRange.value = (0.05 + 0.95 * f).toFixed(2); opacityVal.textContent = Number(opacityRange.value).toFixed(2); }
@@ -530,9 +666,24 @@
     else if ((status & 0xF0) === 0xA0) { const note = d1; const amt = d2/127; const n = activeNotes.get(note); if (n) { n.pressure = amt; } }
   }
 
-  function noteOn(note, vel=100, source='live') { held.add(note); activeNotes.set(note, { velocity: vel, sustained:false, pressure: 0 }); startTone(note, vel); refreshNoteList(); }
-  function noteOff(note) { if (sustainDown) { const n = activeNotes.get(note); if (n) n.sustained = true; refreshNoteList(); return; } held.delete(note); activeNotes.delete(note); stopTone(note); refreshNoteList(); }
-  function flushSustained() { const toStop = []; activeNotes.forEach((val, key) => { if (val.sustained) toStop.push(key); }); toStop.forEach(k => { held.delete(k); activeNotes.delete(k); stopTone(k); }); refreshNoteList(); }
+  function maybePadOn(note, vel){
+    const type = PAD_MAP[note];
+    if (!type) return false;
+    triggerPad(type, vel);
+    return true; // handled as a pad (don’t steer pen)
+  }
+  function maybePadOff(/*note*/){ /*not needed for synth drums*/ }
+
+  // Trigger both sound + FX for a pad
+  function triggerPad(type, vel=110){
+    const center = { x: stageSize.cx, y: stageSize.cy };
+    if (type==='kick'){ playKick(vel); fxKick(center.x, center.y, vel); }
+    else if (type==='snare'){ playSnare(vel); fxSnare(center.x, center.y, vel); }
+    else if (type==='ch'){ playHat(vel,false); fxHat(center.x, center.y, vel,false); }
+    else if (type==='oh'){ playHat(vel,true); fxHat(center.x, center.y, vel,true); }
+    else if (type==='tom'){ playTom(vel); fxTom(center.x, center.y, vel); }
+    else if (type==='crash'){ playCrash(vel); fxCrash(center.x, center.y, vel); }
+  }
 
   function refreshNoteList() {
     noteList.innerHTML = '';
@@ -592,29 +743,27 @@
   blendSel.addEventListener('change', () => { layers[activeLayer].blend = blendSel.value; });
 
   // Resize
-  function resizeCanvas(c) { const dpr = Math.max(1, window.devicePixelRatio || 1); const rect = stageWrap.getBoundingClientRect(); c.width = Math.floor(rect.width * dpr); c.height = Math.floor(rect.height * dpr); c.style.width = rect.width + 'px'; c.style.height = rect.height + 'px'; const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
-  function resizeAll() { resizeBase(); layers.forEach(l => resizeCanvas(l.canvas)); updateCenter(); }
+  function resizeCanvas(c) {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const rect = stageWrap.getBoundingClientRect();
+    c.width = Math.floor(rect.width * dpr);
+    c.height = Math.floor(rect.height * dpr);
+    c.style.width = rect.width + 'px'; c.style.height = rect.height + 'px';
+    const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function resizeAll() { resizeBase(); resizeFx(); layers.forEach(l => resizeCanvas(l.canvas)); updateCenter(); }
   window.addEventListener('resize', resizeAll);
   createLayer();
 
   // Pen & flow
   const pen = { x: 0, y: 0, px: 0, py: 0 };
   let flowPhase = 0;
-// base (toggle) + momentary (Shift)
-let baseEraser = false, shiftErase = false;
-let erasing = false;
 
-function updateEraser(){
-  erasing = baseEraser || shiftErase;
-  btnEraser.textContent = `Eraser: ${erasing ? 'On' : 'Off'}`;
-}
-function toggleEraser(force=null){
-  if (force === null) baseEraser = !baseEraser;
-  else baseEraser = !!force;
-  updateEraser();
-}
-btnEraser.addEventListener('click', () => toggleEraser());
-
+  // Eraser: toggleable (button/sustain) + momentary (Shift)
+  let baseEraser = false, shiftErase = false, erasing = false;
+  function updateEraser(){ erasing = baseEraser || shiftErase; btnEraser.textContent = `Eraser: ${erasing ? 'On' : 'Off'}`; }
+  function toggleEraser(force=null) { if (force === null) baseEraser = !baseEraser; else baseEraser = !!force; updateEraser(); }
+  btnEraser.addEventListener('click', () => toggleEraser());
 
   function colorHexToHsl(hex) { const r = parseInt(hex.slice(1,3),16)/255; const g = parseInt(hex.slice(3,5),16)/255; const b = parseInt(hex.slice(5,7),16)/255; const max = Math.max(r,g,b), min = Math.min(r,g,b); let h,s,l=(max+min)/2; if(max===min){h=s=0;} else { const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min); switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;} h/=6; } return {h: h*360, s: s*100, l: l*100}; }
 
@@ -661,7 +810,6 @@ btnEraser.addEventListener('click', () => toggleEraser());
       ctx.lineWidth = width;
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     } else if (type === 'particles') {
-      // No base line — just a cloud of dots along the segment
       const dx = x2-x1, dy = y2-y1; const dist = Math.hypot(dx,dy) || 1; const steps = Math.max(1, Math.floor(dist / Math.max(1, width*0.8)));
       for (let i=0;i<=steps;i++){
         const t = i/steps; const bx = x1 + dx*t; const by = y1 + dy*t;
@@ -738,7 +886,7 @@ btnEraser.addEventListener('click', () => toggleEraser());
     const baseScatter = scatterRange.valueAsNumber + mpeScatter;
     const scatterEff = baseScatter * (1 - cons * parseFloat(consBias.value));
 
-    // Softer gravity curve: gentler and capped to avoid snapping
+    // Softer gravity curve
     const gRaw = parseFloat(gravity.value);
     const gEff = Math.pow(gRaw, 1.8) * 0.45;
     if (gEff > 0) {
@@ -766,9 +914,8 @@ btnEraser.addEventListener('click', () => toggleEraser());
       let sat = parseInt(satRange.value,10);
       let light = parseInt(lightRange.value,10);
       if (paletteSel.value === 'mono') {
-        // full grey spectrum: lightness varies with pitch class average
         const avgPc = actNotes.reduce((a,b)=>a+pc(b),0)/Math.max(1,actNotes.length);
-        light = Math.round(25 + (avgPc/11)*55); // 25..80
+        light = Math.round(25 + (avgPc/11)*55);
         sat = 0;
       }
       const hue = computeHue(hueAuto, velAvg);
@@ -779,6 +926,9 @@ btnEraser.addEventListener('click', () => toggleEraser());
       drawSymmetry(ctx, pen.px, pen.py, pen.x, pen.y, width, hue.toFixed(1), sat, light, alpha);
     }
 
+    // Draw drum FX overlay
+    drawEffects(dt);
+
     // Composite to recorder if active
     if (isRecording && recCtx) { compositeTo(recCtx); }
 
@@ -786,36 +936,32 @@ btnEraser.addEventListener('click', () => toggleEraser());
   }
   requestAnimationFrame(loop);
 
-  // Keyboard as fallback
+  // Keyboard mappings
   const KEY_LAYOUT = { 'a': 60, 'w': 61, 's': 62, 'e': 63, 'd': 64, 'f': 65, 't': 66, 'g': 67, 'y': 68, 'h': 69, 'u': 70, 'j': 71, 'k': 72 };
+  const KEY_DRUMS = { '1':'kick', '2':'snare', '3':'ch', '4':'oh', '5':'tom', '6':'crash' };
   const downKeys = new Set();
+
   window.addEventListener('keydown', (e) => {
-  const k = e.key.toLowerCase();
+    const raw = e.key; const k = raw.length===1 ? raw.toLowerCase() : raw;
+    if (raw === 'Shift') { shiftErase = true; updateEraser(); e.preventDefault(); return; }
+    if (k === 'n') { createLayer(); e.preventDefault(); return; }
+    if (k === 'c') { clearLayer(); e.preventDefault(); return; }
 
-  // Shift = momentary eraser (no conflict with notes)
-  if (e.key === 'Shift') { shiftErase = true; updateEraser(); e.preventDefault(); return; }
+    // Drum keys first
+    const pad = KEY_DRUMS[k];
+    if (pad && !downKeys.has(k)) { downKeys.add(k); triggerPad(pad, 115); return; }
 
-  if (k === 'n') { createLayer(); e.preventDefault(); return; }
-  if (k === 'c') { clearLayer(); e.preventDefault(); return; }
-
-  const note = KEY_LAYOUT[k];
-  if (note !== undefined && !downKeys.has(k)) {
-    downKeys.add(k);
-    noteOn(note, 110, 'keys');
-  }
-});
-
-window.addEventListener('keyup', (e) => {
-  const k = e.key.toLowerCase();
-
-  if (e.key === 'Shift') { shiftErase = false; updateEraser(); return; }
-
-  const note = KEY_LAYOUT[k];
-  if (note !== undefined) {
-    downKeys.delete(k);
-    noteOff(note);
-  }
-});
+    // Piano keys
+    const note = KEY_LAYOUT[k];
+    if (note !== undefined && !downKeys.has(k)) { downKeys.add(k); noteOn(note, 110, 'keys'); }
+  });
+  window.addEventListener('keyup', (e) => {
+    const raw = e.key; const k = raw.length===1 ? raw.toLowerCase() : raw;
+    if (raw === 'Shift') { shiftErase = false; updateEraser(); return; }
+    if (KEY_DRUMS[k]) { downKeys.delete(k); return; } // one-shot drums
+    const note = KEY_LAYOUT[k];
+    if (note !== undefined) { downKeys.delete(k); noteOff(note); }
+  });
 
   stageWrap.addEventListener('pointerdown', () => { ensureAudio(); audioCtx && audioCtx.resume(); });
 
@@ -860,56 +1006,52 @@ window.addEventListener('keyup', (e) => {
 
   // Flow & keys help popovers
   function renderKeysPop(){
-  if (!keysPop) return;
+    if (!keysPop) return;
 
-  // Show a QWERTY-style grid, highlight only the mapped keys
-  const KB_ROWS = [
-    ['Q','W','E','R','T','Y','U','I','O','P'],
-    ['A','S','D','F','G','H','J','K','L'],
-    ['Z','X','C','V','B','N','M']
-  ];
+    // Four rows: numbers, QWERTY, ASDF, ZXCV
+    const KB_ROWS = [
+      ['1','2','3','4','5','6','7','8','9','0'],
+      ['Q','W','E','R','T','Y','U','I','O','P'],
+      ['A','S','D','F','G','H','J','K','L'],
+      ['Z','X','C','V','B','N','M']
+    ];
 
-  const cells = KB_ROWS.map(row => {
-    const cellsHtml = row.map(k => {
-      const n = KEY_LAYOUT[k.toLowerCase()];
-      const mapped = n !== undefined;
-      const note = mapped ? midiNoteName(n) : '';
-      const sharp = mapped && note.includes('#');
-      const cls = `keycap${mapped ? ' mapped' : ''}${sharp ? ' sharp' : ''}`;
-      const title = mapped ? `${k} → ${note}` : `${k} (not mapped)`;
-      return `<div class="${cls}" title="${title}">
-                <span class="label">${k}</span>
-                ${mapped ? `<span class="note">${note}</span>` : ''}
-              </div>`;
+    const cells = KB_ROWS.map(row => {
+      const cellsHtml = row.map(k => {
+        const kLower = k.toLowerCase();
+        const n = KEY_LAYOUT[kLower];
+        const mapped = n !== undefined;
+        const note = mapped ? midiNoteName(n) : '';
+        const sharp = mapped && note.includes('#');
+        const pad = KEY_DRUMS[k]; // numbers are uppercase single char already
+        const hasPad = !!pad;
+        const cls = `keycap${mapped || hasPad ? ' mapped' : ''}${sharp ? ' sharp' : ''}`;
+        const title = hasPad ? `${k} → ${pad.toUpperCase()}`
+                    : mapped ? `${k} → ${note}` : `${k} (not mapped)`;
+        const line2 = hasPad ? `<span class="note">${pad.toUpperCase()}</span>`
+                             : (mapped ? `<span class="note">${note}</span>` : '');
+        return `<div class="${cls}" title="${title}"><span class="label">${k}</span>${line2}</div>`;
+      }).join('');
+      return `<div class="kb-row">${cellsHtml}</div>`;
     }).join('');
-    return `<div class="kb-row">${cellsHtml}</div>`;
-  }).join('');
 
-  keysPop.style.maxWidth = 'none'; // let it be wide like a keyboard
-  keysPop.innerHTML =
-    `<div style="margin-bottom:6px"><strong>Computer keyboard</strong></div>` +
-    `<div class="keys-grid">${cells}</div>` +
-    `<div class="muted" style="margin-top:6px">
-      Shortcuts: <span class="kbd">Shift</span> hold eraser • <span class="kbd">N</span> new layer • <span class="kbd">C</span> clear layer
-     </div>`;
+    keysPop.style.maxWidth = 'none';
+    keysPop.innerHTML =
+      `<div style="margin-bottom:6px"><strong>Computer keyboard</strong></div>` +
+      `<div class="keys-grid">${cells}</div>` +
+      `<div class="muted" style="margin-top:6px">
+         Shortcuts: <span class="kbd">Shift</span> hold eraser • <span class="kbd">N</span> new layer • <span class="kbd">C</span> clear layer
+       </div>`;
 
-  const barRect = document.querySelector('.topbar').getBoundingClientRect();
-  const btnRect = btnKeys.getBoundingClientRect();
-  keysPop.style.left = (btnRect.left - barRect.left) + 'px';
-  keysPop.style.display='block';
-}
-
+    const barRect = document.querySelector('.topbar').getBoundingClientRect();
+    const btnRect = btnKeys.getBoundingClientRect();
+    keysPop.style.left = (btnRect.left - barRect.left) + 'px';
+    keysPop.style.display='block';
+  }
   if (btnKeys){
-  btnKeys.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    keysPop.style.display = (keysPop.style.display==='block') ? 'none' : 'block';
-    if (keysPop.style.display==='block') renderKeysPop();
-  });
-  document.addEventListener('click', (e)=>{
-    if (!keysPop.contains(e.target) && e.target !== btnKeys) keysPop.style.display='none';
-  });
-}
-
+    btnKeys.addEventListener('click', (e)=>{ e.stopPropagation(); if (keysPop.style.display==='block') keysPop.style.display='none'; else renderKeysPop(); });
+    document.addEventListener('click', (e)=>{ if (!keysPop.contains(e.target) && e.target!==btnKeys) keysPop.style.display='none'; });
+  }
 
   function renderFlowPop(){
     if (!flowPop) return;
@@ -944,13 +1086,14 @@ window.addEventListener('keyup', (e) => {
     } else {
       colorPick.value='#7c3aed'; colorModeSel.value='auto'; hueOffset.value='0'; satRange.value='85'; lightRange.value='60'; brushTypeSel.value='line';
     }
-    // update readouts
     satVal.textContent=satRange.value; lightVal.textContent=lightRange.value; hueOffsetVal.textContent=hueOffset.value;
   });
 
   // Defaults
   scatterRange.value = '0'; scatterVal.textContent = '0';
   centerPen(); updateCenter();
+  resizeAll();
 })();</script>
 </body>
 </html>
+<!-- ----- end 2----- -->
