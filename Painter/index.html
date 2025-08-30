@@ -56,6 +56,19 @@
     .tab.active { background: #17233a; color: var(--text); border-color: #2a3b52; }
     .value { font-size: 12px; color: var(--muted); width:40px; text-align:right; }
 
+    /* Keys visual layout */
+.keys-grid{ display:inline-block; padding:6px; }
+.kb-row{ display:flex; gap:6px; margin:4px 0; }
+.keycap{
+  min-width:28px; padding:6px 8px; border-radius:6px;
+  background:#0c1423; border:1px solid #243349;
+  text-align:center; line-height:1;
+}
+.keycap .label{ font-weight:700; font-size:12px; color:var(--text); }
+.keycap .note{ display:block; font-size:11px; color:#9fb3d1; margin-top:2px; }
+.keycap.mapped{ background:#17233a; border-color:#2a3b52; }
+.keycap.sharp .note{ color:#ffd166; }  /* colour for C# / D# etc. */
+
     /* Popovers/help */
     .popover { position:absolute; top:100%; left:12px; margin-top:6px; background:#0e1626; border:1px solid #263142; border-radius:8px; padding:8px 10px; font-size:12px; color:var(--muted); z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,.35); max-width:420px; display:none; }
     .popover.small{ max-width:360px; }
@@ -808,18 +821,56 @@
 
   // Flow & keys help popovers
   function renderKeysPop(){
-    if (!keysPop) return;
-    const pairs = Object.entries(KEY_LAYOUT).map(([k,n])=>`<span class="kbd">${k.toUpperCase()}</span> → ${midiNoteName(n)}`).join(' &nbsp;•&nbsp; ');
-    keysPop.innerHTML = `<div style="margin-bottom:6px"><strong>Computer keyboard</strong></div>${pairs}<div class="muted" style="margin-top:6px">Shortcuts: <span class="kbd">E</span> eraser • <span class="kbd">N</span> new layer • <span class="kbd">C</span> clear layer</div>`;
-    const barRect = document.querySelector('.topbar').getBoundingClientRect();
-    const btnRect = btnKeys.getBoundingClientRect();
-    keysPop.style.left = (btnRect.left - barRect.left) + 'px';
-    keysPop.style.display='block';
-  }
+  if (!keysPop) return;
+
+  // Show a QWERTY-style grid, highlight only the mapped keys
+  const KB_ROWS = [
+    ['Q','W','E','R','T','Y','U','I','O','P'],
+    ['A','S','D','F','G','H','J','K','L'],
+    ['Z','X','C','V','B','N','M']
+  ];
+
+  const cells = KB_ROWS.map(row => {
+    const cellsHtml = row.map(k => {
+      const n = KEY_LAYOUT[k.toLowerCase()];
+      const mapped = n !== undefined;
+      const note = mapped ? midiNoteName(n) : '';
+      const sharp = mapped && note.includes('#');
+      const cls = `keycap${mapped ? ' mapped' : ''}${sharp ? ' sharp' : ''}`;
+      const title = mapped ? `${k} → ${note}` : `${k} (not mapped)`;
+      return `<div class="${cls}" title="${title}">
+                <span class="label">${k}</span>
+                ${mapped ? `<span class="note">${note}</span>` : ''}
+              </div>`;
+    }).join('');
+    return `<div class="kb-row">${cellsHtml}</div>`;
+  }).join('');
+
+  keysPop.style.maxWidth = 'none'; // let it be wide like a keyboard
+  keysPop.innerHTML =
+    `<div style="margin-bottom:6px"><strong>Computer keyboard</strong></div>` +
+    `<div class="keys-grid">${cells}</div>` +
+    `<div class="muted" style="margin-top:6px">
+       Shortcuts: <span class="kbd">E</span> eraser • <span class="kbd">N</span> new layer • <span class="kbd">C</span> clear layer
+     </div>`;
+
+  const barRect = document.querySelector('.topbar').getBoundingClientRect();
+  const btnRect = btnKeys.getBoundingClientRect();
+  keysPop.style.left = (btnRect.left - barRect.left) + 'px';
+  keysPop.style.display='block';
+}
+
   if (btnKeys){
-    btnKeys.addEventListener('click', (e)=>{ e.stopPropagation(); if (keysPop.style.display==='block') keysPop.style.display='none'; else renderKeysPop(); });
-    document.addEventListener('click', (e)=>{ if (!keysPop.contains(e.target) && e.target!==btnKeys) keysPop.style.display='none'; });
-  }
+  btnKeys.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    keysPop.style.display = (keysPop.style.display==='block') ? 'none' : 'block';
+    if (keysPop.style.display==='block') renderKeysPop();
+  });
+  document.addEventListener('click', (e)=>{
+    if (!keysPop.contains(e.target) && e.target !== btnKeys) keysPop.style.display='none';
+  });
+}
+
 
   function renderFlowPop(){
     if (!flowPop) return;
