@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Music‑Painter — MIDI + Keyboard</title>
+  <title>Music-Painter — MIDI + Keyboard</title>
   <style>
     :root {
       --bg: #0b0f14;
@@ -21,7 +21,7 @@
 
     /* Layout */
     .app { display: grid; grid-template-rows: auto 1fr auto; height: 100%; }
-    .topbar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: linear-gradient(180deg, #121a2b, #0e1622); border-bottom: 1px solid var(--panelEdge); }
+    .topbar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: linear-gradient(180deg, #121a2b, #0e1622); border-bottom: 1px solid var(--panelEdge); position: relative; }
     .topbar .spacer { flex: 1; }
 
     #stageWrap { position: relative; background: radial-gradient(1200px 1200px at 80% -10%, rgba(76, 201, 240, .08), transparent 60%), radial-gradient(1000px 800px at 20% 110%, rgba(168, 85, 247, .06), transparent 60%); overflow: hidden; }
@@ -32,7 +32,7 @@
     .tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
     .tabs .spacer { flex: 1; }
     .sections { display: block; }
-    .section { display:none; background: #0e1622; border: 1px solid #223049; border-radius: 12px; padding: 8px; min-width: 260px; }
+    .section { display:none; background: #0e1622; border: 1px solid #223049; border-radius: 12px; padding: 8px; min-width: 260px; position: relative; }
     .section.active { display:block; }
     .section h2 { font-size: 12px; font-weight: 800; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; display:flex; align-items:center; justify-content:space-between; }
     .section h2 .hint{ font-weight:600; color:#9fb3d1; font-size:11px; }
@@ -55,6 +55,11 @@
     .tab { padding: 4px 8px; border-radius: 999px; border: 1px solid #263142; background: #0e1626; color: var(--muted); cursor: pointer; font-size: 11px; }
     .tab.active { background: #17233a; color: var(--text); border-color: #2a3b52; }
     .value { font-size: 12px; color: var(--muted); width:40px; text-align:right; }
+
+    /* Popovers/help */
+    .popover { position:absolute; top:100%; left:12px; margin-top:6px; background:#0e1626; border:1px solid #263142; border-radius:8px; padding:8px 10px; font-size:12px; color:var(--muted); z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,.35); max-width:420px; display:none; }
+    .popover.small{ max-width:360px; }
+    .popover .kbd{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#0c1423; padding:2px 6px; border-radius:6px; border:1px solid #243349; color:var(--text); }
   </style>
 </head>
 <body>
@@ -63,16 +68,19 @@
     <div class="topbar">
       <button id="btnStartAudio" class="primary" title="Required by browsers to start sound">Start Audio</button>
       <button id="btnConnectMIDI" title="Connect your MIDI keyboard">Connect MIDI</button>
+      <button id="btnKeys" class="tiny" title="Show computer keyboard mapping">Keys</button>
       <button id="btnPanic" class="danger" title="Silence everything and reset audio">HARD Panic</button>
       <span class="spacer"></span>
       <span class="pill" id="midiStatus">MIDI: not connected</span>
       <span class="pill" id="audioStatus">Audio: suspended</span>
       <span class="pill" id="fps">0 fps</span>
+      <span class="pill" id="recBadge" style="display:none;background:#3c0b0b;border-color:#8a1e1e;color:#ffbdbd;">REC ●</span>
+      <div id="keysPop" class="popover"></div>
     </div>
 
     <!-- Stage -->
     <div id="stageWrap">
-      <footer class="tip">Tip: Consonant intervals (3rds, 5ths) smooth curves • Pitch‑bend rotates flow • Sustain toggles eraser</footer>
+      <footer class="tip">Tip: Consonant intervals (3rds, 5ths) smooth curves • Pitch-bend rotates flow • Sustain toggles eraser</footer>
     </div>
 
     <!-- Bottom dock (controls) -->
@@ -110,7 +118,7 @@
         </div>
 
         <div class="section" id="secColour">
-          <h2>Colour <span class="hint">Pick or auto‑map</span></h2>
+          <h2>Colour <span class="hint">Pick or auto-map</span></h2>
           <div class="row split">
             <label class="muted">Mode</label>
             <select id="colorMode" title="Auto maps pitch→hue; Velocity mode shifts hue by how hard you play">
@@ -153,6 +161,8 @@
 
         <div class="section" id="secFlow">
           <h2>Flow <span class="hint">How notes steer</span></h2>
+          <div id="flowPop" class="popover small" style="display:none"></div>
+          <div class="row"><button id="btnFlowHelp" class="tiny" title="Show flow help">Flow help</button></div>
           <div class="row split">
             <label class="muted">Mode</label>
             <select id="flowMode" title="Balanced: musical + organic • Harmonic: follows chord shapes • Melodic: follows your phrase">
@@ -233,7 +243,7 @@
         <div class="section" id="secNotes">
           <h2>Notes <span class="hint">Active MIDI</span></h2>
           <div class="list" id="noteList"></div>
-          <p class="muted" style="margin-top:8px">Pitch → hue (or fixed), velocity → thickness. Aftertouch → thickness; CC74 → scatter; Mod‑wheel → opacity.</p>
+          <p class="muted" style="margin-top:8px">Pitch → hue (or fixed), velocity → thickness. Aftertouch → thickness; CC74 → scatter; Mod-wheel → opacity.</p>
         </div>
 
         <div class="section" id="secCapture">
@@ -249,6 +259,7 @@
     </div>
   </div>
 
+<!-- ----- start 2 ----- -->
 <script>
 (() => {
   // ----- DOM refs -----
@@ -259,7 +270,18 @@
   baseCanvas.style.zIndex = 0;
   stageWrap.prepend(baseCanvas);
   const baseCtx = baseCanvas.getContext('2d');
-  function resizeBase(){ const dpr=Math.max(1, window.devicePixelRatio||1); const rect=stageWrap.getBoundingClientRect(); const prev=document.createElement('canvas'); prev.width=baseCanvas.width; prev.height=baseCanvas.height; prev.getContext('2d').drawImage(baseCanvas,0,0); baseCanvas.width=Math.floor(rect.width*dpr); baseCanvas.height=Math.floor(rect.height*dpr); baseCanvas.style.width=rect.width+'px'; baseCanvas.style.height=rect.height+'px'; baseCtx.setTransform(dpr,0,0,dpr,0,0); try{ baseCtx.drawImage(prev,0,0, prev.width, prev.height, 0,0, baseCanvas.width, baseCanvas.height);}catch{} }
+  function resizeBase(){
+    const dpr=Math.max(1, window.devicePixelRatio||1);
+    const rect=stageWrap.getBoundingClientRect();
+    const prev=document.createElement('canvas');
+    prev.width=baseCanvas.width; prev.height=baseCanvas.height;
+    prev.getContext('2d').drawImage(baseCanvas,0,0);
+    baseCanvas.width=Math.floor(rect.width*dpr);
+    baseCanvas.height=Math.floor(rect.height*dpr);
+    baseCanvas.style.width=rect.width+'px'; baseCanvas.style.height=rect.height+'px';
+    baseCtx.setTransform(dpr,0,0,dpr,0,0);
+    try{ baseCtx.drawImage(prev,0,0, prev.width, prev.height, 0,0, baseCanvas.width, baseCanvas.height);}catch{}
+  }
   const tabsEl = document.getElementById('tabs');
   const dockEl = document.getElementById('dock');
 
@@ -268,6 +290,13 @@
   const fpsEl = document.getElementById('fps');
   const btnStartAudio = document.getElementById('btnStartAudio');
   const btnConnectMIDI = document.getElementById('btnConnectMIDI');
+  const btnKeys = document.getElementById('btnKeys');
+  const keysPop = document.getElementById('keysPop');
+  const recBadge = document.getElementById('recBadge');
+  const btnRecord = document.getElementById('btnRecord');
+  const btnStopRec = document.getElementById('btnStopRec');
+  const btnFlowHelp = document.getElementById('btnFlowHelp');
+  const flowPop = document.getElementById('flowPop');
   const btnPanic = document.getElementById('btnPanic');
   const midiInputsSel = (()=>{ const sel=document.createElement('select'); sel.style.display='none'; document.body.appendChild(sel); return sel; })(); // hidden, we auto-pick first
 
@@ -356,6 +385,12 @@
   // freeze old art when fade settings change so past strokes stay unchanged
   trailRange.addEventListener('change', freezeArtwork);
   silenceFade.addEventListener('change', freezeArtwork);
+  // also freeze as the sliders move so past work isn't affected
+  let lastTrail = parseFloat(trailRange.value), lastSilence = parseFloat(silenceFade.value);
+  trailRange.addEventListener('input', ()=>{ const v=parseFloat(trailRange.value); if (v!==lastTrail){ freezeArtwork(); lastTrail=v; } });
+  silenceFade.addEventListener('input', ()=>{ const v=parseFloat(silenceFade.value); if (v!==lastSilence){ freezeArtwork(); lastSilence=v; } });
+  // record UI initial state
+  if (btnStopRec) btnStopRec.disabled = true;
 
   // --- Audio ---
   let audioCtx = null;
@@ -677,9 +712,9 @@
     const baseScatter = scatterRange.valueAsNumber + mpeScatter;
     const scatterEff = baseScatter * (1 - cons * parseFloat(consBias.value));
 
-    // Stronger center gravity
+    // Softer gravity curve: gentler and capped to avoid snapping
     const gRaw = parseFloat(gravity.value);
-    const gEff = 0.9 * (gRaw*gRaw*(3-2*gRaw)); // smoothstep for gentler curve
+    const gEff = Math.pow(gRaw, 1.8) * 0.45;
     if (gEff > 0) {
       const gx = (stageSize.cx - pen.x), gy = (stageSize.cy - pen.y);
       const gm = Math.hypot(gx,gy)||1;
@@ -704,8 +739,8 @@
       let hueAuto = ((hueNum / Math.max(0.0001, weightSum)) % 360 + 360) % 360;
       let sat = parseInt(satRange.value,10);
       let light = parseInt(lightRange.value,10);
-      if (monoMode) {
-        // grey spectrum: lightness follows pitch class
+      if (paletteSel.value === 'mono') {
+        // full grey spectrum: lightness varies with pitch class average
         const avgPc = actNotes.reduce((a,b)=>a+pc(b),0)/Math.max(1,actNotes.length);
         light = Math.round(25 + (avgPc/11)*55); // 25..80
         sat = 0;
@@ -718,7 +753,9 @@
       drawSymmetry(ctx, pen.px, pen.py, pen.x, pen.y, width, hue.toFixed(1), sat, light, alpha);
     }
 
+    // Composite to recorder if active
     if (isRecording && recCtx) { compositeTo(recCtx); }
+
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
@@ -740,6 +777,7 @@
   function startRecord(){
     try {
       ensureAudio(); resizeRec();
+      if (!recCanvas.captureStream) throw new Error('Canvas captureStream not supported in this browser');
       const streamV = recCanvas.captureStream(60);
       const dest = audioCtx.createMediaStreamDestination();
       masterGain.node.connect(dest);
@@ -752,9 +790,15 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url; a.download = 'music-painter.webm'; a.click();
         setTimeout(()=>URL.revokeObjectURL(url), 2000);
+        if (recBadge) recBadge.style.display='none';
+        if (btnRecord){ btnRecord.disabled = false; btnRecord.textContent = 'Record'; btnRecord.classList.add('primary'); btnRecord.classList.remove('danger'); }
+        if (btnStopRec){ btnStopRec.disabled = true; }
       };
       mediaRecorder.start();
       isRecording = true;
+      if (btnRecord){ btnRecord.disabled = true; btnRecord.textContent = 'Recording…'; btnRecord.classList.remove('primary'); btnRecord.classList.add('danger'); }
+      if (btnStopRec){ btnStopRec.disabled = false; }
+      if (recBadge){ recBadge.style.display = 'inline-block'; }
     } catch (err) { alert('Capture failed: ' + err.message); }
   }
   function stopRecord(){ if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); isRecording = false; }
@@ -762,28 +806,61 @@
   document.getElementById('btnStopRec').addEventListener('click', stopRecord);
   document.getElementById('btnScreenshot').addEventListener('click', savePNG);
 
-  // Palette presets
+  // Flow & keys help popovers
+  function renderKeysPop(){
+    if (!keysPop) return;
+    const pairs = Object.entries(KEY_LAYOUT).map(([k,n])=>`<span class="kbd">${k.toUpperCase()}</span> → ${midiNoteName(n)}`).join(' &nbsp;•&nbsp; ');
+    keysPop.innerHTML = `<div style="margin-bottom:6px"><strong>Computer keyboard</strong></div>${pairs}<div class="muted" style="margin-top:6px">Shortcuts: <span class="kbd">E</span> eraser • <span class="kbd">N</span> new layer • <span class="kbd">C</span> clear layer</div>`;
+    const barRect = document.querySelector('.topbar').getBoundingClientRect();
+    const btnRect = btnKeys.getBoundingClientRect();
+    keysPop.style.left = (btnRect.left - barRect.left) + 'px';
+    keysPop.style.display='block';
+  }
+  if (btnKeys){
+    btnKeys.addEventListener('click', (e)=>{ e.stopPropagation(); if (keysPop.style.display==='block') keysPop.style.display='none'; else renderKeysPop(); });
+    document.addEventListener('click', (e)=>{ if (!keysPop.contains(e.target) && e.target!==btnKeys) keysPop.style.display='none'; });
+  }
+
+  function renderFlowPop(){
+    if (!flowPop) return;
+    flowPop.innerHTML = `<div style='margin-bottom:6px'><strong>Flow modes</strong></div>` +
+      `<div><b>Balanced</b>: mix of melodic path + harmonic pull.</div>` +
+      `<div><b>Harmonic</b>: follows chord shapes; consonant intervals steer straighter.</div>` +
+      `<div><b>Melodic Memory</b>: continues the direction of your phrase.</div>` +
+      `<hr style='border-color:#263142'>` +
+      `<div><b>Smoothness</b>: higher = longer arcs.</div>` +
+      `<div><b>Consonance Bias</b>: higher = less jitter when notes fit together.</div>`;
+    const secRect = document.getElementById('secFlow').getBoundingClientRect();
+    const btnRect = btnFlowHelp.getBoundingClientRect();
+    flowPop.style.left = (btnRect.left - secRect.left) + 'px';
+    flowPop.style.display='block';
+  }
+  if (btnFlowHelp){
+    btnFlowHelp.addEventListener('click', (e)=>{ e.stopPropagation(); if (flowPop.style.display==='block') flowPop.style.display='none'; else renderFlowPop(); });
+    document.addEventListener('click', (e)=>{ if (!flowPop.contains(e.target) && e.target!==btnFlowHelp) flowPop.style.display='none'; });
+  }
+
+  // Palette presets handling
   paletteSel.addEventListener('change', () => {
-    monoMode = false;
     const p = paletteSel.value;
-    if (p === 'ocean'){
+    if (p==='ocean'){
       colorPick.value = '#1de2ff'; satRange.value='90'; lightRange.value='60'; colorModeSel.value='offset'; hueOffset.value='-40'; brushTypeSel.value='line';
-    } else if (p === 'sunset'){
+    } else if (p==='sunset'){
       colorPick.value='#ff7a18'; satRange.value='95'; lightRange.value='58'; colorModeSel.value='offset'; hueOffset.value='20'; brushTypeSel.value='line';
-    } else if (p === 'neon'){
+    } else if (p==='neon'){
       colorPick.value='#00fff0'; satRange.value='100'; lightRange.value='65'; colorModeSel.value='vel'; brushTypeSel.value='glow';
-    } else if (p === 'mono'){
-      monoMode = true; colorPick.value='#9ca3af'; satRange.value='0'; lightRange.value='60'; colorModeSel.value='fixed'; brushTypeSel.value='line';
-    } else { // reset defaults
+    } else if (p==='mono'){
+      colorPick.value='#9ca3af'; satRange.value='0'; lightRange.value='60'; colorModeSel.value='fixed'; brushTypeSel.value='line';
+    } else {
       colorPick.value='#7c3aed'; colorModeSel.value='auto'; hueOffset.value='0'; satRange.value='85'; lightRange.value='60'; brushTypeSel.value='line';
     }
+    // update readouts
     satVal.textContent=satRange.value; lightVal.textContent=lightRange.value; hueOffsetVal.textContent=hueOffset.value;
   });
 
-  // defaults
+  // Defaults
   scatterRange.value = '0'; scatterVal.textContent = '0';
   centerPen(); updateCenter();
-})();
-</script>
+})();</script>
 </body>
 </html>
