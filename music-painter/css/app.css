@@ -3,31 +3,54 @@
   --accent:#4cc9f0; --good:#22c55e; --warn:#f59e0b; --danger:#ef4444;
 }
 *{box-sizing:border-box}
-html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
-  font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-.app{display:grid;grid-template-rows:auto 1fr auto;height:100%}
 
-html,body{height:100%;min-height:100svh;} /* ensure content isn’t pushed off-screen on iOS/Android */
-.app{display:grid;grid-template-rows:auto 1fr auto;min-height:100svh;}
-/* Hide the desktop-only MIDI button on mobile */
-@media (hover:none) and (pointer:coarse){
-  #btnConnectMIDI{ display:none !important; }
+/* viewport sizing (mobile-safe) */
+html,body{
+  margin:0;
+  height:100%;
+  min-height:100svh;        /* safe viewport height for iOS/Android */
+  background:var(--bg);
+  color:var(--text);
+  font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+}
+.app{
+  display:grid;
+  grid-template-rows:auto 1fr auto;
+  min-height:100svh;
 }
 
-.topbar{position:relative;display:flex;align-items:center;gap:8px;padding:10px 12px;
-  background:linear-gradient(180deg,#121a2b,#0e1622);border-bottom:1px solid var(--panelEdge)}
+/* top bar */
+.topbar{
+  position:relative;display:flex;align-items:center;gap:8px;padding:10px 12px;
+  background:linear-gradient(180deg,#121a2b,#0e1622);border-bottom:1px solid var(--panelEdge)
+}
 .topbar .spacer{flex:1}
 .pill{font-size:11px;padding:2px 8px;border-radius:999px;background:#0c1423;border:1px solid #243349;color:var(--muted)}
 
-#stageWrap{position:relative;overflow:hidden;
-  background:radial-gradient(1200px 1200px at 80% -10%, rgba(76,201,240,.08), transparent 60%),
-             radial-gradient(1000px 800px at 20% 110%, rgba(168,85,247,.06), transparent 60%)}
+/* stage */
+#stageWrap{
+  position:relative;
+  overflow:hidden;
+  /* IMPORTANT: allow the 1fr row to shrink on mobile so the dock is visible */
+  min-height:0;
+  background:
+    radial-gradient(1200px 1200px at 80% -10%, rgba(76,201,240,.08), transparent 60%),
+    radial-gradient(1000px 800px at 20% 110%, rgba(168,85,247,.06), transparent 60%);
+}
 .layerCanvas{position:absolute;inset:0;display:block;width:100%;height:100%}
 #fxCanvas{position:absolute;inset:0;display:block;width:100%;height:100%;pointer-events:none;z-index:10}
-footer.tip{position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);
-  padding:6px 10px;border-radius:10px;font-size:12px;pointer-events:none}
+footer.tip{
+  position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);
+  padding:6px 10px;border-radius:10px;font-size:12px;pointer-events:none
+}
 
-.dock{background:var(--panel);border-top:1px solid var(--panelEdge);padding:6px 8px}
+/* bottom dock */
+.dock{
+  background:var(--panel);border-top:1px solid var(--panelEdge);padding:6px 8px;
+  position:sticky; bottom:0; z-index:20;
+  /* keep above phone home indicator */
+  padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 6px);
+}
 .tabs{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
 .tabs .spacer{flex:1}
 .tab{padding:4px 8px;border-radius:999px;border:1px solid #263142;background:#0e1626;color:var(--muted);cursor:pointer;font-size:11px}
@@ -64,3 +87,10 @@ button.tiny{padding:6px 8px;font-size:12px}
 
 /* collapsed dock */
 .dock.collapsed .sections{display:none}
+
+/* mobile tweaks */
+@media (hover:none) and (pointer:coarse){
+  #btnConnectMIDI{ display:none !important; }    /* hide on mobile */
+  .section{ min-width:0; }                       /* allow narrow screens */
+  .sections{ max-height:38vh; overflow:auto; -webkit-overflow-scrolling:touch; }
+}
