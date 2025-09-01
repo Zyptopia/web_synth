@@ -22,14 +22,12 @@
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const r = stageWrap.getBoundingClientRect();
 
-    // copy current pixels
     const prev = document.createElement('canvas');
     prev.width = c.width; prev.height = c.height;
     if (prev.width && prev.height){
       try { prev.getContext('2d').drawImage(c, 0, 0); } catch {}
     }
 
-    // resize
     c.width  = Math.floor(r.width * dpr);
     c.height = Math.floor(r.height * dpr);
     c.style.width = r.width + 'px';
@@ -38,14 +36,12 @@
     const ctx = c.getContext('2d');
     ctx.setTransform(dpr,0,0,dpr,0,0);
 
-    // draw back (scaled)
     if (prev.width && prev.height){
       try { ctx.drawImage(prev, 0,0, prev.width,prev.height, 0,0, c.width,c.height); } catch {}
     }
   }
   function resizeBase(){ preserveResize(baseCanvas); }
   function resizeFx(){
-    // Transient layer, but preserve to avoid visible flicker when panels animate.
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const r = stageWrap.getBoundingClientRect();
     const prev = document.createElement('canvas');
@@ -209,7 +205,7 @@
     influence.scatter*=decay; influence.spin*=decay; influence.center*=decay; influence.ybias*=decay;
   }
 
-  // --------- drawing primitives ----------
+  // --------- drawing ----------
   function drawStroke(ctx,x1,y1,x2,y2,width,hue,sat,light,alpha){
     const type=MP.ui.brushType();
     const comp=(MP.ui.isErasing()?'destination-out':(type==='glow'?'lighter':MP.ui.layerBlend(activeLayer)));

@@ -14,7 +14,7 @@
 
   // ---------- styles (adds on top of app.css) ----------
   const css = `
-  :root{ --padH:0px; --padW:0px; --topH:0px; }
+  :root{ --padFixedH: 44svh; --padFixedW: 46vw; --padH:0px; --topH:0px; }
 
   .mp-pad__toggle{
     position:fixed; right:10px; bottom:12px;
@@ -24,13 +24,14 @@
   .mp-pad{
     position:fixed; left:0; right:0; bottom:0; z-index:10040; background:#0e1622;
     border-top:1px solid #223049; box-shadow:0 -10px 30px rgba(0,0,0,.35);
+    height:var(--padFixedH);
     transform:translateY(100%); transition:transform .22s ease
   }
   .mp-pad.show{ transform:translateY(0) }
   .mp-pad__bar{ display:flex; gap:8px; align-items:center; padding:6px 8px; border-bottom:1px solid #223049 }
   .mp-pad__bar .sp{ flex:1 }
   .mp-pad__btn{ background:#0f172a; color:#e8f0ff; border:1px solid #263142; border-radius:10px; padding:6px 10px }
-  .mp-ctrls{ padding:8px; background:#0e1622; border-bottom:1px solid #223049; }
+  .mp-ctrls{ padding:8px; background:#0e1622; border-bottom:1px solid #223049; max-height:34svh; overflow:auto; }
   .mp-ctrls.hidden{ display:none; }
   .mp-ctrls__tabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
   .mp-ctrls__tab{ padding:4px 8px; border:1px solid #263142; border-radius:999px; background:#0f172a; color:#9fb3d1; font-size:12px; }
@@ -40,7 +41,7 @@
   .mp-padsRow{ display:grid; grid-template-columns:repeat(8,1fr); gap:8px; padding:8px; }
 
   /* Piano visuals */
-  .mp-piano{ position:relative; height:180px; padding:8px }
+  .mp-piano{ position:relative; height:180px; padding:8px; -webkit-user-select:none; user-select:none; }
   .mp-white{
     position:relative; display:inline-block; height:100%; width:calc(100% / 8);
     border:1px solid #2a3b52; border-bottom-color:#1c2a44;
@@ -54,14 +55,13 @@
     background:linear-gradient(#222,#050505); border:1px solid #000; border-radius:0 0 4px 4px
   }
   .mp-black.pressed{ background:linear-gradient(#111,#000) }
-  .mp-keylbl{ position:absolute; bottom:6px; left:50%; transform:translateX(-50%); font-size:12px; color:#1b2440 }
 
-  /* Canvas sizing on mobile (portrait: pad steals height; landscape: pad steals width) */
+  /* Canvas sizing on mobile */
   .mobile #stageWrap{ height:calc(100svh - var(--topH,0px) - var(--padH,0px)); }
   .mobile.land #stageWrap{ height:calc(100svh - var(--topH,0px)); }
   .mobile.land .mp-pad{
     top:var(--topH,0px); bottom:auto; right:0; left:auto;
-    width:min(46vw, 420px); height:calc(100svh - var(--topH,0px));
+    width:min(var(--padFixedW), 420px); height:calc(100svh - var(--topH,0px));
     border-top:none; border-left:1px solid #223049;
     transform:translateX(100%);
   }
@@ -83,7 +83,7 @@
       <div class="sp"></div>
       <div style="display:flex;gap:6px;align-items:center">
         <button id="mpOctDown" class="mp-pad__btn">◀︎</button>
-        <span id="mpOctLbl" style="color:#9fb3d1;font-size:12px">C4–C5</span>
+        <span id="mpOctLbl" style="color:#9fb3d1;font-size:12px"></span>
         <button id="mpOctUp" class="mp-pad__btn">▶︎</button>
       </div>
       <button id="mpPadsToggle" class="mp-pad__btn">Pads: On</button>
@@ -98,7 +98,7 @@
   `;
   document.body.appendChild(pad);
 
-  // Selectors (declare BEFORE using in listeners)
+  // Selectors
   const btnClose   = pad.querySelector("#mpPadClose");
   const btnCtrls   = pad.querySelector("#mpToggleCtrls");
   const btnOctDown = pad.querySelector("#mpOctDown");
@@ -119,6 +119,7 @@
   const noteName = (n)=> ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][n%12] + (Math.floor(n/12)-1);
   const setOctLbl = ()=> {
     const low = 12*(octave+1);
+    // No labels on keys; only tiny status label here:
     octLbl.textContent = `${noteName(low).replace(/\d+/, '')}${octave}–C${octave+1}`;
   };
 
@@ -127,29 +128,22 @@
   const isLandscape = () =>
     window.matchMedia('(orientation: landscape)').matches || (window.innerWidth > window.innerHeight);
 
-  let padVarsRAF = 0;
-  function updatePadVars(){
-    cancelAnimationFrame(padVarsRAF);
-    padVarsRAF = requestAnimationFrame(()=>{
-      const th = topbar?.getBoundingClientRect().height || 0;
-      document.documentElement.style.setProperty('--topH', `${th}px`);
+  function updateTop(){
+    const th = topbar?.getBoundingClientRect().height || 0;
+    document.documentElement.style.setProperty('--topH', `${th}px`);
+  }
 
-      const land = isLandscape();
-      document.documentElement.classList.toggle('land', land);
+  function applyPadSpace(){
+    // Only change when pad show/hide or orientation changes.
+    const land = isLandscape();
+    document.documentElement.classList.toggle('land', land);
+    const open = pad.classList.contains('show');
+    document.documentElement.style.setProperty('--padH', (open && !land) ? 'var(--padFixedH)' : '0px');
+  }
 
-      if (land){
-        const pw = pad.classList.contains('show') ? (pad.getBoundingClientRect().width || 0) : 0;
-        document.documentElement.style.setProperty('--padW', pw + 'px');
-        document.documentElement.style.setProperty('--padH', '0px');
-      } else {
-        const ph = pad.classList.contains('show') ? (pad.getBoundingClientRect().height || 0) : 0;
-        document.documentElement.style.setProperty('--padH', ph + 'px');
-        document.documentElement.style.setProperty('--padW', '0px');
-      }
-
-      // Resize canvases without losing pixels (draw.js preserves)
-      MP.draw?.resizeAll?.();
-    });
+  function requestCanvasResize(){
+    // Resize canvases without losing pixels (draw.js preserves)
+    MP.draw?.resizeAll?.();
   }
 
   function showPad(open){
@@ -158,9 +152,10 @@
       toggle.style.display = 'none';
     } else {
       pad.classList.remove('show');
-      setTimeout(()=>{ toggle.style.display = ''; updatePadVars(); }, 180);
+      setTimeout(()=>{ toggle.style.display = ''; }, 180);
     }
-    updatePadVars();
+    applyPadSpace();
+    requestCanvasResize();
   }
 
   // ---------- helpers ----------
@@ -188,7 +183,7 @@
     for (let i=0;i<whiteOffsets.length;i++){
       const n=base+whiteOffsets[i];
       const w=document.createElement('div'); w.className='mp-white';
-      const pc=n%12; if(pc===0||pc===5){ const lab=document.createElement('div'); lab.className='mp-keylbl'; lab.textContent=noteName(n); w.appendChild(lab); }
+      // (No text labels to avoid selection popups)
       bindPress(w,n); wrap.appendChild(w); whites.push({el:w,i});
     }
     whites.forEach(({el,i})=>{
@@ -247,8 +242,6 @@
     const sel=document.createElement('select');
 
     const desktopSel = document.getElementById(srcId);
-
-    // If provided, use opts; otherwise clone options from the desktop select
     if (opts && opts.length){
       sel.innerHTML = opts.map(o=>`<option value="${o}">${o}</option>`).join('');
     } else if (desktopSel && desktopSel.options && desktopSel.options.length){
@@ -272,13 +265,11 @@
       }
     });
 
-    // keep in sync if desktop changes later
     if (desktopSel){
       desktopSel.addEventListener('change', ()=>{ sel.value = desktopSel.value; }, {passive:true});
     }
 
-    wrap.append(lab, sel);
-    return wrap;
+    wrap.append(lab, sel); return wrap;
   }
   function proxyButton(label, onClick){
     const b=document.createElement('button'); b.className='mp-pad__btn'; b.textContent=label; b.addEventListener('click', onClick); return b;
@@ -340,7 +331,7 @@
       proxyRange('Idle Fade',    'silenceFade',0, 0.05, 0.002)
     );
 
-    // Layers (compact)
+    // Layers
     const sl = document.getElementById('mpsec_layers');
     sl.append(
       proxyRange('Layer Opacity','layerOpacity', 0.05, 1, 0.05),
@@ -358,18 +349,26 @@
       proxyButton('Screenshot',()=> document.getElementById('btnScreenshot')?.click())
     );
 
-    activate('sound'); // default
+    activate('sound');
   }
 
   // ---------- wire ----------
+  document.addEventListener('visibilitychange', updateTop, {passive:true});
+  window.addEventListener('resize', ()=>{ updateTop(); applyPadSpace(); requestCanvasResize(); });
+
+  const topInit = ()=>{ updateTop(); applyPadSpace(); requestCanvasResize(); };
+
   toggle.addEventListener('click', ()=> showPad(true));
   btnClose.addEventListener('click', ()=> showPad(false));
+
+  // Important: controls toggle does NOT request canvas resize (prevents clear)
   btnCtrls.addEventListener('click', ()=>{
     ctrlsWrap.classList.toggle('hidden');
     btnCtrls.textContent = ctrlsWrap.classList.contains('hidden') ? '▸ Controls' : '▾ Controls';
-    updatePadVars();
+    // No updatePadVars/resizes here — pad space stays fixed.
   });
-  btnPads.addEventListener('click', ()=>{ padsVisible = !padsVisible; buildPads(); updatePadVars(); });
+
+  btnPads.addEventListener('click', ()=>{ padsVisible = !padsVisible; buildPads(); /* no resize needed */ });
   btnOctDown.addEventListener('click', ()=>{ octave = Math.max(1, octave-1); buildPiano(); });
   btnOctUp.addEventListener('click',   ()=>{ octave = Math.min(7, octave+1); buildPiano(); });
 
@@ -381,11 +380,5 @@
 
   // open pad by default and size things
   showPad(true);
-  requestAnimationFrame(updatePadVars);
-
-  // keep sizing in sync
-  const ro = new ResizeObserver(updatePadVars);
-  ro.observe(document.documentElement);
-  ro.observe(pad);
-  window.addEventListener('resize', updatePadVars);
+  requestAnimationFrame(topInit);
 })(window.MP);
