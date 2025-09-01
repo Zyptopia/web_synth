@@ -9,17 +9,11 @@ html.mobile #btnConnectMIDI{ display:none !important; }
 
 /* the middle row must be allowed to shrink, and we’ll pad its bottom by the dock height */
 #stageWrap{ min-height:0; padding-bottom:var(--dockh, 0px); }
-
-/* desktop behaviour: sticky is fine */
 .dock{ position:sticky; bottom:0; z-index:20; }
+html.mobile .dock{ position:fixed; left:0; right:0; bottom:0; z-index:50;
+  padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 6px); }
+html.mobile #btnConnectMIDI{ display:none !important; }
 
-/* on mobile, force the dock on-screen no matter what */
-html.mobile .dock{
-  position:fixed;
-  left:0; right:0; bottom:0;
-  z-index:50;
-  padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 6px);
-}
 
 /* optional: make the sections scroll if the dock is short on a small screen */
 @media (max-width: 900px){

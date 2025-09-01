@@ -14,14 +14,13 @@ const stageWrap = MP.el('stageWrap');
 // hide MIDI button on mobile (runtime, not just CSS)
 if (MP.isMobile && btnConnectMIDI) btnConnectMIDI.style.display = 'none';
 
-// keep the dock visible: push the drawing area up by the dock height on mobile
 function updateDockPadding(){
   const h = dockEl?.getBoundingClientRect().height || 0;
-  // write a CSS var the stylesheet will use
   document.documentElement.style.setProperty('--dockh', MP.isMobile ? `${h}px` : '0px');
 }
 updateDockPadding();
 window.addEventListener('resize', updateDockPadding);
+
 
 
   // sections
