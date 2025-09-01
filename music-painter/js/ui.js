@@ -9,6 +9,8 @@
   const btnEraser = el('btnEraser');
   const tabsEl = el('tabs'); const dockEl = el('dock');
 
+    if (MP.isMobile && btnConnectMIDI) btnConnectMIDI.style.display = 'none';
+
   // sections
   const ids = ['secBrush','secColour','secFlow','secFX','secLayers','secNotes','secCapture'];
   function activateSection(id,btn){

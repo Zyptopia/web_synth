@@ -109,40 +109,97 @@
   const effects=[];            // fast/transient (fxCanvas)
   const accents=[];            // long-lived additive (accentCanvas)
   const influence={scatter:0,spin:0,center:0,ybias:0}; // kept very subtle now
+  const MAX_RING = 180;
+  const MAX_BLOOM = 160;
 
   function addAccent(obj){ accents.push(obj); }
 
   MP.drawFX = {
-    // --- long-lived “add, not distort” visuals ---
-    kick(x,y,v){
-      const hue = (x*0.2 + y*0.1) % 360;
-      addAccent({type:'bloom',x,y,r:12,a:0.25+0.4*(v/127),h:hue,grow:1.6,fade:0.002});           // gentle color wash
-      influence.center += 0.02*(v/127); // subtle (scaled again later)
-    },
-    snare(x,y,v){
-      const count = 40;
-      for(let i=0;i<count;i++){
-        const ang=Math.random()*Math.PI*2, sp=0.8+Math.random()*1.8;
-        addAccent({type:'confetti',x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,a:0.18+0.25*(v/127),life:1.8+Math.random()*0.8,h:(ang*180/Math.PI)%360});
-      }
-      influence.scatter += 2*(v/127);
-    },
-    hat(x,y,v,open){
-      const n=open?22:12;
-      for(let i=0;i<n;i++){
-        const ang=Math.random()*Math.PI*2, sp=open?1.4:1.0;
-        addAccent({type:'sparkle',x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,a:0.18+0.2*(v/127),life:open?1.6:0.9});
-      }
-    },
-    tom(x,y,v,which){
-      addAccent({type:'ribbon',x,y,t:0,a:0.22+0.28*(v/127),dir:(which==='hi')?-1:1,h:(which==='hi')?290:230});
-      influence.spin += 0.05*(v/127); // very small rotation nudge
-    },
-    clap(x,y,v){
-      for(let i=0;i<3;i++){ addAccent({type:'ring',x,y,r:10+i*12,a:0.2+0.3*(v/127),grow:0.9,fade:0.0018}); }
-      influence.scatter += 1*(v/127);
+  // Subtle bloom; smaller + fades sooner
+  kick: function(x, y, v) {
+    const hue = (x * 0.2 + y * 0.1) % 360;
+    addAccent({
+      type: 'bloom',
+      x: x,
+      y: y,
+      r: 10,
+      a: 0.18 + 0.28 * (v / 127),
+      h: hue,
+      grow: 1.1,
+      fade: 0.004
+    });
+    influence.center += 0.015 * (v / 127);
+  },
+
+  // “Confetti embers”: fewer, slower, lower alpha
+  snare: function(x, y, v) {
+    const count = 16;
+    for (let i = 0; i < count; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const sp  = 0.5 + Math.random() * 1.1;
+      addAccent({
+        type: 'confetti',
+        x: x,
+        y: y,
+        vx: Math.cos(ang) * sp,
+        vy: Math.sin(ang) * sp,
+        a: 0.10 + 0.16 * (v / 127),
+        life: 1.0 + Math.random() * 0.8,
+        h: (ang * 180 / Math.PI) % 360
+      });
     }
-  };
+    influence.scatter += 1.2 * (v / 127);
+  },
+
+  // Sparkles (this is the “good” firework)
+  hat: function(x, y, v, open) {
+    const n = open ? 20 : 12;
+    for (let i = 0; i < n; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const sp  = open ? 1.2 : 0.9;
+      addAccent({
+        type: 'sparkle',
+        x: x,
+        y: y,
+        vx: Math.cos(ang) * sp,
+        vy: Math.sin(ang) * sp,
+        a: 0.14 + 0.18 * (v / 127),
+        life: open ? 1.3 : 0.8
+      });
+    }
+  },
+
+  // Graceful ribbon; tiny spin
+  tom: function(x, y, v, which) {
+    addAccent({
+      type: 'ribbon',
+      x: x,
+      y: y,
+      t: 0,
+      a: 0.18 + 0.24 * (v / 127),
+      dir: (which === 'hi') ? -1 : 1,
+      h: (which === 'hi') ? 290 : 230
+    });
+    influence.spin += 0.035 * (v / 127);
+  },
+
+  // Two small rings with faster fade (much subtler)
+  clap: function(x, y, v) {
+    for (let i = 0; i < 2; i++) {
+      addAccent({
+        type: 'ring',
+        x: x,
+        y: y,
+        r: 8 + i * 10,
+        a: 0.16 + 0.22 * (v / 127),
+        grow: 0.55,
+        fade: 0.006
+      });
+    }
+    influence.scatter += 0.8 * (v / 127);
+  }
+};
+
 
   // transient layer (kept light; mostly glints)
   function drawFX(dt){
@@ -172,6 +229,7 @@
     accents.forEach((a,i)=>{
       if (a.type==='bloom'){
         a.r += a.grow*(dt*60); a.a -= a.fade*(dt*60);
+        if (a.r > MAX_BLOOM) a.a = 0;
         if (a.a<=0){ accents.splice(i,1); return; }
         const grad=accentCtx.createRadialGradient(a.x,a.y,0,a.x,a.y,a.r);
         grad.addColorStop(0,`hsla(${a.h},100%,60%,${a.a*0.35})`);
@@ -199,6 +257,7 @@
         accentCtx.stroke(); accentCtx.restore();
       } else if (a.type==='ring'){
         a.r += a.grow*(dt*60); a.a -= a.fade*(dt*60);
+        if (a.r > MAX_RING) a.a = 0;
         if (a.a<=0){ accents.splice(i,1); return; }
         accentCtx.save(); accentCtx.globalCompositeOperation='lighter';
         accentCtx.strokeStyle=`hsla(200,100%,75%,${a.a})`;
