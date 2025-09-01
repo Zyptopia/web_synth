@@ -6,10 +6,16 @@
     navigator.maxTouchPoints > 0;
   if (!isMobile) return;
 
+  // Hide desktop-only MIDI button just in case CSS misses it
+  const midiBtn = document.getElementById('btnConnectMIDI');
+  if (midiBtn) midiBtn.style.display = 'none';
+
   document.documentElement.classList.add("mobile");
 
   // ---------- styles (adds on top of app.css) ----------
   const css = `
+  :root{ --padH:0px; --padW:0px; --topH:0px; }
+
   .mp-pad__toggle{
     position:fixed; right:10px; bottom:12px;
     z-index:10050; background:#17233a; border:1px solid #2a3b52;
@@ -49,6 +55,17 @@
   }
   .mp-black.pressed{ background:linear-gradient(#111,#000) }
   .mp-keylbl{ position:absolute; bottom:6px; left:50%; transform:translateX(-50%); font-size:12px; color:#1b2440 }
+
+  /* Canvas sizing on mobile (portrait: pad steals height; landscape: pad steals width) */
+  .mobile #stageWrap{ height:calc(100svh - var(--topH,0px) - var(--padH,0px)); }
+  .mobile.land #stageWrap{ height:calc(100svh - var(--topH,0px)); }
+  .mobile.land .mp-pad{
+    top:var(--topH,0px); bottom:auto; right:0; left:auto;
+    width:min(46vw, 420px); height:calc(100svh - var(--topH,0px));
+    border-top:none; border-left:1px solid #223049;
+    transform:translateX(100%);
+  }
+  .mobile.land .mp-pad.show{ transform:translateX(0); }
   `;
   const style = document.createElement("style"); style.textContent = css; document.head.appendChild(style);
 
@@ -81,20 +98,7 @@
   `;
   document.body.appendChild(pad);
 
-  // put near top-level handlers, after `const pad = ...` and `const toggle = ...`
-function showPad(open){
-  if (open){
-    pad.classList.add('show');
-    toggle.style.display = 'none';     // HIDE the floating Pad button
-  } else {
-    pad.classList.remove('show');
-    toggle.style.display = '';         // SHOW it again when closed
-  }
-  // keep canvas sized
-  if (typeof updatePadVars === 'function') requestAnimationFrame(updatePadVars);
-}
-
-
+  // Selectors (declare BEFORE using in listeners)
   const btnClose   = pad.querySelector("#mpPadClose");
   const btnCtrls   = pad.querySelector("#mpToggleCtrls");
   const btnOctDown = pad.querySelector("#mpOctDown");
@@ -111,27 +115,53 @@ function showPad(open){
   const PADS = [40,41,42,43,36,37,38,39];
   let padsVisible = true;
   let octave = 4; // C4
-  function noteName(n){ return ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][n%12] + (Math.floor(n/12)-1); }
-  function setOctLbl(){ const low = 12*(octave+1); octLbl.textContent = `${noteName(low).replace(/\d+/,'')}${octave}–C${octave+1}`; }
 
-  // ---------- keep canvas sized above the pad ----------
+  const noteName = (n)=> ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][n%12] + (Math.floor(n/12)-1);
+  const setOctLbl = ()=> {
+    const low = 12*(octave+1);
+    octLbl.textContent = `${noteName(low).replace(/\d+/, '')}${octave}–C${octave+1}`;
+  };
+
+  // ---------- layout / sizing ----------
+  const topbar = document.querySelector('.topbar');
+  const isLandscape = () =>
+    window.matchMedia('(orientation: landscape)').matches || (window.innerWidth > window.innerHeight);
+
+  let padVarsRAF = 0;
   function updatePadVars(){
-    const topbar = document.querySelector('.topbar');
-    const th = topbar?.getBoundingClientRect().height || 0;
-    const ph = pad.classList.contains('show') ? (pad.getBoundingClientRect().height || 0) : 0;
-    document.documentElement.style.setProperty('--topH', `${th}px`);
-    document.documentElement.style.setProperty('--padH', `${ph}px`);
-    MP.draw?.resizeAll?.(); // resize canvases + recenter pen
+    cancelAnimationFrame(padVarsRAF);
+    padVarsRAF = requestAnimationFrame(()=>{
+      const th = topbar?.getBoundingClientRect().height || 0;
+      document.documentElement.style.setProperty('--topH', `${th}px`);
+
+      const land = isLandscape();
+      document.documentElement.classList.toggle('land', land);
+
+      if (land){
+        const pw = pad.classList.contains('show') ? (pad.getBoundingClientRect().width || 0) : 0;
+        document.documentElement.style.setProperty('--padW', pw + 'px');
+        document.documentElement.style.setProperty('--padH', '0px');
+      } else {
+        const ph = pad.classList.contains('show') ? (pad.getBoundingClientRect().height || 0) : 0;
+        document.documentElement.style.setProperty('--padH', ph + 'px');
+        document.documentElement.style.setProperty('--padW', '0px');
+      }
+
+      // Resize canvases without losing pixels (draw.js preserves)
+      MP.draw?.resizeAll?.();
+    });
   }
 
-  // pad opens by default
-  showPad(true);  // opens + hides toggle
-  requestAnimationFrame(updatePadVars);
-
-  // Observe size changes (orientation, bars, etc.)
-  const ro = new ResizeObserver(updatePadVars);
-  ro.observe(document.documentElement);
-  ro.observe(pad);
+  function showPad(open){
+    if (open){
+      pad.classList.add('show');
+      toggle.style.display = 'none';
+    } else {
+      pad.classList.remove('show');
+      setTimeout(()=>{ toggle.style.display = ''; updatePadVars(); }, 180);
+    }
+    updatePadVars();
+  }
 
   // ---------- helpers ----------
   const pointerToNote = new Map();
@@ -215,16 +245,40 @@ function showPad(open){
     const wrap=document.createElement('div'); wrap.className='row split';
     const lab=document.createElement('label'); lab.className='muted'; lab.textContent=label;
     const sel=document.createElement('select');
-    sel.innerHTML = opts.map(o=>`<option value="${o}">${o}</option>`).join('');
-    // if the desktop select exists, reflect it
+
     const desktopSel = document.getElementById(srcId);
+
+    // If provided, use opts; otherwise clone options from the desktop select
+    if (opts && opts.length){
+      sel.innerHTML = opts.map(o=>`<option value="${o}">${o}</option>`).join('');
+    } else if (desktopSel && desktopSel.options && desktopSel.options.length){
+      for (const o of desktopSel.options){
+        const opt = document.createElement('option');
+        opt.value = o.value; opt.textContent = o.textContent;
+        sel.appendChild(opt);
+      }
+    } else {
+      sel.innerHTML = '<option value="">—</option>';
+    }
+
     if (desktopSel) sel.value = desktopSel.value;
+
     sel.addEventListener('change', ()=>{
       if (srcId==='synthPresetSel') MP.audio.setSynthPreset(sel.value);
       if (srcId==='drumKitSel')     MP.drums.setKit(sel.value);
-      if (desktopSel){ desktopSel.value = sel.value; desktopSel.dispatchEvent(new Event('change',{bubbles:true})); }
+      if (desktopSel){
+        desktopSel.value = sel.value;
+        desktopSel.dispatchEvent(new Event('change',{bubbles:true}));
+      }
     });
-    wrap.append(lab, sel); return wrap;
+
+    // keep in sync if desktop changes later
+    if (desktopSel){
+      desktopSel.addEventListener('change', ()=>{ sel.value = desktopSel.value; }, {passive:true});
+    }
+
+    wrap.append(lab, sel);
+    return wrap;
   }
   function proxyButton(label, onClick){
     const b=document.createElement('button'); b.className='mp-pad__btn'; b.textContent=label; b.addEventListener('click', onClick); return b;
@@ -304,7 +358,7 @@ function showPad(open){
       proxyButton('Screenshot',()=> document.getElementById('btnScreenshot')?.click())
     );
 
-    activate('sound'); // default to Sound on mobile
+    activate('sound'); // default
   }
 
   // ---------- wire ----------
@@ -316,7 +370,6 @@ function showPad(open){
     updatePadVars();
   });
   btnPads.addEventListener('click', ()=>{ padsVisible = !padsVisible; buildPads(); updatePadVars(); });
-
   btnOctDown.addEventListener('click', ()=>{ octave = Math.max(1, octave-1); buildPiano(); });
   btnOctUp.addEventListener('click',   ()=>{ octave = Math.min(7, octave+1); buildPiano(); });
 
@@ -325,5 +378,14 @@ function showPad(open){
   buildPiano();
   buildPads();
   setOctLbl();
-  updatePadVars();
+
+  // open pad by default and size things
+  showPad(true);
+  requestAnimationFrame(updatePadVars);
+
+  // keep sizing in sync
+  const ro = new ResizeObserver(updatePadVars);
+  ro.observe(document.documentElement);
+  ro.observe(pad);
+  window.addEventListener('resize', updatePadVars);
 })(window.MP);

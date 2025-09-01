@@ -146,3 +146,35 @@ button.tiny{padding:6px 8px;font-size:12px}
   .sections{ max-height:38vh; overflow:auto; -webkit-overflow-scrolling:touch; }
 }
 html.mobile .popover{ position:fixed; z-index:10070; }
+
+/* Ensure popovers sit above the mobile pad */
+html.mobile .popover{ position:fixed; z-index:10070; }
+
+/* Mobile portrait: canvas height accounts for top bar + pad height */
+html.mobile #stageWrap{
+  height: calc(100svh - var(--topH, 0px) - var(--padH, 0px));
+  width: 100%;
+  min-height: 0;
+}
+
+/* Mobile landscape: canvas on the left, pad as a right-side rail */
+@media (orientation: landscape){
+  html.mobile #stageWrap{
+    position: fixed;
+    top: var(--topH, 0px);
+    left: 0;
+    height: calc(100svh - var(--topH, 0px));
+    width: calc(100svw - var(--padW, 0px));
+  }
+  /* Side-docked pad */
+  .mp-pad.land{
+    top: var(--topH, 0px);
+    bottom: 0;
+    right: 0;
+    left: auto;
+    width: min(44svw, 520px);
+    height: auto;
+    transform: translateX(100%); /* hidden by default */
+  }
+  .mp-pad.land.show{ transform: translateX(0); }
+}

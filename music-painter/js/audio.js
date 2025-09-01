@@ -170,4 +170,17 @@
   };
 
   MP.audio.hardClose = async () => { try{ MP.audio.activeOsc.forEach((_,n)=>MP.audio.stopTone(n,true)); }catch{} await MP.audio.close(); };
+
+  // ADD this in audio.js (inside the IIFE, before "})(window.MP);")
+MP.audio.unlock = async function unlock() {
+  try {
+    MP.audio.ensure();
+    await audioCtx.resume();
+    return audioCtx.state || 'running';
+  } catch (err) {
+    console.warn('unlock failed', err);
+    return 'error';
+  }
+};
+
 })(window.MP);
