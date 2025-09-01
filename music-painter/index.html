@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Music-Painter — MIDI + Keyboard</title>
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Top control bar -->
+    <div class="topbar">
+      <button id="btnStartAudio" class="primary" title="Required by browsers to start sound">Start Audio</button>
+      <button id="btnConnectMIDI" title="Connect your MIDI keyboard">Connect MIDI</button>
+      <button id="btnKeys" class="tiny" title="Show computer keyboard mapping">Keys</button>
+      <button id="btnPanic" class="danger" title="Silence everything and reset audio">HARD Panic</button>
+      <span class="spacer"></span>
+      <span class="pill" id="midiStatus">MIDI: not connected</span>
+      <span class="pill" id="audioStatus">Audio: idle</span>
+      <span class="pill" id="fps">0 fps</span>
+      <span class="pill" id="recBadge" style="display:none;background:#3c0b0b;border-color:#8a1e1e;color:#ffbdbd;">REC ●</span>
+      <div id="keysPop" class="popover"></div>
+    </div>
+
+    <!-- Stage -->
+    <div id="stageWrap">
+      <canvas id="fxCanvas"></canvas>
+      <footer class="tip">Tip: Hold <b>Shift</b> to erase • Sustain pedal toggles eraser • Pitch-bend rotates flow</footer>
+    </div>
+
+    <!-- Bottom dock (controls) -->
+    <div class="dock" id="dock">
+      <div class="tabs" id="tabs"></div>
+      <div class="sections">
+        <!-- Brush -->
+        <div class="section" id="secBrush">
+          <h2>Brush <span class="hint">Style & size</span></h2>
+          <div class="row split"><label class="muted">Type</label>
+            <select id="brushType">
+              <option value="line" selected>Line (smooth)</option>
+              <option value="particles">Particles (spray)</option>
+              <option value="blocks">Blocks (square trail)</option>
+              <option value="glow">Glow Ink (additive)</option>
+            </select>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Brush Scale</label>
+            <input type="range" id="brushScale" min="0.2" max="5" step="0.1" value="1.2">
+            <output class="value" id="brushScaleVal">1.2</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Opacity</label>
+            <input type="range" id="opacity" min="0.05" max="1" step="0.05" value="1">
+            <output class="value" id="opacityVal">1.00</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Scatter</label>
+            <input type="range" id="scatter" min="0" max="60" step="1" value="0">
+            <output class="value" id="scatterVal">0</output>
+          </div>
+          <div class="row">
+            <button id="btnEraser">Eraser: Off</button>
+          </div>
+        </div>
+
+        <!-- Colour -->
+        <div class="section" id="secColour">
+          <h2>Colour <span class="hint">Pick or auto-map</span></h2>
+          <div class="row split">
+            <label class="muted">Mode</label>
+            <select id="colorMode">
+              <option value="auto" selected>Auto (Pitch→Hue)</option>
+              <option value="fixed">Fixed Colour</option>
+              <option value="offset">Auto + Hue Offset</option>
+              <option value="vel">Velocity → Hue Shift</option>
+            </select>
+          </div>
+          <div class="row split">
+            <label class="muted">Pick</label>
+            <input id="colorPick" type="color" value="#7c3aed">
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Hue Offset</label>
+            <input id="hueOffset" type="range" min="-180" max="180" step="1" value="0">
+            <output class="value" id="hueOffsetVal">0</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Saturation</label>
+            <input id="sat" type="range" min="0" max="100" step="1" value="85">
+            <output class="value" id="satVal">85</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Lightness</label>
+            <input id="light" type="range" min="0" max="100" step="1" value="60">
+            <output class="value" id="lightVal">60</output>
+          </div>
+          <div class="row split">
+            <label class="muted">Palette Preset</label>
+            <select id="palette">
+              <option value="none" selected>—</option>
+              <option value="ocean">Ocean</option>
+              <option value="sunset">Sunset</option>
+              <option value="neon">Neon</option>
+              <option value="mono">Monochrome</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Flow -->
+        <div class="section" id="secFlow">
+          <h2>Flow <span class="hint">How notes steer</span></h2>
+          <div id="flowPop" class="popover small" style="display:none"></div>
+          <div class="row"><button id="btnFlowHelp" class="tiny">Flow help</button></div>
+          <div class="row split">
+            <label class="muted">Mode</label>
+            <select id="flowMode">
+              <option value="balanced" selected>Balanced</option>
+              <option value="harmonic">Harmonic</option>
+              <option value="melodic">Melodic Memory</option>
+            </select>
+          </div>
+          <div class="rangeRow">
+            <label class="muted" title="Higher = smoother long arcs">Smoothness</label>
+            <input id="flowSmooth" type="range" min="0" max="1" step="0.05" value="0.6">
+            <output class="value" id="flowSmoothVal">0.60</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted" title="Higher = less jitter for consonant chords">Consonance Bias</label>
+            <input id="consBias" type="range" min="0" max="1" step="0.05" value="0.6">
+            <output class="value" id="consBiasVal">0.60</output>
+          </div>
+          <div class="row"><button id="btnResetMem" class="tiny">Reset Melodic Memory</button></div>
+        </div>
+
+        <!-- FX -->
+        <div class="section" id="secFX">
+          <h2>FX <span class="hint">Fun extras</span></h2>
+          <div class="rangeRow">
+            <label class="muted">Symmetry</label>
+            <input id="symmetry" type="range" min="1" max="8" step="1" value="1">
+            <output class="value" id="symmetryVal">1</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Center Gravity</label>
+            <input id="gravity" type="range" min="0" max="1" step="0.01" value="0">
+            <output class="value" id="gravityVal">0.00</output>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Idle Fade</label>
+            <input id="silenceFade" type="range" min="0" max="0.05" step="0.002" value="0">
+            <output class="value" id="silenceFadeVal">0.000</output>
+          </div>
+        </div>
+
+        <!-- Layers -->
+        <div class="section" id="secLayers">
+          <h2>Canvas & Layers <span class="hint">Manage paint surfaces</span></h2>
+          <div class="row">
+            <button id="btnAddLayer" class="good">+ Layer</button>
+            <button id="btnDeleteLayer" class="danger">− Layer</button>
+            <button id="btnClearLayer" class="warn">Clear</button>
+            <button id="btnSavePNG">Save PNG</button>
+          </div>
+          <div class="row split"><label class="muted">Active Layer</label><select id="layerSelect"></select></div>
+          <div class="rangeRow">
+            <label class="muted">Layer Opacity</label>
+            <input id="layerOpacity" type="range" min="0.05" max="1" step="0.05" value="1">
+            <output class="value" id="layerOpacityVal">1.00</output>
+          </div>
+          <div class="row split">
+            <label class="muted">Blend</label>
+            <select id="blend">
+              <option value="source-over" selected>Normal</option>
+              <option value="lighter">Lighter</option>
+              <option value="screen">Screen</option>
+              <option value="multiply">Multiply</option>
+              <option value="overlay">Overlay</option>
+              <option value="color-dodge">Color Dodge</option>
+            </select>
+          </div>
+          <div class="rangeRow">
+            <label class="muted">Trail Fade</label>
+            <input id="trail" type="range" min="0" max="0.2" step="0.005" value="0">
+            <output class="value" id="trailVal">0.00</output>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="section" id="secNotes">
+          <h2>Notes <span class="hint">Active MIDI</span></h2>
+          <div class="list" id="noteList"></div>
+          <p class="muted" style="margin-top:8px">Pitch→hue (or fixed), velocity→thickness, aftertouch→thickness; CC74→scatter; mod-wheel→opacity.</p>
+        </div>
+
+        <!-- Capture -->
+        <div class="section" id="secCapture">
+          <h2>Capture <span class="hint">Record video</span></h2>
+          <div class="row">
+            <button id="btnRecord" class="primary">Record</button>
+            <button id="btnStopRec" class="warn">Stop</button>
+            <button id="btnScreenshot">Screenshot PNG</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts (load order matters) -->
+  <script src="js/core.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/draw.js"></script>
+  <script src="js/midi.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/capture.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
