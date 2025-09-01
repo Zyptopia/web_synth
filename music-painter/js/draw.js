@@ -4,10 +4,15 @@
   const fxCanvas = el('fxCanvas');
   const fxCtx = fxCanvas.getContext('2d');
 
-  // Base (frozen) canvas and paint layers
+  // Base “baked” canvas (existing layers live above this)
   const baseCanvas = document.createElement('canvas');
   baseCanvas.className='layerCanvas'; baseCanvas.style.zIndex=0; stageWrap.prepend(baseCanvas);
   const baseCtx = baseCanvas.getContext('2d');
+
+  // Long-lived additive accent canvas (for drum visuals that linger)
+  const accentCanvas = document.createElement('canvas');
+  accentCanvas.className='layerCanvas'; accentCanvas.style.zIndex=9; stageWrap.appendChild(accentCanvas);
+  const accentCtx = accentCanvas.getContext('2d');
 
   const layers=[]; let activeLayer=0;
 
@@ -36,8 +41,11 @@
     fxCanvas.style.width=r.width+'px'; fxCanvas.style.height=r.height+'px';
     fxCtx.setTransform(dpr,0,0,dpr,0,0);
   }
-  function resizeAll(){ resizeBase(); resizeFx(); layers.forEach(l=>resizeCanvas(l.canvas)); updateCenter(); }
+  function resizeAccent(){ resizeCanvas(accentCanvas); }
 
+  function resizeAll(){ resizeBase(); resizeFx(); resizeAccent(); layers.forEach(l=>resizeCanvas(l.canvas)); updateCenter(); }
+
+  // public layer ops
   function createLayer(){
     const c=document.createElement('canvas'); c.className='layerCanvas'; c.style.zIndex=1+layers.length; stageWrap.appendChild(c);
     const ctx=c.getContext('2d'); ctx.lineCap='round'; ctx.lineJoin='round'; resizeCanvas(c);
@@ -54,18 +62,24 @@
     layers.forEach(l=>l.ctx.clearRect(0,0,l.canvas.width,l.canvas.height));
   }
   function compositeTo(ctx){
-    ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#0b0f14'; ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
-    ctx.drawImage(baseCanvas,0,0); layers.forEach(l=>ctx.drawImage(l.canvas,0,0)); ctx.restore();
+    ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#0b0f14';
+    ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+    ctx.drawImage(baseCanvas,0,0);
+    layers.forEach(l=>ctx.drawImage(l.canvas,0,0));
+    // include accents + current FX in captures
+    ctx.drawImage(accentCanvas,0,0);
+    ctx.drawImage(fxCanvas,0,0);
+    ctx.restore();
   }
 
   // center cache
   const stageSize={w:0,h:0,cx:0,cy:0};
   function updateCenter(){ const r=stageWrap.getBoundingClientRect(); stageSize.w=r.width; stageSize.h=r.height; stageSize.cx=r.width/2; stageSize.cy=r.height/2; }
-  function rotPoint(x,y,cx,cy,a){ const s=Math.sin(a), c=Math.cos(a); x-=cx; y-=cy; const nx=x*c - y*s; const ny=x*s + y*c; return [nx+cx, ny+cy]; }
 
   // pen + colour
   const pen={x:0,y:0,px:0,py:0};
   function centerPen(){ updateCenter(); pen.x=stageSize.cx; pen.y=stageSize.cy; pen.px=pen.x; pen.py=pen.y; }
+  function getPen(){ return {x:pen.x, y:pen.y}; } // <— for pads to spawn visuals right where you draw
 
   // colour helpers
   function hexToHsl(hex){ const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255; const M=Math.max(r,g,b), m=Math.min(r,g,b); let h,s,l=(M+m)/2; if(M===m){h=s=0;} else { const d=M-m; s=l>0.5? d/(2-M-m) : d/(M+m); switch(M){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;} h/=6; } return {h:h*360,s:s*100,l:l*100}; }
@@ -91,29 +105,115 @@
   const baseAngle = n => (n*2.399963229728653 + MP.ui.flowPhase()) % (Math.PI*2);
   const harmAngle = n => (((MP.pc(n)*7)%12) * (2*Math.PI/12));
 
-  // drum FX + lasting influence
-  const effects=[]; const influence={scatter:0,spin:0,center:0,ybias:0};
-  function addInf(k,a){ influence[k]=Math.min(1000, influence[k]+a); }
+  // Drum FX engines
+  const effects=[];            // fast/transient (fxCanvas)
+  const accents=[];            // long-lived additive (accentCanvas)
+  const influence={scatter:0,spin:0,center:0,ybias:0}; // kept very subtle now
+
+  function addAccent(obj){ accents.push(obj); }
+
   MP.drawFX = {
-    kick(x,y,v){ effects.push({type:'ring',x,y,r:8,a:0.9*(v/127),grow:2.8,fade:0.015}); addInf('scatter',8*(v/127)); addInf('center',0.08*(v/127)); },
-    snare(x,y,v){ const n=24; for(let i=0;i<n;i++){ const ang=(i/n)*Math.PI*2; const sp=2+Math.random()*3; effects.push({type:'spark',x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:0.4,a:0.9*(v/127)});} addInf('scatter',14*(v/127)); addInf('spin',0.12*(v/127)); },
-    hat(x,y,v,open){ const n=open?20:10; for(let i=0;i<n;i++){ const ang=Math.random()*Math.PI*2; const sp=open?(2+Math.random()*2):(1+Math.random()*1.5); effects.push({type:'glint',x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:open?0.35:0.12,a:0.7*(v/127)});} addInf('scatter',(open?6:8)*(v/127)); },
-    tom(x,y,v,which){ effects.push({type:'swoop',x,y,t:0,a:0.8*(v/127)}); addInf('ybias',(which==='hi'?-0.12:0.12)*(v/127)); addInf('spin',0.06*(v/127)); },
-    clap(x,y,v){ effects.push({type:'splash',x,y,r:10,a:0.7*(v/127),grow:3.0,fade:0.008}); addInf('scatter',10*(v/127)); }
+    // --- long-lived “add, not distort” visuals ---
+    kick(x,y,v){
+      const hue = (x*0.2 + y*0.1) % 360;
+      addAccent({type:'bloom',x,y,r:12,a:0.25+0.4*(v/127),h:hue,grow:1.6,fade:0.002});           // gentle color wash
+      influence.center += 0.02*(v/127); // subtle (scaled again later)
+    },
+    snare(x,y,v){
+      const count = 40;
+      for(let i=0;i<count;i++){
+        const ang=Math.random()*Math.PI*2, sp=0.8+Math.random()*1.8;
+        addAccent({type:'confetti',x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,a:0.18+0.25*(v/127),life:1.8+Math.random()*0.8,h:(ang*180/Math.PI)%360});
+      }
+      influence.scatter += 2*(v/127);
+    },
+    hat(x,y,v,open){
+      const n=open?22:12;
+      for(let i=0;i<n;i++){
+        const ang=Math.random()*Math.PI*2, sp=open?1.4:1.0;
+        addAccent({type:'sparkle',x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,a:0.18+0.2*(v/127),life:open?1.6:0.9});
+      }
+    },
+    tom(x,y,v,which){
+      addAccent({type:'ribbon',x,y,t:0,a:0.22+0.28*(v/127),dir:(which==='hi')?-1:1,h:(which==='hi')?290:230});
+      influence.spin += 0.05*(v/127); // very small rotation nudge
+    },
+    clap(x,y,v){
+      for(let i=0;i<3;i++){ addAccent({type:'ring',x,y,r:10+i*12,a:0.2+0.3*(v/127),grow:0.9,fade:0.0018}); }
+      influence.scatter += 1*(v/127);
+    }
   };
+
+  // transient layer (kept light; mostly glints)
   function drawFX(dt){
-    fxCtx.save(); fxCtx.globalCompositeOperation='destination-out';
-    fxCtx.fillStyle=`rgba(0,0,0,${0.12*dt*60})`; fxCtx.fillRect(0,0,fxCanvas.width,fxCanvas.height); fxCtx.restore();
-    const decay=Math.pow(0.5, dt/0.5); influence.scatter*=decay; influence.spin*=decay; influence.center*=decay; influence.ybias*=decay;
+    fxCtx.save();
+    fxCtx.globalCompositeOperation='destination-out';
+    fxCtx.fillStyle=`rgba(0,0,0,${0.10*dt*60})`; // quick fade
+    fxCtx.fillRect(0,0,fxCanvas.width,fxCanvas.height);
+    fxCtx.restore();
+
     effects.forEach((e,i)=>{
-      if (e.type==='ring'||e.type==='splash'){ e.r+=e.grow*(dt*60); e.a-=e.fade*(dt*60); if(e.a<=0){effects.splice(i,1);return;}
-        fxCtx.save(); fxCtx.globalCompositeOperation='lighter'; fxCtx.strokeStyle=`hsla(200,100%,70%,${e.a})`; fxCtx.lineWidth=3; fxCtx.beginPath(); fxCtx.arc(e.x,e.y,e.r,0,Math.PI*2); fxCtx.stroke(); fxCtx.restore();
-      } else if (e.type==='spark'||e.type==='glint'){ e.x+=e.vx*(dt*60); e.y+=e.vy*(dt*60); e.life-=dt; if(e.life<=0){effects.splice(i,1);return;}
-        fxCtx.save(); fxCtx.globalCompositeOperation='lighter'; fxCtx.fillStyle=`hsla(45,100%,80%,${e.a})`; fxCtx.fillRect(e.x-1,e.y-1,2,2); fxCtx.restore();
-      } else if (e.type==='swoop'){ e.t+=dt*3; if(e.t>=1){effects.splice(i,1);return;} const yy=e.y+Math.sin(e.t*Math.PI)*60;
-        fxCtx.save(); fxCtx.globalCompositeOperation='lighter'; fxCtx.strokeStyle=`hsla(280,90%,70%,${e.a*(1-e.t)})`; fxCtx.lineWidth=2; fxCtx.beginPath(); fxCtx.moveTo(e.x-40,e.y); fxCtx.quadraticCurveTo(e.x,yy,e.x+40,e.y); fxCtx.stroke(); fxCtx.restore();
+      if (e.type==='glint'){
+        e.x+=e.vx*(dt*60); e.y+=e.vy*(dt*60); e.life-=dt; if (e.life<=0){ effects.splice(i,1); return; }
+        fxCtx.save(); fxCtx.globalCompositeOperation='lighter'; fxCtx.fillStyle=`hsla(50,100%,80%,${e.a})`; fxCtx.fillRect(e.x-1,e.y-1,2,2); fxCtx.restore();
       }
     });
+  }
+
+  // long-lived additive accents
+  function drawAccents(dt){
+    // very slow fade so accents linger; independent from idle/trail fades
+    accentCtx.save();
+    accentCtx.globalCompositeOperation='destination-out';
+    accentCtx.fillStyle=`rgba(0,0,0,${0.004*dt*60})`; // ~long half-life
+    accentCtx.fillRect(0,0,accentCanvas.width,accentCanvas.height);
+    accentCtx.restore();
+
+    accents.forEach((a,i)=>{
+      if (a.type==='bloom'){
+        a.r += a.grow*(dt*60); a.a -= a.fade*(dt*60);
+        if (a.a<=0){ accents.splice(i,1); return; }
+        const grad=accentCtx.createRadialGradient(a.x,a.y,0,a.x,a.y,a.r);
+        grad.addColorStop(0,`hsla(${a.h},100%,60%,${a.a*0.35})`);
+        grad.addColorStop(1,`hsla(${a.h},100%,60%,0)`);
+        accentCtx.save(); accentCtx.globalCompositeOperation='lighter';
+        accentCtx.fillStyle=grad; accentCtx.beginPath(); accentCtx.arc(a.x,a.y,a.r,0,Math.PI*2); accentCtx.fill(); accentCtx.restore();
+      } else if (a.type==='confetti' || a.type==='sparkle'){
+        a.x += a.vx*(dt*60); a.y += a.vy*(dt*60); a.life -= dt; if (a.life<=0){ accents.splice(i,1); return; }
+        accentCtx.save(); accentCtx.globalCompositeOperation='lighter';
+        const hue = a.h ?? ((a.x*0.3 + a.y*0.2) % 360);
+        accentCtx.fillStyle=`hsla(${hue},100%,70%,${a.a})`;
+        accentCtx.fillRect(a.x-1.2,a.y-1.2,2.4,2.4);
+        accentCtx.restore();
+      } else if (a.type==='ribbon'){
+        a.t += dt*0.9; if (a.t>=1.1){ accents.splice(i,1); return; }
+        const span=60, bend=40*a.dir;
+        const x1=a.x-span, x2=a.x+span;
+        const y1=a.y,     y2=a.y;
+        const cx=a.x, cy=a.y+bend*(Math.sin(a.t*Math.PI));
+        accentCtx.save(); accentCtx.globalCompositeOperation='lighter';
+        accentCtx.strokeStyle=`hsla(${a.h},100%,65%,${a.a*(1-a.t)})`;
+        accentCtx.lineWidth=2.5;
+        accentCtx.beginPath(); accentCtx.moveTo(x1,y1);
+        accentCtx.quadraticCurveTo(cx,cy,x2,y2);
+        accentCtx.stroke(); accentCtx.restore();
+      } else if (a.type==='ring'){
+        a.r += a.grow*(dt*60); a.a -= a.fade*(dt*60);
+        if (a.a<=0){ accents.splice(i,1); return; }
+        accentCtx.save(); accentCtx.globalCompositeOperation='lighter';
+        accentCtx.strokeStyle=`hsla(200,100%,75%,${a.a})`;
+        accentCtx.lineWidth=2;
+        accentCtx.beginPath(); accentCtx.arc(a.x,a.y,a.r,0,Math.PI*2); accentCtx.stroke();
+        accentCtx.restore();
+      }
+    });
+
+    // dial back motion influences so they don’t distort drawing
+    const decay = Math.pow(0.5, dt/1.4); // slow decay
+    influence.scatter *= decay;
+    influence.spin    *= decay;
+    influence.center  *= decay;
+    influence.ybias   *= decay;
   }
 
   // drawing primitives
@@ -134,8 +234,8 @@
       const dx=x2-x1, dy=y2-y1; const dist=Math.hypot(dx,dy)||1; const steps=Math.max(1,Math.floor(dist/Math.max(1,width*0.8)));
       for(let i=0;i<=steps;i++){
         const t=i/steps; const bx=x1+dx*t, by=y1+dy*t;
-        const extra=influence.scatter + MP.state.mpeScatter;
-        const spread=Math.max(0.5,width*0.6)+(MP.ui.scatter()+extra)*0.05;
+        const extra=influence.scatter*0.2; // softened
+        const spread=Math.max(0.5,width*0.6)+(MP.ui.scatter()+MP.state.mpeScatter+extra)*0.04;
         const px=bx+(Math.random()-0.5)*spread, py=by+(Math.random()-0.5)*spread;
         const r=Math.max(0.6,(width*0.35)*(0.6+Math.random()*0.8));
         ctx.fillStyle=`hsla(${hue},${sat}%,${light}%,${alpha*0.8})`;
@@ -154,7 +254,14 @@
     const n=Math.max(1,MP.ui.symmetry());
     if (n===1){ drawStroke(ctx,x1,y1,x2,y2,width,hue,sat,light,alpha); return; }
     const step=(2*Math.PI)/n;
-    for(let i=0;i<n;i++){ const a=i*step; const [rx1,ry1]=rotPoint(x1,y1,stageSize.cx,stageSize.cy,a); const [rx2,ry2]=rotPoint(x2,y2,stageSize.cx,stageSize.cy,a); drawStroke(ctx,rx1,ry1,rx2,ry2,width,hue,sat,light,alpha); }
+    for(let i=0;i<n;i++){
+      const a=i*step;
+      const s=Math.sin(a), c=Math.cos(a);
+      const cx=stageSize.cx, cy=stageSize.cy;
+      const rx1=(x1-cx)*c - (y1-cy)*s + cx, ry1=(x1-cx)*s + (y1-cy)*c + cy;
+      const rx2=(x2-cx)*c - (y2-cy)*s + cx, ry2=(x2-cx)*s + (y2-cy)*c + cy;
+      drawStroke(ctx,rx1,ry1,rx2,ry2,width,hue,sat,light,alpha);
+    }
   }
 
   // loop
@@ -166,7 +273,7 @@
     // layer trail fade (time-based)
     const trail=MP.ui.trail(); if (trail>0){ for(const l of layers){ const c=l.ctx; c.save(); c.globalCompositeOperation='destination-out'; c.fillStyle=`rgba(0,0,0,${trail})`; c.fillRect(0,0,l.canvas.width,l.canvas.height); c.restore(); } }
 
-    // idle fade (only when silent)
+    // idle fade (only when silent) – accents are NOT affected (they linger)
     if (MP.state.activeNotes.size===0){ const sf=MP.ui.silenceFade(); if (sf>0){ const per = sf*(dt*60); for(const l of layers){ const c=l.ctx; c.save(); c.globalCompositeOperation='destination-out'; c.fillStyle=`rgba(0,0,0,${per})`; c.fillRect(0,0,l.canvas.width,l.canvas.height); c.restore(); } } }
 
     // vectors from notes
@@ -196,15 +303,22 @@
       const t=0.35; V={x:Bb.x*(1-t)+Hh.x*t, y:Bb.y*(1-t)+Hh.y*t}; const m=Math.hypot(V.x,V.y)||1; V.x/=m; V.y/=m;
     }
 
-    // musical modifiers
+    // very subtle drum influences (so we add, not distort)
+    if (Math.abs(influence.spin) > 0.0001){
+      const ang = influence.spin * 0.001; // tiny rotation
+      const cs = Math.cos(ang), sn = Math.sin(ang);
+      const rx = V.x*cs - V.y*sn, ry = V.x*sn + V.y*cs;
+      V.x = rx; V.y = ry;
+    }
+
     const cons = chordConsonance(act);
-    const baseSc = MP.ui.scatter() + MP.state.mpeScatter + influence.scatter;
+    const baseSc = MP.ui.scatter() + MP.state.mpeScatter + influence.scatter*0.2; // softened
     const scatterEff = baseSc * (1 - cons * MP.ui.consBias());
-    const gRaw = MP.ui.gravity() + influence.center;
-    const gEff = Math.pow(Math.min(1,gRaw),1.8) * 0.45;
+    const gRaw = MP.ui.gravity() + influence.center*0.15;           // softened
+    const gEff = Math.pow(Math.min(1,gRaw),1.8) * 0.35;
     if (gEff>0){ const gx=(stageSize.cx-pen.x), gy=(stageSize.cy-pen.y), gm=Math.hypot(gx,gy)||1;
       V.x = V.x*(1-gEff) + (gx/gm)*gEff; V.y = V.y*(1-gEff) + (gy/gm)*gEff; }
-    if (Math.abs(influence.ybias)>0.0001) V.y += influence.ybias;
+    if (Math.abs(influence.ybias)>0.0001) V.y += influence.ybias*0.2;
 
     const mV=Math.hypot(V.x,V.y)||1; V.x/=mV; V.y/=mV;
 
@@ -231,7 +345,9 @@
       drawSymmetry(ctx, pen.px, pen.py, pen.x, pen.y, width, hue.toFixed(1), sat, light, alpha);
     }
 
-    drawFX(dt);
+    drawAccents(dt); // long-lived additive
+    drawFX(dt);      // quick glints
+
     MP.capture?.compositeEachFrame?.(ctx => compositeTo(ctx));
     requestAnimationFrame(loop);
   }
@@ -243,11 +359,13 @@
     layerSetOpacity:(i,v)=>{ layers[i].opacity=v; },
     freezeArtwork,
     compositeTo,
-    resizeAll, centerPen, updateCenter, fxCanvas
+    resizeAll, centerPen, updateCenter, fxCanvas,
+    getPen
   };
 
+  // init
   window.addEventListener('resize', resizeAll);
-  createLayer();
+  createLayer(); // at least one
   resizeAll(); centerPen();
   requestAnimationFrame(loop);
 })(window.MP);

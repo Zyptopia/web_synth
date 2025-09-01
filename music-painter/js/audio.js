@@ -1,9 +1,11 @@
 (function(MP){
   let audioCtx=null, closedByPanic=false;
   const master = { node:null, level:0.22 };
+
   MP.audio = {
     get ctx(){ return audioCtx; },
     master,
+
     ensure(){
       if (!audioCtx || closedByPanic){
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -18,13 +20,43 @@
       }
       return audioCtx;
     },
+
+    async unlock(){
+      // Must be called from a user gesture (click/keydown/touch)
+      try{
+        const ctx = MP.audio.ensure();
+        if (ctx.state === 'running') return 'running';
+
+        // 1) Try resume directly
+        try { await ctx.resume(); } catch {}
+        if (ctx.state === 'running') return 'running';
+
+        // 2) Nudge the graph with a silent osc burst
+        try{
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          g.gain.value = 0.00001; // inaudible
+          o.connect(g).connect(MP.audio.master.node);
+          o.start();
+          o.stop(ctx.currentTime + 0.05);
+        }catch{}
+
+        try { await ctx.resume(); } catch {}
+        return ctx.state;
+      } catch (e){
+        console.warn('unlock error', e);
+        return 'error';
+      }
+    },
+
     async close(){
       if (audioCtx){ try{ await audioCtx.close(); }catch{} closedByPanic=true; MP.ui?.setAudioState?.('closed'); }
     },
+
     midiToFreq(n){ return 440*Math.pow(2,(n-69)/12); }
   };
 
-  // Simple poly synth
+  // --- Poly synth ---
   const activeOsc = new Map(); // note → {osc,g}
   MP.audio.activeOsc = activeOsc;
 

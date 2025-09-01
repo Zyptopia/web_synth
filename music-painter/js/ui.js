@@ -36,7 +36,9 @@
 
   const flowModeSel  = el('flowMode');   const flowSmooth    = el('flowSmooth'); const flowSmoothVal=el('flowSmoothVal');
   const consBias     = el('consBias');   const consBiasVal   = el('consBiasVal');
-  const btnResetMem  = el('btnResetMem'); const flowPop=el('flowPop'); const btnFlowHelp=el('btnFlowHelp');
+  const btnResetMem  = el('btnResetMem');
+  const flowPop      = el('flowPop');
+  const btnFlowHelp  = el('btnFlowHelp');
 
   const symmetry     = el('symmetry');   const gravity       = el('gravity');
   const symmetryVal  = el('symmetryVal'); const gravityVal   = el('gravityVal');
@@ -68,6 +70,22 @@
   let lastTrail=parseFloat(trailRange.value), lastSilence=parseFloat(silenceFade.value);
   trailRange.addEventListener('input',()=>{ const v=parseFloat(trailRange.value); if(v!==lastTrail){ MP.draw.freezeArtwork(); lastTrail=v; }});
   silenceFade.addEventListener('input',()=>{ const v=parseFloat(silenceFade.value); if(v!==lastSilence){ MP.draw.freezeArtwork(); lastSilence=v; }});
+
+  // --- notes list (this was missing) ---
+  function refreshNoteList(){
+    noteList.innerHTML='';
+    const s=MP.state;
+    if (!s || !s.activeNotes || s.activeNotes.size===0){
+      noteList.innerHTML='<div class="item"><span class="muted">No active notes</span><span class="pill">—</span></div>';
+      return;
+    }
+    s.activeNotes.forEach((n, note)=>{
+      const div=document.createElement('div');
+      const held=s.held && s.held.has(note) ? 1 : 0;
+      div.innerHTML=`<span>${MP.midiNoteName(note)}</span><span class="pill">vel ${n.velocity} • held ${held}${n.sustained?' • sus':''}</span>`;
+      noteList.appendChild(div);
+    });
+  }
 
   // public getters used by draw
   MP.ui = {
@@ -104,11 +122,26 @@
   };
   let _erasing=false, _flowPhase=0;
 
-  // buttons
+  // ---- AUDIO START / UNLOCK ----
+  async function tryUnlock(){
+    const st = await MP.audio.unlock();
+    MP.ui.setAudioState(st);
+    return st;
+  }
   btnStartAudio.addEventListener('click', async ()=>{
-    try{ MP.audio.ensure(); await MP.audio.ctx.resume(); audioStatus.textContent='Audio: running'; }
-    catch(e){ alert('Could not start audio: ' + e.message); }
+    const st = await tryUnlock();
+    if (st !== 'running') alert('Could not start audio. Click anywhere on the canvas then press Start Audio again.');
   });
+  let unlocked=false;
+  const oneShot = async ()=>{
+    if (unlocked) return;
+    const st = await tryUnlock();
+    if (st === 'running'){ unlocked=true; window.removeEventListener('pointerdown', oneShot); window.removeEventListener('keydown', oneShot); }
+  };
+  window.addEventListener('pointerdown', oneShot, { passive:true });
+  window.addEventListener('keydown', oneShot);
+
+  // MIDI / Panic / Eraser
   btnConnectMIDI.addEventListener('click', MP.midi.connect);
   btnPanic.addEventListener('click', MP.engine.panic);
   btnEraser.addEventListener('click', ()=>MP.engine.toggleEraser());
@@ -141,17 +174,16 @@
   // flow help
   btnFlowHelp.addEventListener('click', (e)=>{
     e.stopPropagation();
-    const pop = el('flowPop');
-    pop.innerHTML = `<div style='margin-bottom:6px'><strong>Flow modes</strong></div>
+    flowPop.innerHTML = `<div style='margin-bottom:6px'><strong>Flow modes</strong></div>
     <div><b>Balanced</b>: mix of melodic path + harmonic pull.</div>
     <div><b>Harmonic</b>: follows chord shapes; consonant intervals steer straighter.</div>
     <div><b>Melodic Memory</b>: continues the direction of your phrase.</div>
     <hr style='border-color:#263142'>
     <div><b>Smoothness</b>: higher = longer arcs.</div>
     <div><b>Consonance Bias</b>: higher = less jitter when notes fit together.</div>`;
-    pop.style.display = pop.style.display==='block' ? 'none' : 'block';
+    flowPop.style.display = flowPop.style.display==='block' ? 'none' : 'block';
   });
-  document.addEventListener('click',(e)=>{ const pop=el('flowPop'); if (pop.style.display==='block' && !pop.contains(e.target) && e.target!==btnFlowHelp) pop.style.display='none'; });
+  document.addEventListener('click',(e)=>{ if (flowPop.style.display==='block' && !flowPop.contains(e.target) && e.target!==btnFlowHelp) flowPop.style.display='none'; });
 
   // keyboard (desktop)
   const downKeys = new Set();
@@ -160,34 +192,16 @@
     if (raw==='Shift'){ _erasing=true; btnEraser.textContent='Eraser: On'; e.preventDefault(); return; }
     if (k==='n'){ MP.draw.createLayer(); e.preventDefault(); return; }
     if (k==='c'){ MP.draw.clearLayer(); e.preventDefault(); return; }
-    const drum = MP.KEY_DRUMS_NOTE[k]; if (drum!==undefined && !downKeys.has(k)){ downKeys.add(k); MP.midi.triggerPad(MP.PAD_TO_TYPE[drum],115); return; }
+    const drum = MP.KEY_DRUMS_NOTE[k]; if (drum!==undefined && !downKeys.has(k)){ downKeys.add(k); MP.midi.triggerPad(MP.PAD_TO_TYPE[drum],115); return; } // one-shot
     const note = MP.KEY_LAYOUT[k]; if (note!==undefined && !downKeys.has(k)){ downKeys.add(k); MP.engine.noteOn(note,110); }
   });
   window.addEventListener('keyup',(e)=>{
     const raw=e.key; const k=raw.length===1? raw.toLowerCase() : raw;
     if (raw==='Shift'){ _erasing=false; btnEraser.textContent='Eraser: Off'; return; }
-    const drum = MP.KEY_DRUMS_NOTE[k]; if (drum!==undefined){ downKeys.delete(k); return; } // one-shots
+    const drum = MP.KEY_DRUMS_NOTE[k]; if (drum!==undefined){ downKeys.delete(k); return; }
     const note = MP.KEY_LAYOUT[k]; if (note!==undefined){ downKeys.delete(k); MP.engine.noteOff(note); }
   });
 
-  // wake audio by gesture
-  el('stageWrap').addEventListener('pointerdown', ()=>{ try{ MP.audio.ensure(); MP.audio.ctx.resume(); audioStatus.textContent='Audio: running'; }catch{} });
-
-  // keys tooltip
-  const keysBtn = el('btnKeys'), keysPop = el('keysPop');
-  function renderKeysPop(){
-    const KB_ROWS=[ ['1','2','3','4','5','6','7','8','9','0'], ['Q','W','E','R','T','Y','U','I','O','P'], ['A','S','D','F','G','H','J','K','L'], ['Z','X','C','V','B','N','M'] ];
-    const html = KB_ROWS.map(row=>{
-      return `<div class="kb-row">` + row.map(k=>{
-        const kl=k.toLowerCase(); const n=MP.KEY_LAYOUT[kl]; const pad=MP.KEY_DRUMS_NOTE[k];
-        const mapped=(n!==undefined)||(pad!==undefined);
-        const title= pad!==undefined? `${k} → Pad ${pad}` : (n!==undefined ? `${k} → ${MP.midiNoteName(n)}` : `${k} (not mapped)`);
-        const line2= pad!==undefined? `<span class="note">Pad ${pad}</span>` : (n!==undefined? `<span class="note">${MP.midiNoteName(n)}</span>` :'');
-        return `<div class="keycap${mapped?' mapped':''}" title="${title}"><span class="label">${k}</span>${line2}</div>`;
-      }).join('') + `</div>`;
-    }).join('');
-    keysPop.innerHTML = `<div style="margin-bottom:6px"><strong>Computer keyboard</strong></div><div class="keys-grid">${html}</div><div class="muted" style="margin-top:6px">Shortcuts: <span class="kbd">Shift</span> hold eraser • <span class="kbd">N</span> new layer • <span class="kbd">C</span> clear layer</div>`;
-  }
-  keysBtn.addEventListener('click',(e)=>{ e.stopPropagation(); if (keysPop.style.display==='block') keysPop.style.display='none'; else { renderKeysPop(); keysPop.style.display='block'; }});
-  document.addEventListener('click',(e)=>{ if (!keysPop.contains(e.target) && e.target!==keysBtn) keysPop.style.display='none'; });
+  // also try to unlock when clicking the stage
+  el('stageWrap').addEventListener('pointerdown', ()=>{ tryUnlock(); }, { passive:true });
 })(window.MP);

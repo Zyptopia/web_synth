@@ -1,14 +1,16 @@
 (function(MP){
   const el = MP.el;
   const midiStatus = el('midiStatus');
+  const hiddenSel = (()=>{ const s=document.createElement('select'); s.style.display='none'; document.body.appendChild(s); return s; })();
 
   let access=null, input=null;
 
   function setInput(i){ if (input) input.onmidimessage=null; input=i; if (input){ input.onmidimessage=onMsg; midiStatus.textContent='MIDI: ' + (input.name||'connected'); } }
 
   function populate(){
-    if (!access) return;
+    hiddenSel.innerHTML=''; if (!access) return;
     const inputs = Array.from(access.inputs.values());
+    inputs.forEach((inp,idx)=>{ const opt=document.createElement('option'); opt.value=inp.id; opt.textContent=inp.name||`Input ${idx+1}`; hiddenSel.appendChild(opt); });
     if (inputs.length) setInput(inputs[0]);
     else midiStatus.textContent='MIDI: no inputs';
   }
@@ -20,16 +22,18 @@
   }
 
   function triggerPad(type, vel){
-    const cx=MP.draw.fxCanvas.width/2, cy=MP.draw.fxCanvas.height/2;
-    if (type==='kick'){ MP.drums.kick(vel); MP.drawFX.kick(cx,cy,vel); }
-    else if (type==='snare'){ MP.drums.snare(vel); MP.drawFX.snare(cx,cy,vel); }
-    else if (type==='hat-closed'){ MP.drums.hat(vel,false); MP.drawFX.hat(cx,cy,vel,false); }
-    else if (type==='hat-open'){ MP.drums.hat(vel,true); MP.drawFX.hat(cx,cy,vel,true); }
-    else if (type==='tom-low'){ MP.drums.tom(vel,'low'); MP.drawFX.tom(cx,cy,vel,'lo'); }
-    else if (type==='tom-floor'){ MP.drums.tom(vel,'mid'); MP.drawFX.tom(cx,cy,vel,'lo'); }
-    else if (type==='tom-high'){ MP.drums.tom(vel,'hi'); MP.drawFX.tom(cx,cy,vel,'hi'); }
-    else if (type==='rim'){ MP.drums.snare(Math.max(70,vel)); MP.drawFX.snare(cx,cy,vel*0.8); }
-    else if (type==='clap'){ MP.drums.clap(vel); MP.drawFX.clap(cx,cy,vel); }
+    const p = MP.draw.getPen ? MP.draw.getPen() : { x: MP.draw.fxCanvas.width/2, y: MP.draw.fxCanvas.height/2 };
+    const x = p.x, y = p.y;
+
+    if (type==='kick'){ MP.drums.kick(vel); MP.drawFX.kick(x,y,vel); }
+    else if (type==='snare'){ MP.drums.snare(vel); MP.drawFX.snare(x,y,vel); }
+    else if (type==='hat-closed'){ MP.drums.hat(vel,false); MP.drawFX.hat(x,y,vel,false); }
+    else if (type==='hat-open'){ MP.drums.hat(vel,true); MP.drawFX.hat(x,y,vel,true); }
+    else if (type==='tom-low'){ MP.drums.tom(vel,'low'); MP.drawFX.tom(x,y,vel,'lo'); }
+    else if (type==='tom-floor'){ MP.drums.tom(vel,'mid'); MP.drawFX.tom(x,y,vel,'lo'); }
+    else if (type==='tom-high'){ MP.drums.tom(vel,'hi'); MP.drawFX.tom(x,y,vel,'hi'); }
+    else if (type==='rim'){ MP.drums.snare(Math.max(70,vel)); MP.drawFX.snare(x,y,vel*0.8); }
+    else if (type==='clap'){ MP.drums.clap(vel); MP.drawFX.clap(x,y,vel); }
   }
 
   function maybePadOn(note, vel){
