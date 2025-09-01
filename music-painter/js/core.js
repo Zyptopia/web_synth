@@ -5,10 +5,17 @@ window.MP = window.MP || {};
 
     // simple mobile check (used by mobile.js)
   MP.isMobile = (() => {
-    const ua = navigator.userAgent || '';
-    const coarse = matchMedia?.('(hover:none) and (pointer:coarse)').matches;
-    return coarse || /Android|webOS|iPhone|iPad|iPod|Mobile|CriOS|FxiOS/i.test(ua);
-  })();
+  const ua = navigator.userAgent || '';
+  const coarse = matchMedia?.('(hover:none) and (pointer:coarse)').matches;
+  return coarse || /Android|webOS|iPhone|iPad|iPod|Mobile|CriOS|FxiOS/i.test(ua);
+})();
+
+// add a CSS hook so we can style reliably
+if (MP.isMobile) {
+  document.documentElement.classList.add('mobile');
+} else {
+  document.documentElement.classList.remove('mobile');
+}
 
 
   // --- SAFE UI STUB (replaced by real ui.js later) ---

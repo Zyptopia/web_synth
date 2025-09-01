@@ -9,7 +9,20 @@
   const btnEraser = el('btnEraser');
   const tabsEl = el('tabs'); const dockEl = el('dock');
 
-    if (MP.isMobile && btnConnectMIDI) btnConnectMIDI.style.display = 'none';
+const stageWrap = MP.el('stageWrap');
+
+// hide MIDI button on mobile (runtime, not just CSS)
+if (MP.isMobile && btnConnectMIDI) btnConnectMIDI.style.display = 'none';
+
+// keep the dock visible: push the drawing area up by the dock height on mobile
+function updateDockPadding(){
+  const h = dockEl?.getBoundingClientRect().height || 0;
+  // write a CSS var the stylesheet will use
+  document.documentElement.style.setProperty('--dockh', MP.isMobile ? `${h}px` : '0px');
+}
+updateDockPadding();
+window.addEventListener('resize', updateDockPadding);
+
 
   // sections
   const ids = ['secBrush','secColour','secFlow','secFX','secLayers','secNotes','secCapture'];
@@ -18,6 +31,7 @@
     tabsEl.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
     const sec=document.getElementById(id); if(sec) sec.classList.add('active');
     if (btn) btn.classList.add('active');
+    updateDockPadding();
   }
   ids.forEach((id,i)=>{ const b=document.createElement('button'); b.className='tab'; b.textContent=id.replace('sec',''); b.addEventListener('click',()=>activateSection(id,b)); tabsEl.appendChild(b); if(i===0) activateSection(id,b); });
   const spacer=document.createElement('div'); spacer.className='spacer'; tabsEl.appendChild(spacer);
