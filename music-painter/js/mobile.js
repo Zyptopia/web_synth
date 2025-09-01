@@ -1,4 +1,4 @@
-// Mobile mini keyboard + pads + compact control panel
+// Mobile mini keyboard + pads + compact control panel (pad opens by default)
 (function (MP) {
   const isMobile =
     (MP && MP.isMobile) ||
@@ -24,6 +24,14 @@
   .mp-pad__bar{ display:flex; gap:8px; align-items:center; padding:6px 8px; border-bottom:1px solid #223049 }
   .mp-pad__bar .sp{ flex:1 }
   .mp-pad__btn{ background:#0f172a; color:#e8f0ff; border:1px solid #263142; border-radius:10px; padding:6px 10px }
+  .mp-ctrls{ padding:8px; background:#0e1622; border-bottom:1px solid #223049; }
+  .mp-ctrls.hidden{ display:none; }
+  .mp-ctrls__tabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+  .mp-ctrls__tab{ padding:4px 8px; border:1px solid #263142; border-radius:999px; background:#0f172a; color:#9fb3d1; font-size:12px; }
+  .mp-ctrls__tab.active{ background:#17233a; color:#e8f0ff; border-color:#2a3b52; }
+  .mp-ctrls__section{ display:none; }
+  .mp-ctrls__section.active{ display:block; }
+  .mp-padsRow{ display:grid; grid-template-columns:repeat(8,1fr); gap:8px; padding:8px; }
 
   /* Piano visuals */
   .mp-piano{ position:relative; height:180px; padding:8px }
@@ -73,6 +81,20 @@
   `;
   document.body.appendChild(pad);
 
+  // put near top-level handlers, after `const pad = ...` and `const toggle = ...`
+function showPad(open){
+  if (open){
+    pad.classList.add('show');
+    toggle.style.display = 'none';     // HIDE the floating Pad button
+  } else {
+    pad.classList.remove('show');
+    toggle.style.display = '';         // SHOW it again when closed
+  }
+  // keep canvas sized
+  if (typeof updatePadVars === 'function') requestAnimationFrame(updatePadVars);
+}
+
+
   const btnClose   = pad.querySelector("#mpPadClose");
   const btnCtrls   = pad.querySelector("#mpToggleCtrls");
   const btnOctDown = pad.querySelector("#mpOctDown");
@@ -91,6 +113,25 @@
   let octave = 4; // C4
   function noteName(n){ return ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][n%12] + (Math.floor(n/12)-1); }
   function setOctLbl(){ const low = 12*(octave+1); octLbl.textContent = `${noteName(low).replace(/\d+/,'')}${octave}–C${octave+1}`; }
+
+  // ---------- keep canvas sized above the pad ----------
+  function updatePadVars(){
+    const topbar = document.querySelector('.topbar');
+    const th = topbar?.getBoundingClientRect().height || 0;
+    const ph = pad.classList.contains('show') ? (pad.getBoundingClientRect().height || 0) : 0;
+    document.documentElement.style.setProperty('--topH', `${th}px`);
+    document.documentElement.style.setProperty('--padH', `${ph}px`);
+    MP.draw?.resizeAll?.(); // resize canvases + recenter pen
+  }
+
+  // pad opens by default
+  showPad(true);  // opens + hides toggle
+  requestAnimationFrame(updatePadVars);
+
+  // Observe size changes (orientation, bars, etc.)
+  const ro = new ResizeObserver(updatePadVars);
+  ro.observe(document.documentElement);
+  ro.observe(pad);
 
   // ---------- helpers ----------
   const pointerToNote = new Map();
@@ -147,6 +188,7 @@
 
   // ---------- compact control panel ----------
   const SECTIONS = [
+    { id:'sound',  label:'Sound'  },
     { id:'brush',  label:'Brush'  },
     { id:'colour', label:'Colour' },
     { id:'flow',   label:'Flow'   },
@@ -169,34 +211,42 @@
     input.addEventListener('input', ()=>{ out.textContent=input.value; if(src){ src.value=input.value; src.dispatchEvent(new Event('input', {bubbles:true})); } });
     wrap.append(lab,input,out); return wrap;
   }
-  function proxySelect(label, srcId, optionsFromDom=true, optionsList=[]){
-    const src=document.getElementById(srcId);
+  function proxySelect(label, srcId, opts){
     const wrap=document.createElement('div'); wrap.className='row split';
     const lab=document.createElement('label'); lab.className='muted'; lab.textContent=label;
     const sel=document.createElement('select');
-    if (optionsFromDom && src){
-      sel.innerHTML = src.innerHTML;
-      sel.value = src.value;
-    } else {
-      sel.innerHTML = optionsList.map(o=>`<option value="${o.value}">${o.label}</option>`).join('');
-      if (src) sel.value=src.value;
-    }
-    sel.addEventListener('change', ()=>{ if(src){ src.value=sel.value; src.dispatchEvent(new Event('change', {bubbles:true})); } });
+    sel.innerHTML = opts.map(o=>`<option value="${o}">${o}</option>`).join('');
+    // if the desktop select exists, reflect it
+    const desktopSel = document.getElementById(srcId);
+    if (desktopSel) sel.value = desktopSel.value;
+    sel.addEventListener('change', ()=>{
+      if (srcId==='synthPresetSel') MP.audio.setSynthPreset(sel.value);
+      if (srcId==='drumKitSel')     MP.drums.setKit(sel.value);
+      if (desktopSel){ desktopSel.value = sel.value; desktopSel.dispatchEvent(new Event('change',{bubbles:true})); }
+    });
     wrap.append(lab, sel); return wrap;
   }
   function proxyButton(label, onClick){
     const b=document.createElement('button'); b.className='mp-pad__btn'; b.textContent=label; b.addEventListener('click', onClick); return b;
   }
   function buildCtrls(){
-    // tabs + sections
     tabsEl.innerHTML=''; secsEl.innerHTML='';
     SECTIONS.forEach(s=>{ tabsEl.appendChild(mkTab(s)); secsEl.appendChild(mkSec(s)); });
     tabsEl.addEventListener('click',(e)=>{ const id=e.target?.dataset?.id; if(id) activate(id); });
 
+    // Sound
+    const ss = document.getElementById('mpsec_sound');
+    const synthOpts = MP.audio.getSynthPresets ? MP.audio.getSynthPresets() : ['Classic','Soft','Square','Tri','Pluck'];
+    const kitOpts   = MP.drums.getKits ? MP.drums.getKits() : ['Clean','808','LoFi','Bright'];
+    ss.append(
+      proxySelect('Piano Synth','synthPresetSel', synthOpts),
+      proxySelect('Drum Kit','drumKitSel', kitOpts)
+    );
+
     // Brush
     const sb = document.getElementById('mpsec_brush');
     sb.append(
-      proxySelect('Type','brushType'),
+      proxySelect('Type','brushType', []),
       proxyRange('Scale',   'brushScale', 0.2, 5,   0.1),
       proxyRange('Opacity', 'opacity',    0.05,1,   0.05),
       proxyRange('Scatter', 'scatter',    0,   60,  1),
@@ -212,7 +262,7 @@
     pickInp.addEventListener('input', ()=>{ if(colorPickSrc){ colorPickSrc.value = pickInp.value; colorPickSrc.dispatchEvent(new Event('input',{bubbles:true})); } });
     pickRow.append(pickLab, pickInp);
     sc.append(
-      proxySelect('Mode','colorMode'),
+      proxySelect('Mode','colorMode', []),
       pickRow,
       proxyRange('Hue Offset','hueOffset', -180,180, 1),
       proxyRange('Saturation','sat',       0,   100, 1),
@@ -222,7 +272,7 @@
     // Flow
     const sf = document.getElementById('mpsec_flow');
     sf.append(
-      proxySelect('Mode','flowMode'),
+      proxySelect('Mode','flowMode', []),
       proxyRange('Smoothness',    'flowSmooth', 0, 1, 0.05),
       proxyRange('Consonance Bias','consBias',  0, 1, 0.05),
       proxyButton('Reset Melodic Memory', ()=> document.getElementById('btnResetMem')?.click())
@@ -240,7 +290,7 @@
     const sl = document.getElementById('mpsec_layers');
     sl.append(
       proxyRange('Layer Opacity','layerOpacity', 0.05, 1, 0.05),
-      proxySelect('Blend','blend'),
+      proxySelect('Blend','blend', []),
       proxyRange('Trail Fade','trail', 0, 0.2, 0.005),
       proxyButton('Clear Layer', ()=> document.getElementById('btnClearLayer')?.click()),
       proxyButton('Save PNG',   ()=> document.getElementById('btnSavePNG')?.click())
@@ -254,17 +304,18 @@
       proxyButton('Screenshot',()=> document.getElementById('btnScreenshot')?.click())
     );
 
-    activate('brush'); // default
+    activate('sound'); // default to Sound on mobile
   }
 
   // ---------- wire ----------
-  toggle.addEventListener('click', ()=> pad.classList.add('show'));
-  btnClose.addEventListener('click', ()=> pad.classList.remove('show'));
+  toggle.addEventListener('click', ()=> showPad(true));
+  btnClose.addEventListener('click', ()=> showPad(false));
   btnCtrls.addEventListener('click', ()=>{
     ctrlsWrap.classList.toggle('hidden');
     btnCtrls.textContent = ctrlsWrap.classList.contains('hidden') ? '▸ Controls' : '▾ Controls';
+    updatePadVars();
   });
-  btnPads.addEventListener('click', ()=>{ padsVisible = !padsVisible; buildPads(); });
+  btnPads.addEventListener('click', ()=>{ padsVisible = !padsVisible; buildPads(); updatePadVars(); });
 
   btnOctDown.addEventListener('click', ()=>{ octave = Math.max(1, octave-1); buildPiano(); });
   btnOctUp.addEventListener('click',   ()=>{ octave = Math.min(7, octave+1); buildPiano(); });
@@ -274,4 +325,5 @@
   buildPiano();
   buildPads();
   setOctLbl();
+  updatePadVars();
 })(window.MP);

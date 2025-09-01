@@ -42,6 +42,18 @@ html.mobile .dock{ display:none !important; }
 /* Keep the floating Pad toggle above anything */
 .mp-pad__toggle{ z-index:10050; }
 
+/* Hide the full desktop dock on mobile (mobile uses its own compact panel) */
+html.mobile .dock{ display:none !important; }
+
+/* Mobile: stage always fits the visible area that remains above the pad */
+html.mobile #stageWrap{
+  height: calc(100svh - var(--topH, 0px) - var(--padH, 0px));
+  min-height: 0; /* allow shrinking */
+}
+
+/* Keep the floating mobile “Pad” toggle above everything */
+.mp-pad__toggle{ z-index:10050; }
+
 
 /* viewport sizing (mobile-safe) */
 html,body{
@@ -133,3 +145,4 @@ button.tiny{padding:6px 8px;font-size:12px}
   .section{ min-width:0; }                       /* allow narrow screens */
   .sections{ max-height:38vh; overflow:auto; -webkit-overflow-scrolling:touch; }
 }
+html.mobile .popover{ position:fixed; z-index:10070; }

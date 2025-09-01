@@ -9,18 +9,27 @@
   const btnEraser = el('btnEraser');
   const tabsEl = el('tabs'); const dockEl = el('dock');
 
-const stageWrap = MP.el('stageWrap');
+  const stageWrap = MP.el('stageWrap');
 
-// hide MIDI button on mobile (runtime, not just CSS)
-if (MP.isMobile && btnConnectMIDI) btnConnectMIDI.style.display = 'none';
+  // --- topbar height -> CSS var so mobile can size canvas around pad/topbar
+  const topbar = document.querySelector('.topbar');
+  function updateTopVar(){
+    const th = topbar?.getBoundingClientRect().height || 0;
+    document.documentElement.style.setProperty('--topH', `${th}px`);
+  }
+  updateTopVar();
+  window.addEventListener('resize', updateTopVar);
 
-function updateDockPadding(){
-  const h = dockEl?.getBoundingClientRect().height || 0;
-  document.documentElement.style.setProperty('--dockh', MP.isMobile ? '0px' : `${h}px`);
-}
-updateDockPadding();
-window.addEventListener('resize', updateDockPadding);
+  // Hide Connect MIDI on mobile at runtime (in case CSS misses some engines)
+  if (MP.isMobile && btnConnectMIDI) btnConnectMIDI.style.display = 'none';
+  // (you had this twice, one copy is enough)
 
+  function updateDockPadding(){
+    const h = dockEl?.getBoundingClientRect().height || 0;
+    document.documentElement.style.setProperty('--dockh', MP.isMobile ? '0px' : `${h}px`);
+  }
+  updateDockPadding();
+  window.addEventListener('resize', updateDockPadding);
 
   // sections
   const ids = ['secBrush','secColour','secFlow','secFX','secLayers','secNotes','secCapture'];
@@ -36,6 +45,41 @@ window.addEventListener('resize', updateDockPadding);
   const btnToggleDock=document.createElement('button'); btnToggleDock.className='tiny'; btnToggleDock.textContent='▾ Collapse';
   btnToggleDock.addEventListener('click',()=>{ dockEl.classList.toggle('collapsed'); btnToggleDock.textContent=dockEl.classList.contains('collapsed')?'▴ Expand':'▾ Collapse'; });
   tabsEl.appendChild(btnToggleDock);
+
+  // --- optional desktop "Sound" section (presets) ---
+  (function(){
+    const sectionsWrap = document.querySelector('.sections');
+    const sec = document.createElement('div');
+    sec.className = 'section'; sec.id = 'secSound';
+    sec.innerHTML = `
+      <h2>Sound <span class="hint">Instruments</span></h2>
+      <div class="row split">
+        <label class="muted">Piano Synth</label>
+        <select id="synthPresetSel"></select>
+      </div>
+      <div class="row split">
+        <label class="muted">Drum Kit</label>
+        <select id="drumKitSel"></select>
+      </div>
+    `;
+    sectionsWrap.insertBefore(sec, sectionsWrap.firstChild);
+
+    const b=document.createElement('button'); b.className='tab'; b.textContent='Sound';
+    b.addEventListener('click',()=>activateSection('secSound', b));
+    tabsEl.insertBefore(b, tabsEl.firstChild);
+
+    const synthSel = sec.querySelector('#synthPresetSel');
+    const kitSel   = sec.querySelector('#drumKitSel');
+    (MP.audio.getSynthPresets?.() || ['Classic','Soft','Square','Tri','Pluck']).forEach(n=>{
+      const o=document.createElement('option'); o.value=n; o.textContent=n; synthSel.appendChild(o);
+    });
+    (MP.drums.getKits?.() || ['Clean','808','LoFi','Bright']).forEach(n=>{
+      const o=document.createElement('option'); o.value=n; o.textContent=n; kitSel.appendChild(o);
+    });
+
+    synthSel.addEventListener('change', ()=>MP.audio.setSynthPreset(synthSel.value));
+    kitSel.addEventListener('change',   ()=>MP.drums.setKit(kitSel.value));
+  })();
 
   // controls
   const brushTypeSel = el('brushType');
@@ -85,7 +129,7 @@ window.addEventListener('resize', updateDockPadding);
   trailRange.addEventListener('input',()=>{ const v=parseFloat(trailRange.value); if(v!==lastTrail){ MP.draw.freezeArtwork(); lastTrail=v; }});
   silenceFade.addEventListener('input',()=>{ const v=parseFloat(silenceFade.value); if(v!==lastSilence){ MP.draw.freezeArtwork(); lastSilence=v; }});
 
-  // --- notes list (this was missing) ---
+  // --- notes list ---
   function refreshNoteList(){
     noteList.innerHTML='';
     const s=MP.state;
@@ -156,7 +200,7 @@ window.addEventListener('resize', updateDockPadding);
   window.addEventListener('keydown', oneShot);
 
   // MIDI / Panic / Eraser
-  btnConnectMIDI.addEventListener('click', MP.midi.connect);
+  btnConnectMIDI?.addEventListener('click', MP.midi.connect);
   btnPanic.addEventListener('click', MP.engine.panic);
   btnEraser.addEventListener('click', ()=>MP.engine.toggleEraser());
 
@@ -198,6 +242,59 @@ window.addEventListener('resize', updateDockPadding);
     flowPop.style.display = flowPop.style.display==='block' ? 'none' : 'block';
   });
   document.addEventListener('click',(e)=>{ if (flowPop.style.display==='block' && !flowPop.contains(e.target) && e.target!==btnFlowHelp) flowPop.style.display='none'; });
+
+  // --- KEYS POPOVER (new) ---
+  const keysBtn = el('btnKeys');
+  const keysPop = el('keysPop');
+
+  function renderKeysPop(){
+    const KB_ROWS=[
+      ['1','2','3','4','5','6','7','8','9','0'],
+      ['Q','W','E','R','T','Y','U','I','O','P'],
+      ['A','S','D','F','G','H','J','K','L'],
+      ['Z','X','C','V','B','N','M']
+    ];
+    const html = KB_ROWS.map(row=>{
+      return `<div class="kb-row">` + row.map(k=>{
+        const kl=k.toLowerCase();
+        const n=MP.KEY_LAYOUT[kl];
+        const pad=MP.KEY_DRUMS_NOTE[k];
+        const mapped=(n!==undefined)||(pad!==undefined);
+        const title= pad!==undefined? `${k} → Pad ${pad}` : (n!==undefined ? `${k} → ${MP.midiNoteName(n)}` : `${k} (not mapped)`);
+        const line2= pad!==undefined? `<span class="note">Pad ${pad}</span>` : (n!==undefined? `<span class="note">${MP.midiNoteName(n)}</span>` :'');
+        return `<div class="keycap${mapped?' mapped':''}" title="${title}"><span class="label">${k}</span>${line2}</div>`;
+      }).join('') + `</div>`;
+    }).join('');
+    keysPop.innerHTML = `<div style="margin-bottom:6px"><strong>Computer keyboard</strong></div>
+      <div class="keys-grid">${html}</div>
+      <div class="muted" style="margin-top:6px">Shortcuts:
+        <span class="kbd">Shift</span> hold eraser •
+        <span class="kbd">N</span> new layer •
+        <span class="kbd">C</span> clear layer
+      </div>`;
+  }
+
+  if (keysBtn && keysPop){
+    keysBtn.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      if (keysPop.style.display==='block'){ keysPop.style.display='none'; return; }
+      renderKeysPop();
+
+      // position by the button, above the mobile pad
+      const rect = keysBtn.getBoundingClientRect();
+      keysPop.style.position = 'fixed';
+      keysPop.style.left = Math.round(rect.left) + 'px';
+      keysPop.style.top  = Math.round(rect.bottom + 6) + 'px';
+      keysPop.style.zIndex = '10070'; // higher than mobile pad (10040)
+      keysPop.style.display = 'block';
+    });
+
+    document.addEventListener('click',(e)=>{
+      if (!keysPop.contains(e.target) && e.target!==keysBtn){
+        keysPop.style.display='none';
+      }
+    });
+  }
 
   // keyboard (desktop)
   const downKeys = new Set();
