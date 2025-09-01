@@ -21,6 +21,27 @@ html.mobile #btnConnectMIDI{ display:none !important; }
   .section{ min-width:0; }
 }
 
+/* Hide the full desktop dock on mobile */
+html.mobile .dock{ display:none !important; }
+
+/* Mobile control panel (inside the mobile pad) */
+.mp-ctrls{ padding:8px; background:#0e1622; border-bottom:1px solid #223049; }
+.mp-ctrls.hidden{ display:none; }
+.mp-ctrls__tabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+.mp-ctrls__tab{
+  padding:4px 8px; border:1px solid #263142; border-radius:999px;
+  background:#0f172a; color:#9fb3d1; font-size:12px;
+}
+.mp-ctrls__tab.active{ background:#17233a; color:#e8f0ff; border-color:#2a3b52; }
+.mp-ctrls__section{ display:none; }
+.mp-ctrls__section.active{ display:block; }
+
+/* Pads row (shares button style with existing mobile pad buttons) */
+.mp-padsRow{ display:grid; grid-template-columns:repeat(8,1fr); gap:8px; padding:8px; }
+
+/* Keep the floating Pad toggle above anything */
+.mp-pad__toggle{ z-index:10050; }
+
 
 /* viewport sizing (mobile-safe) */
 html,body{

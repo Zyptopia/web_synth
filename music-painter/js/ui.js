@@ -16,11 +16,10 @@ if (MP.isMobile && btnConnectMIDI) btnConnectMIDI.style.display = 'none';
 
 function updateDockPadding(){
   const h = dockEl?.getBoundingClientRect().height || 0;
-  document.documentElement.style.setProperty('--dockh', MP.isMobile ? `${h}px` : '0px');
+  document.documentElement.style.setProperty('--dockh', MP.isMobile ? '0px' : `${h}px`);
 }
 updateDockPadding();
 window.addEventListener('resize', updateDockPadding);
-
 
 
   // sections
