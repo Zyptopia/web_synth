@@ -178,3 +178,8 @@ html.mobile #stageWrap{
   }
   .mp-pad.land.show{ transform: translateX(0); }
 }
+
+/* Mic pill colours + tap-zoom prevention */
+.pill.on  { background:#09361c; border-color:#1e8a46; color:#b6ffcc; }
+.pill.off { background:#0c1423; border-color:#243349; color:var(--muted); }
+button, .mp-pad__btn, .tab { touch-action: manipulation; }

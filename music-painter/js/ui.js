@@ -85,8 +85,9 @@ const micRow = document.createElement('div');
 micRow.className = 'row';
 micRow.innerHTML = `
   <button id="btnMicToggle">Mic: Off</button>
-  <label class="muted" style="margin-left:8px">Sensitivity</label>
-  <input type="range" id="micSense" min="0.005" max="0.08" step="0.005" value="0.02" style="width:160px">
+  <label class="muted" style="margin-left:8px">Threshold</label>
+  <input type="range" id="micSense" min="0" max="1" step="0.01" value="0.50" style="width:180px">
+  <span class="muted" style="font-size:11px;margin-left:4px">Quiet ← → Loud</span>
   <label class="muted" style="margin-left:8px">Monitor</label>
   <input type="checkbox" id="micMon">
 `;
@@ -96,19 +97,31 @@ const micBtn   = sec.querySelector('#btnMicToggle');
 const micSense = sec.querySelector('#micSense');
 const micMon   = sec.querySelector('#micMon');
 
-micBtn.addEventListener('click', async () => {
-   try { await MP.audio.unlock(); } catch {}
-   micBtn.disabled = true;
-   micBtn.textContent = 'Mic: Starting…';
-   const on = await MP.mic.toggle();       // await start/permission
-   micBtn.textContent = on ? 'Mic: On' : 'Mic: Off';
-   micBtn.disabled = false;
-   MP.ui?.setAudioState?.(MP.audio.ctx?.state || 'running');
- });
-micSense.addEventListener('input', () => MP.mic.setSensitivity(parseFloat(micSense.value)));
-micMon.addEventListener('change', () => MP.mic.setMonitor(!!micMon.checked));
+const micStatus = MP.el('micStatus');
+const setMicIndicator = (on)=>{
+  if (!micStatus) return;
+  micStatus.textContent = 'Mic: ' + (on ? 'on' : 'off');
+  micStatus.classList.toggle('on',  !!on);
+  micStatus.classList.toggle('off', !on);
+};
+const mapMicThreshold = v => 0.005 + v * (0.08 - 0.005); // 0 = very sensitive (quiet), 1 = needs loud
 
-  })();
+micBtn.addEventListener('click', async () => {
+  try { await MP.audio.unlock(); } catch {}
+  micBtn.disabled = true;
+  micBtn.textContent = 'Mic: Starting…';
+  const on = await MP.mic.toggle();   // waits for permission/start
+  micBtn.textContent = on ? 'Mic: On' : 'Mic: Off';
+  micBtn.disabled = false;
+  setMicIndicator(on);
+  MP.ui?.setAudioState?.(MP.audio.ctx?.state || 'running');
+  });
+MP.mic.setSensitivity(mapMicThreshold(parseFloat(micSense.value)));
+micSense.addEventListener('input', () => {
+  MP.mic.setSensitivity(mapMicThreshold(parseFloat(micSense.value)));
+});
+});
+
 
   
 
@@ -343,7 +356,6 @@ micMon.addEventListener('change', () => MP.mic.setMonitor(!!micMon.checked));
     const drum = MP.KEY_DRUMS_NOTE[k]; if (drum!==undefined){ downKeys.delete(k); return; }
     const note = MP.KEY_LAYOUT[k]; if (note!==undefined){ downKeys.delete(k); MP.engine.noteOff(note); }
   });
-
   // also try to unlock when clicking the stage
   el('stageWrap').addEventListener('pointerdown', ()=>{ tryUnlock(); }, { passive:true });
 })(window.MP);

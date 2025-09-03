@@ -134,12 +134,13 @@
   }
 
   function applyPadSpace(){
-    // Only change when pad show/hide or orientation changes.
-    const land = isLandscape();
-    document.documentElement.classList.toggle('land', land);
-    const open = pad.classList.contains('show');
-    document.documentElement.style.setProperty('--padH', (open && !land) ? 'var(--padFixedH)' : '0px');
-  }
+  const land = isLandscape();
+  document.documentElement.classList.toggle('land', land);
+  const open = pad.classList.contains('show');
+  document.documentElement.style.setProperty('--padH', (open && !land) ? 'var(--padFixedH)' : '0px');
+  setPadWVar();
+}
+
 
   function requestCanvasResize(){
     // Resize canvases without losing pixels (draw.js preserves)
@@ -159,6 +160,18 @@
   }
 
   // ---------- helpers ----------
+
+  function setPadWVar(){
+  const land = isLandscape();
+  const open = pad.classList.contains('show');
+  let px = '0px';
+  if (land && open) {
+    const w = Math.min(window.innerWidth * 0.46, 420); // match CSS min(46vw, 420px)
+    px = `${Math.round(w)}px`;
+  }
+  document.documentElement.style.setProperty('--padW', px);
+}
+
   const pointerToNote = new Map();
   function bindPress(el, note){
     const down = (e)=>{ e.preventDefault(); el.classList.add('pressed'); MP.engine.noteOn(note, 110); pointerToNote.set(e.pointerId || 'm', note); };
@@ -290,7 +303,7 @@
 
     ss.append(
   proxyButton('Mic: Toggle', () => document.getElementById('btnMicToggle')?.click()),
-  proxyRange('Mic Sensitivity', 'micSense', 0.005, 0.08, 0.005)
+  proxyRange('Mic Threshold (Quiet↔Loud)', 'micSense', 0, 1, 0.01)
 );
 
     // Brush
@@ -367,11 +380,12 @@
   btnClose.addEventListener('click', ()=> showPad(false));
 
   // Important: controls toggle does NOT request canvas resize (prevents clear)
-  btnCtrls.addEventListener('click', ()=>{
-    ctrlsWrap.classList.toggle('hidden');
-    btnCtrls.textContent = ctrlsWrap.classList.contains('hidden') ? '▸ Controls' : '▾ Controls';
-    // No updatePadVars/resizes here — pad space stays fixed.
-  });
+  btnCtrls.addEventListener('pointerdown', (e)=>{
+  e.preventDefault(); // kills double-tap zoom on iOS/Android
+  ctrlsWrap.classList.toggle('hidden');
+  btnCtrls.textContent = ctrlsWrap.classList.contains('hidden') ? '▸ Controls' : '▾ Controls';
+  // No resizes here — pad space stays fixed so canvas doesn’t jump.
+}, { passive:false });
 
   btnPads.addEventListener('click', ()=>{ padsVisible = !padsVisible; buildPads(); /* no resize needed */ });
   btnOctDown.addEventListener('click', ()=>{ octave = Math.max(1, octave-1); buildPiano(); });
