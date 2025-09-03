@@ -1,4 +1,4 @@
-// draw.js (FULL REPLACEMENT)
+// draw.js (FULL REPLACEMENT, zoom-on-resize fixed)
 (function(MP){
   const el = MP.el;
   const stageWrap = el('stageWrap');
@@ -17,46 +17,62 @@
 
   const layers=[]; let activeLayer=0;
 
-  // --------- resize helpers (preserve pixels) ----------
+  // --------- resize helpers (preserve pixels, no compounding zoom) ----------
+  function copyWithIdentity(ctx, prev, dstW, dstH){
+    // copy device→device pixels using identity transform to avoid re-scaling
+    ctx.setTransform(1,0,0,1,0,0);
+    if (prev && prev.width && prev.height){
+      ctx.drawImage(prev, 0,0, prev.width, prev.height, 0,0, dstW, dstH);
+    }
+  }
   function preserveResize(c){
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const r = stageWrap.getBoundingClientRect();
 
-    const prev = document.createElement('canvas');
-    prev.width = c.width; prev.height = c.height;
-    if (prev.width && prev.height){
+    const prevW = c.width, prevH = c.height;
+    let prev = null;
+    if (prevW && prevH){
+      prev = document.createElement('canvas');
+      prev.width = prevW; prev.height = prevH;
       try { prev.getContext('2d').drawImage(c, 0, 0); } catch {}
     }
 
-    c.width  = Math.floor(r.width * dpr);
-    c.height = Math.floor(r.height * dpr);
+    const newW = Math.floor(r.width * dpr);
+    const newH = Math.floor(r.height * dpr);
+    c.width = newW; c.height = newH;
     c.style.width = r.width + 'px';
     c.style.height = r.height + 'px';
 
     const ctx = c.getContext('2d');
+    // 1) copy previous pixels 1:1 in device space
+    copyWithIdentity(ctx, prev, newW, newH);
+    // 2) now switch to CSS-pixel coordinates for future drawing
     ctx.setTransform(dpr,0,0,dpr,0,0);
-
-    if (prev.width && prev.height){
-      try { ctx.drawImage(prev, 0,0, prev.width,prev.height, 0,0, c.width,c.height); } catch {}
-    }
   }
   function resizeBase(){ preserveResize(baseCanvas); }
   function resizeFx(){
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const r = stageWrap.getBoundingClientRect();
-    const prev = document.createElement('canvas');
-    prev.width = fxCanvas.width; prev.height = fxCanvas.height;
-    if (prev.width && prev.height){
+
+    const prevW = fxCanvas.width, prevH = fxCanvas.height;
+    let prev = null;
+    if (prevW && prevH){
+      prev = document.createElement('canvas');
+      prev.width = prevW; prev.height = prevH;
       try { prev.getContext('2d').drawImage(fxCanvas,0,0); } catch {}
     }
-    fxCanvas.width  = Math.floor(r.width * dpr);
-    fxCanvas.height = Math.floor(r.height * dpr);
+
+    const newW = Math.floor(r.width * dpr);
+    const newH = Math.floor(r.height * dpr);
+    fxCanvas.width  = newW;
+    fxCanvas.height = newH;
     fxCanvas.style.width = r.width + 'px';
     fxCanvas.style.height = r.height + 'px';
+
+    // 1) copy previous pixels 1:1 in device space
+    copyWithIdentity(fxCtx, prev, newW, newH);
+    // 2) switch to CSS-pixel coordinates
     fxCtx.setTransform(dpr,0,0,dpr,0,0);
-    if (prev.width && prev.height){
-      try { fxCtx.drawImage(prev,0,0,prev.width,prev.height,0,0,fxCanvas.width,fxCanvas.height); } catch {}
-    }
   }
   function resizeAccent(){ preserveResize(accentCanvas); }
   function resizeAll(){

@@ -86,6 +86,8 @@
       <button id="btnMicToggle">Mic: Off</button>
       <label class="muted" style="margin-left:8px">Mic Sensitivity</label>
       <input type="range" id="micSense" min="0" max="1" step="0.01" value="0.50" style="width:180px">
+      <label class="muted" style="margin-left:8px">Drum Accents</label>
+      <input type="checkbox" id="micDrums">
       <label class="muted" style="margin-left:8px">Monitor</label>
       <input type="checkbox" id="micMon">
     `;
@@ -94,6 +96,7 @@
     const micBtn   = sec.querySelector('#btnMicToggle');
     const micSense = sec.querySelector('#micSense');
     const micMon   = sec.querySelector('#micMon');
+    const micDrums = sec.querySelector('#micDrums');
 
     const micStatus = MP.el('micStatus');
     const setMicIndicator = (on)=>{
@@ -108,7 +111,6 @@
       try { await MP.audio.unlock(); } catch {}
       if (!btn) return;
       btn.disabled = true;
-      const prev = btn.textContent;
       btn.textContent = 'Mic: Starting…';
       const on = await MP.mic.toggle();
       btn.textContent = on ? 'Mic: On' : 'Mic: Off';
@@ -126,6 +128,7 @@
       MP.mic.setSensitivity(mapMicThreshold(parseFloat(micSense.value)));
     });
     micMon.addEventListener('change', ()=> MP.mic.setMonitor(!!micMon.checked));
+    micDrums.addEventListener('change', ()=> MP.mic.setDrums(!!micDrums.checked));
 
     // Hook up topbar mic button too
     if (btnMicTop){
@@ -280,7 +283,7 @@
     satVal.textContent=satRange.value; lightVal.textContent=lightRange.value; hueOffsetVal.textContent=hueOffset.value;
   });
 
-  // flow help
+  // flow help (single declaration + wiring)
   btnFlowHelp.addEventListener('click', (e)=>{
     e.stopPropagation();
     flowPop.innerHTML = `<div style='margin-bottom:6px'><strong>Flow modes</strong></div>
@@ -311,7 +314,7 @@
         const n=MP.KEY_LAYOUT[kl];
         const pad=MP.KEY_DRUMS_NOTE[k];
         const mapped=(n!==undefined)||(pad!==undefined);
-        const title= pad!==undefined? `${k} → Pad ${pad}` : (n!==undefined ? `${k} → ${MP.midiNoteName(n)}` : `${k} (not mapped)`);
+        const title= pad!==undefined? `${k} → Pad ${pad}` : (n!==undefined ? `${MP.midiNoteName(n)}` : `${k} (not mapped)`);
         const line2= pad!==undefined? `<span class="note">Pad ${pad}</span>` : (n!==undefined? `<span class="note">${MP.midiNoteName(n)}</span>` :'');
         return `<div class="keycap${mapped?' mapped':''}" title="${title}"><span class="label">${k}</span>${line2}</div>`;
       }).join('') + `</div>`;
