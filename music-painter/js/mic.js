@@ -2,11 +2,12 @@
 (function (MP) {
   let stream = null, source = null, analyser = null, buf = null, raf = null;
   let currentNote = null, stableCount = 0, monitorGain = null;
+
   const params = {
-    sensitivity: 0.02,            // RMS below this = silence
-    minFreq: 60,                  // Hz
-    maxFreq: 1200,                // Hz
-    monitor: false                // route mic to speakers? (off by default)
+    sensitivity: 0.02,   // RMS below this = silence
+    minFreq: 60,         // Hz
+    maxFreq: 1200,       // Hz
+    monitor: false       // route mic to speakers? (off by default)
   };
 
   function isOn() { return !!raf; }
@@ -14,11 +15,10 @@
   async function start() {
     if (raf) return;
     try {
-      // Make sure WebAudio context exists/unlocked
-      await MP.audio.unlock?.();   // safe if defined
+      // ensure AudioContext exists & is running
+      try { await MP.audio.unlock?.(); } catch {}
       const ctx = MP.audio.ensure();
 
-      // Ask for mic (best fidelity for pitch detection)
       stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
@@ -33,10 +33,10 @@
       buf = new Float32Array(analyser.fftSize);
       source.connect(analyser);
 
-      applyMonitor(); // optional monitoring (off by default)
+      applyMonitor(); // optional, off by default
       loop();
     } catch (err) {
-      alert('Microphone error: ' + err.message);
+      alert('Microphone error: ' + (err?.message || err));
       stop();
     }
   }
@@ -64,7 +64,7 @@
     if (params.monitor) {
       const ctx = MP.audio.ensure();
       monitorGain = ctx.createGain();
-      monitorGain.gain.value = 0.15;       // quiet to avoid feedback
+      monitorGain.gain.value = 0.15; // quiet to avoid feedback
       source.connect(monitorGain).connect(MP.audio.master.node);
     }
   }
@@ -103,7 +103,7 @@
       currentNote = note;
       stableCount = 0;
     } else if (Math.abs(note - currentNote) >= 1) {
-      // require two consecutive frames to switch notes to reduce flicker
+      // require two consecutive frames to switch notes (reduce flicker)
       if (++stableCount >= 2) {
         MP.engine.noteOff(currentNote);
         MP.engine.noteOn(note, vel);

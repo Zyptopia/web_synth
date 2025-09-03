@@ -79,9 +79,9 @@
 
     synthSel.addEventListener('change', ()=>MP.audio.setSynthPreset(synthSel.value));
     kitSel.addEventListener('change',   ()=>MP.drums.setKit(kitSel.value));
-  })();
 
-  const micRow = document.createElement('div');
+    // --- Mic controls ---
+const micRow = document.createElement('div');
 micRow.className = 'row';
 micRow.innerHTML = `
   <button id="btnMicToggle">Mic: Off</button>
@@ -92,19 +92,22 @@ micRow.innerHTML = `
 `;
 sec.appendChild(micRow);
 
-const micBtn  = sec.querySelector('#btnMicToggle');
+const micBtn   = sec.querySelector('#btnMicToggle');
 const micSense = sec.querySelector('#micSense');
 const micMon   = sec.querySelector('#micMon');
 
 micBtn.addEventListener('click', async () => {
-  try {
-    await MP.audio.unlock();                 // ensure AudioContext is running
-  } catch {}
+  try { await MP.audio.unlock(); } catch {}
   MP.mic.toggle();
   micBtn.textContent = MP.mic.isOn() ? 'Mic: On' : 'Mic: Off';
+  MP.ui?.setAudioState?.(MP.audio.ctx?.state || 'running');
 });
 micSense.addEventListener('input', () => MP.mic.setSensitivity(parseFloat(micSense.value)));
 micMon.addEventListener('change', () => MP.mic.setMonitor(!!micMon.checked));
+
+  })();
+
+  
 
   // controls
   const brushTypeSel = el('brushType');
