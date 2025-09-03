@@ -97,11 +97,14 @@ const micSense = sec.querySelector('#micSense');
 const micMon   = sec.querySelector('#micMon');
 
 micBtn.addEventListener('click', async () => {
-  try { await MP.audio.unlock(); } catch {}
-  MP.mic.toggle();
-  micBtn.textContent = MP.mic.isOn() ? 'Mic: On' : 'Mic: Off';
-  MP.ui?.setAudioState?.(MP.audio.ctx?.state || 'running');
-});
+   try { await MP.audio.unlock(); } catch {}
+   micBtn.disabled = true;
+   micBtn.textContent = 'Mic: Starting…';
+   const on = await MP.mic.toggle();       // await start/permission
+   micBtn.textContent = on ? 'Mic: On' : 'Mic: Off';
+   micBtn.disabled = false;
+   MP.ui?.setAudioState?.(MP.audio.ctx?.state || 'running');
+ });
 micSense.addEventListener('input', () => MP.mic.setSensitivity(parseFloat(micSense.value)));
 micMon.addEventListener('change', () => MP.mic.setMonitor(!!micMon.checked));
 

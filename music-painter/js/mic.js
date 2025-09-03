@@ -13,8 +13,15 @@
   function isOn() { return !!raf; }
 
   async function start() {
-    if (raf) return;
+    if (raf) return true;
     try {
+        // Must be HTTPS or localhost for mic
+     if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+       throw new Error('Microphone requires HTTPS (or localhost)');
+     }
+     if (!navigator.mediaDevices?.getUserMedia) {
+       throw new Error('getUserMedia not supported in this browser');
+     }
       // ensure AudioContext exists & is running
       try { await MP.audio.unlock?.(); } catch {}
       const ctx = MP.audio.ensure();
@@ -35,9 +42,11 @@
 
       applyMonitor(); // optional, off by default
       loop();
+      return true;
     } catch (err) {
       alert('Microphone error: ' + (err?.message || err));
       stop();
+      return false;
     }
   }
 
@@ -53,8 +62,11 @@
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
   }
 
-  function toggle() { isOn() ? stop() : start(); }
-
+  async function toggle() {
+   if (isOn()) { stop(); return false; }
+   const ok = await start();
+   return !!ok;
+ }
   function setSensitivity(v) { params.sensitivity = Math.max(0.002, Math.min(0.2, v)); }
   function setMonitor(on) { params.monitor = !!on; applyMonitor(); }
 
