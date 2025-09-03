@@ -5,8 +5,8 @@
   const fpsEl       = el('fps');
   const btnStartAudio = el('btnStartAudio');
   const btnConnectMIDI = el('btnConnectMIDI');
-  const btnPanic = el('btnPanic');
   const btnEraser = el('btnEraser');
+  const btnMicTop = el('btnMicTop');
   const tabsEl = el('tabs'); const dockEl = el('dock');
 
   const stageWrap = MP.el('stageWrap');
@@ -22,7 +22,6 @@
 
   // Hide Connect MIDI on mobile at runtime (in case CSS misses some engines)
   if (MP.isMobile && btnConnectMIDI) btnConnectMIDI.style.display = 'none';
-  // (you had this twice, one copy is enough)
 
   function updateDockPadding(){
     const h = dockEl?.getBoundingClientRect().height || 0;
@@ -46,7 +45,7 @@
   btnToggleDock.addEventListener('click',()=>{ dockEl.classList.toggle('collapsed'); btnToggleDock.textContent=dockEl.classList.contains('collapsed')?'▴ Expand':'▾ Collapse'; });
   tabsEl.appendChild(btnToggleDock);
 
-  // --- optional desktop "Sound" section (presets) ---
+  // --- desktop "Sound" section (adds synth/drums + mic controls) ---
   (function(){
     const sectionsWrap = document.querySelector('.sections');
     const sec = document.createElement('div');
@@ -80,50 +79,59 @@
     synthSel.addEventListener('change', ()=>MP.audio.setSynthPreset(synthSel.value));
     kitSel.addEventListener('change',   ()=>MP.drums.setKit(kitSel.value));
 
-    // --- Mic controls ---
-const micRow = document.createElement('div');
-micRow.className = 'row';
-micRow.innerHTML = `
-  <button id="btnMicToggle">Mic: Off</button>
-  <label class="muted" style="margin-left:8px">Threshold</label>
-  <input type="range" id="micSense" min="0" max="1" step="0.01" value="0.50" style="width:180px">
-  <span class="muted" style="font-size:11px;margin-left:4px">Quiet ← → Loud</span>
-  <label class="muted" style="margin-left:8px">Monitor</label>
-  <input type="checkbox" id="micMon">
-`;
-sec.appendChild(micRow);
+    // --- Mic controls (desktop panel) ---
+    const micRow = document.createElement('div');
+    micRow.className = 'row';
+    micRow.innerHTML = `
+      <button id="btnMicToggle">Mic: Off</button>
+      <label class="muted" style="margin-left:8px">Mic Sensitivity</label>
+      <input type="range" id="micSense" min="0" max="1" step="0.01" value="0.50" style="width:180px">
+      <label class="muted" style="margin-left:8px">Monitor</label>
+      <input type="checkbox" id="micMon">
+    `;
+    sec.appendChild(micRow);
 
-const micBtn   = sec.querySelector('#btnMicToggle');
-const micSense = sec.querySelector('#micSense');
-const micMon   = sec.querySelector('#micMon');
+    const micBtn   = sec.querySelector('#btnMicToggle');
+    const micSense = sec.querySelector('#micSense');
+    const micMon   = sec.querySelector('#micMon');
 
-const micStatus = MP.el('micStatus');
-const setMicIndicator = (on)=>{
-  if (!micStatus) return;
-  micStatus.textContent = 'Mic: ' + (on ? 'on' : 'off');
-  micStatus.classList.toggle('on',  !!on);
-  micStatus.classList.toggle('off', !on);
-};
-const mapMicThreshold = v => 0.005 + v * (0.08 - 0.005); // 0 = very sensitive (quiet), 1 = needs loud
+    const micStatus = MP.el('micStatus');
+    const setMicIndicator = (on)=>{
+      if (!micStatus) return;
+      micStatus.textContent = 'Mic: ' + (on ? 'on' : 'off');
+      micStatus.classList.toggle('on',  !!on);
+      micStatus.classList.toggle('off', !on);
+    };
+    const mapMicThreshold = v => 0.005 + v * (0.08 - 0.005); // left=quiet (more sensitive), right=loud
 
-micBtn.addEventListener('click', async () => {
-  try { await MP.audio.unlock(); } catch {}
-  micBtn.disabled = true;
-  micBtn.textContent = 'Mic: Starting…';
-  const on = await MP.mic.toggle();   // waits for permission/start
-  micBtn.textContent = on ? 'Mic: On' : 'Mic: Off';
-  micBtn.disabled = false;
-  setMicIndicator(on);
-  MP.ui?.setAudioState?.(MP.audio.ctx?.state || 'running');
-  });
-MP.mic.setSensitivity(mapMicThreshold(parseFloat(micSense.value)));
-micSense.addEventListener('input', () => {
-  MP.mic.setSensitivity(mapMicThreshold(parseFloat(micSense.value)));
-});
-});
+    async function doMicToggle(btn){
+      try { await MP.audio.unlock(); } catch {}
+      if (!btn) return;
+      btn.disabled = true;
+      const prev = btn.textContent;
+      btn.textContent = 'Mic: Starting…';
+      const on = await MP.mic.toggle();
+      btn.textContent = on ? 'Mic: On' : 'Mic: Off';
+      btn.disabled = false;
+      setMicIndicator(on);
+      MP.ui?.setAudioState?.(MP.audio.ctx?.state || 'running');
+      // reflect to the other mic button if present
+      if (btn === micBtn && btnMicTop){ btnMicTop.textContent = btn.textContent; }
+      if (btn === btnMicTop && micBtn){ micBtn.textContent = btn.textContent; }
+    }
 
+    micBtn.addEventListener('click', ()=>doMicToggle(micBtn));
+    MP.mic.setSensitivity(mapMicThreshold(parseFloat(micSense.value)));
+    micSense.addEventListener('input', () => {
+      MP.mic.setSensitivity(mapMicThreshold(parseFloat(micSense.value)));
+    });
+    micMon.addEventListener('change', ()=> MP.mic.setMonitor(!!micMon.checked));
 
-  
+    // Hook up topbar mic button too
+    if (btnMicTop){
+      btnMicTop.addEventListener('click', ()=>doMicToggle(btnMicTop));
+    }
+  })();
 
   // controls
   const brushTypeSel = el('brushType');
@@ -243,9 +251,8 @@ micSense.addEventListener('input', () => {
   window.addEventListener('pointerdown', oneShot, { passive:true });
   window.addEventListener('keydown', oneShot);
 
-  // MIDI / Panic / Eraser
+  // MIDI / Eraser
   btnConnectMIDI?.addEventListener('click', MP.midi.connect);
-  btnPanic.addEventListener('click', MP.engine.panic);
   btnEraser.addEventListener('click', ()=>MP.engine.toggleEraser());
 
   // layers ui
@@ -287,7 +294,7 @@ micSense.addEventListener('input', () => {
   });
   document.addEventListener('click',(e)=>{ if (flowPop.style.display==='block' && !flowPop.contains(e.target) && e.target!==btnFlowHelp) flowPop.style.display='none'; });
 
-  // --- KEYS POPOVER (new) ---
+  // --- KEYS POPOVER ---
   const keysBtn = el('btnKeys');
   const keysPop = el('keysPop');
 
@@ -324,12 +331,11 @@ micSense.addEventListener('input', () => {
       if (keysPop.style.display==='block'){ keysPop.style.display='none'; return; }
       renderKeysPop();
 
-      // position by the button, above the mobile pad
       const rect = keysBtn.getBoundingClientRect();
       keysPop.style.position = 'fixed';
       keysPop.style.left = Math.round(rect.left) + 'px';
       keysPop.style.top  = Math.round(rect.bottom + 6) + 'px';
-      keysPop.style.zIndex = '10070'; // higher than mobile pad (10040)
+      keysPop.style.zIndex = '10070';
       keysPop.style.display = 'block';
     });
 
@@ -347,7 +353,7 @@ micSense.addEventListener('input', () => {
     if (raw==='Shift'){ _erasing=true; btnEraser.textContent='Eraser: On'; e.preventDefault(); return; }
     if (k==='n'){ MP.draw.createLayer(); e.preventDefault(); return; }
     if (k==='c'){ MP.draw.clearLayer(); e.preventDefault(); return; }
-    const drum = MP.KEY_DRUMS_NOTE[k]; if (drum!==undefined && !downKeys.has(k)){ downKeys.add(k); MP.midi.triggerPad(MP.PAD_TO_TYPE[drum],115); return; } // one-shot
+    const drum = MP.KEY_DRUMS_NOTE[k]; if (drum!==undefined && !downKeys.has(k)){ downKeys.add(k); MP.midi.triggerPad(MP.PAD_TO_TYPE[drum],115); return; }
     const note = MP.KEY_LAYOUT[k]; if (note!==undefined && !downKeys.has(k)){ downKeys.add(k); MP.engine.noteOn(note,110); }
   });
   window.addEventListener('keyup',(e)=>{
@@ -356,6 +362,5 @@ micSense.addEventListener('input', () => {
     const drum = MP.KEY_DRUMS_NOTE[k]; if (drum!==undefined){ downKeys.delete(k); return; }
     const note = MP.KEY_LAYOUT[k]; if (note!==undefined){ downKeys.delete(k); MP.engine.noteOff(note); }
   });
-  // also try to unlock when clicking the stage
   el('stageWrap').addEventListener('pointerdown', ()=>{ tryUnlock(); }, { passive:true });
 })(window.MP);

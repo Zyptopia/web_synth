@@ -119,7 +119,6 @@
   const noteName = (n)=> ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][n%12] + (Math.floor(n/12)-1);
   const setOctLbl = ()=> {
     const low = 12*(octave+1);
-    // No labels on keys; only tiny status label here:
     octLbl.textContent = `${noteName(low).replace(/\d+/, '')}${octave}–C${octave+1}`;
   };
 
@@ -134,16 +133,14 @@
   }
 
   function applyPadSpace(){
-  const land = isLandscape();
-  document.documentElement.classList.toggle('land', land);
-  const open = pad.classList.contains('show');
-  document.documentElement.style.setProperty('--padH', (open && !land) ? 'var(--padFixedH)' : '0px');
-  setPadWVar();
-}
-
+    const land = isLandscape();
+    document.documentElement.classList.toggle('land', land);
+    const open = pad.classList.contains('show');
+    document.documentElement.style.setProperty('--padH', (open && !land) ? 'var(--padFixedH)' : '0px');
+    setPadWVar();
+  }
 
   function requestCanvasResize(){
-    // Resize canvases without losing pixels (draw.js preserves)
     MP.draw?.resizeAll?.();
   }
 
@@ -159,18 +156,16 @@
     requestCanvasResize();
   }
 
-  // ---------- helpers ----------
-
   function setPadWVar(){
-  const land = isLandscape();
-  const open = pad.classList.contains('show');
-  let px = '0px';
-  if (land && open) {
-    const w = Math.min(window.innerWidth * 0.46, 420); // match CSS min(46vw, 420px)
-    px = `${Math.round(w)}px`;
+    const land = isLandscape();
+    const open = pad.classList.contains('show');
+    let px = '0px';
+    if (land && open) {
+      const w = Math.min(window.innerWidth * 0.46, 420);
+      px = `${Math.round(w)}px`;
+    }
+    document.documentElement.style.setProperty('--padW', px);
   }
-  document.documentElement.style.setProperty('--padW', px);
-}
 
   const pointerToNote = new Map();
   function bindPress(el, note){
@@ -196,7 +191,6 @@
     for (let i=0;i<whiteOffsets.length;i++){
       const n=base+whiteOffsets[i];
       const w=document.createElement('div'); w.className='mp-white';
-      // (No text labels to avoid selection popups)
       bindPress(w,n); wrap.appendChild(w); whites.push({el:w,i});
     }
     whites.forEach(({el,i})=>{
@@ -285,12 +279,12 @@
     wrap.append(lab, sel); return wrap;
   }
   function proxyButton(label, onClick){
-    const b=document.createElement('button'); b.className='mp-pad__btn'; b.textContent=label; b.addEventListener('click', onClick); return b;
+    const b=document.createElement('button'); b.className='mp-pad__btn'; b.textContent=label; b.addEventListener('pointerdown', (e)=>{ e.preventDefault(); onClick(); }, {passive:false}); return b;
   }
   function buildCtrls(){
     tabsEl.innerHTML=''; secsEl.innerHTML='';
     SECTIONS.forEach(s=>{ tabsEl.appendChild(mkTab(s)); secsEl.appendChild(mkSec(s)); });
-    tabsEl.addEventListener('click',(e)=>{ const id=e.target?.dataset?.id; if(id) activate(id); });
+    tabsEl.addEventListener('pointerdown',(e)=>{ const id=e.target?.dataset?.id; if(id){ e.preventDefault(); activate(id);} }, {passive:false});
 
     // Sound
     const ss = document.getElementById('mpsec_sound');
@@ -302,9 +296,9 @@
     );
 
     ss.append(
-  proxyButton('Mic: Toggle', () => document.getElementById('btnMicToggle')?.click()),
-  proxyRange('Mic Threshold (Quiet↔Loud)', 'micSense', 0, 1, 0.01)
-);
+      proxyButton('Mic: Toggle', () => (document.getElementById('btnMicTop') || document.getElementById('btnMicToggle'))?.click()),
+      proxyRange('Mic Sensitivity', 'micSense', 0, 1, 0.01)
+    );
 
     // Brush
     const sb = document.getElementById('mpsec_brush');
@@ -376,20 +370,19 @@
 
   const topInit = ()=>{ updateTop(); applyPadSpace(); requestCanvasResize(); };
 
-  toggle.addEventListener('click', ()=> showPad(true));
-  btnClose.addEventListener('click', ()=> showPad(false));
+  toggle.addEventListener('pointerdown', (e)=>{ e.preventDefault(); showPad(true); }, {passive:false});
+  btnClose.addEventListener('pointerdown', (e)=>{ e.preventDefault(); showPad(false); }, {passive:false});
 
-  // Important: controls toggle does NOT request canvas resize (prevents clear)
+  // Controls toggle already prevents zoom & no canvas resize
   btnCtrls.addEventListener('pointerdown', (e)=>{
-  e.preventDefault(); // kills double-tap zoom on iOS/Android
-  ctrlsWrap.classList.toggle('hidden');
-  btnCtrls.textContent = ctrlsWrap.classList.contains('hidden') ? '▸ Controls' : '▾ Controls';
-  // No resizes here — pad space stays fixed so canvas doesn’t jump.
-}, { passive:false });
+    e.preventDefault();
+    ctrlsWrap.classList.toggle('hidden');
+    btnCtrls.textContent = ctrlsWrap.classList.contains('hidden') ? '▸ Controls' : '▾ Controls';
+  }, { passive:false });
 
-  btnPads.addEventListener('click', ()=>{ padsVisible = !padsVisible; buildPads(); /* no resize needed */ });
-  btnOctDown.addEventListener('click', ()=>{ octave = Math.max(1, octave-1); buildPiano(); });
-  btnOctUp.addEventListener('click',   ()=>{ octave = Math.min(7, octave+1); buildPiano(); });
+  btnPads.addEventListener('pointerdown', (e)=>{ e.preventDefault(); padsVisible = !padsVisible; buildPads(); }, {passive:false});
+  btnOctDown.addEventListener('pointerdown', (e)=>{ e.preventDefault(); octave = Math.max(1, octave-1); buildPiano(); }, {passive:false});
+  btnOctUp.addEventListener('pointerdown',   (e)=>{ e.preventDefault(); octave = Math.min(7, octave+1); buildPiano(); }, {passive:false});
 
   // ---------- initial render ----------
   buildCtrls();

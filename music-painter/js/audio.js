@@ -115,7 +115,7 @@
   MP.drums.setKit = function(name){ if (DRUM_KITS[name]) kitName=name; };
   MP.drums.getKits = () => Object.keys(DRUM_KITS);
 
-  function envGain(t0,a=0.001,d=0.15){ const g=audioCtx.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(1.0,t0+a); g.gain.exponentialRampToValueAtTime(0.0001,t0+a+d); return g; }
+  function envGain(t0,a=0.001,d=0.15){ const g=audioCtx.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(1.0,t0+a); g.gain.exponentialRampToValueAtTime(0.0001, t0+a+d); return g; }
   function mkNoise(){ const len=audioCtx.sampleRate*2; const b=audioCtx.createBuffer(1,len,audioCtx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1; return b; }
   let noiseBuf=null; const noise=()=> noiseBuf || (noiseBuf=mkNoise());
 

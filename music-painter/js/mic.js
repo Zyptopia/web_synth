@@ -3,13 +3,13 @@
   let stream = null, source = null, analyser = null, buf = null, raf = null;
   let currentNote = null, stableCount = 0, monitorGain = null;
   let specAnalyser = null, freqBuf = null;
-const onset = {
-  emaL: 0, emaM: 0, emaH: 0,
-  lastK: 0, lastS: 0, lastH: 0
-};
+  const onset = {
+    emaL: 0, emaM: 0, emaH: 0,
+    lastK: 0, lastS: 0, lastH: 0
+  };
 
   const params = {
-    sensitivity: 0.02,   // RMS below this = silence
+    sensitivity: 0.02,   // RMS below this = silence (mapped from UI 0..1)
     minFreq: 60,         // Hz
     maxFreq: 1200,       // Hz
     monitor: false       // route mic to speakers? (off by default)
@@ -20,13 +20,13 @@ const onset = {
   async function start() {
     if (raf) return true;
     try {
-        // Must be HTTPS or localhost for mic
-     if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-       throw new Error('Microphone requires HTTPS (or localhost)');
-     }
-     if (!navigator.mediaDevices?.getUserMedia) {
-       throw new Error('getUserMedia not supported in this browser');
-     }
+      // Must be HTTPS or localhost for mic
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        throw new Error('Microphone requires HTTPS (or localhost)');
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('getUserMedia not supported in this browser');
+      }
       // ensure AudioContext exists & is running
       try { await MP.audio.unlock?.(); } catch {}
       const ctx = MP.audio.ensure();
@@ -46,10 +46,9 @@ const onset = {
       source.connect(analyser);
 
       specAnalyser = ctx.createAnalyser();
-specAnalyser.fftSize = 2048;
-freqBuf = new Uint8Array(specAnalyser.frequencyBinCount);
-source.connect(specAnalyser);
-
+      specAnalyser.fftSize = 2048;
+      freqBuf = new Uint8Array(specAnalyser.frequencyBinCount);
+      source.connect(specAnalyser);
 
       applyMonitor(); // optional, off by default
       loop();
@@ -74,10 +73,10 @@ source.connect(specAnalyser);
   }
 
   async function toggle() {
-   if (isOn()) { stop(); return false; }
-   const ok = await start();
-   return !!ok;
- }
+    if (isOn()) { stop(); return false; }
+    const ok = await start();
+    return !!ok;
+  }
   function setSensitivity(v) { params.sensitivity = Math.max(0.002, Math.min(0.2, v)); }
   function setMonitor(on) { params.monitor = !!on; applyMonitor(); }
 
@@ -104,52 +103,51 @@ source.connect(specAnalyser);
     const rms = Math.sqrt(sum / buf.length);
 
     // --- Drum onset detection (low/mid/high bands) ---
-if (specAnalyser && freqBuf) {
-  specAnalyser.getByteFrequencyData(freqBuf);
-  const sr = analyser.context.sampleRate;
-  const n  = specAnalyser.fftSize;
-  const hzPerBin = sr / n;
+    if (specAnalyser && freqBuf) {
+      specAnalyser.getByteFrequencyData(freqBuf);
+      const sr = analyser.context.sampleRate;
+      const n  = specAnalyser.fftSize;
+      const hzPerBin = sr / n;
 
-  function band(lo, hi){
-    const i0 = Math.max(0, Math.floor(lo / hzPerBin));
-    const i1 = Math.min(freqBuf.length-1, Math.ceil(hi / hzPerBin));
-    let s = 0;
-    for (let i=i0;i<=i1;i++) s += freqBuf[i];
-    return s / Math.max(1, i1-i0+1); // average magnitude 0..255
-  }
+      function band(lo, hi){
+        const i0 = Math.max(0, Math.floor(lo / hzPerBin));
+        const i1 = Math.min(freqBuf.length-1, Math.ceil(hi / hzPerBin));
+        let s = 0;
+        for (let i=i0;i<=i1;i++) s += freqBuf[i];
+        return s / Math.max(1, i1-i0+1); // average magnitude 0..255
+      }
 
-  const eL = band(35, 160);    // kick-ish
-  const eM = band(160, 1200);  // snare-ish
-  const eH = band(6000, 12000);// hat-ish
+      const eL = band(35, 160);    // kick-ish
+      const eM = band(160, 1200);  // snare-ish
+      const eH = band(6000, 12000);// hat-ish
 
-  const a = 0.15; // EMA speed
-  onset.emaL = onset.emaL*(1-a) + eL*a;
-  onset.emaM = onset.emaM*(1-a) + eM*a;
-  onset.emaH = onset.emaH*(1-a) + eH*a;
+      const a = 0.15; // EMA speed
+      onset.emaL = onset.emaL*(1-a) + eL*a;
+      onset.emaM = onset.emaM*(1-a) + eM*a;
+      onset.emaH = onset.emaH*(1-a) + eH*a;
 
-  const now = performance.now();
-  const loudEnough = rms > params.sensitivity * 0.8;
+      const now = performance.now();
+      const loudEnough = rms > params.sensitivity * 0.8;
 
-  // Kick
-  if (loudEnough && eL > onset.emaL * 1.8 && now - onset.lastK > 220){
-    const vel = Math.min(127, 60 + Math.floor((eL/255)*67));
-    MP.midi.triggerPad('kick', vel);
-    onset.lastK = now;
-  }
-  // Snare
-  if (loudEnough && eM > onset.emaM * 1.6 && now - onset.lastS > 180){
-    const vel = Math.min(127, 65 + Math.floor((eM/255)*62));
-    MP.midi.triggerPad('snare', vel);
-    onset.lastS = now;
-  }
-  // Hats (closed)
-  if (loudEnough && eH > onset.emaH * 1.5 && now - onset.lastH > 120){
-    const vel = Math.min(127, 55 + Math.floor((eH/255)*72));
-    MP.midi.triggerPad('hat-closed', vel);
-    onset.lastH = now;
-  }
-}
-
+      // Kick
+      if (loudEnough && eL > onset.emaL * 1.8 && now - onset.lastK > 220){
+        const vel = Math.min(127, 60 + Math.floor((eL/255)*67));
+        MP.midi.triggerPad('kick', vel);
+        onset.lastK = now;
+      }
+      // Snare
+      if (loudEnough && eM > onset.emaM * 1.6 && now - onset.lastS > 180){
+        const vel = Math.min(127, 65 + Math.floor((eM/255)*62));
+        MP.midi.triggerPad('snare', vel);
+        onset.lastS = now;
+      }
+      // Hats (closed)
+      if (loudEnough && eH > onset.emaH * 1.5 && now - onset.lastH > 120){
+        const vel = Math.min(127, 55 + Math.floor((eH/255)*72));
+        MP.midi.triggerPad('hat-closed', vel);
+        onset.lastH = now;
+      }
+    }
 
     // Silence gate
     if (rms < params.sensitivity) {

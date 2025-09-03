@@ -141,8 +141,8 @@ button.tiny{padding:6px 8px;font-size:12px}
 
 /* mobile tweaks */
 @media (hover:none) and (pointer:coarse){
-  #btnConnectMIDI{ display:none !important; }    /* hide on mobile */
-  .section{ min-width:0; }                       /* allow narrow screens */
+  #btnConnectMIDI{ display:none !important; }
+  .section{ min-width:0; }
   .sections{ max-height:38vh; overflow:auto; -webkit-overflow-scrolling:touch; }
 }
 html.mobile .popover{ position:fixed; z-index:10070; }
@@ -166,7 +166,6 @@ html.mobile #stageWrap{
     height: calc(100svh - var(--topH, 0px));
     width: calc(100svw - var(--padW, 0px));
   }
-  /* Side-docked pad */
   .mp-pad.land{
     top: var(--topH, 0px);
     bottom: 0;
@@ -174,7 +173,7 @@ html.mobile #stageWrap{
     left: auto;
     width: min(44svw, 520px);
     height: auto;
-    transform: translateX(100%); /* hidden by default */
+    transform: translateX(100%);
   }
   .mp-pad.land.show{ transform: translateX(0); }
 }
@@ -182,4 +181,5 @@ html.mobile #stageWrap{
 /* Mic pill colours + tap-zoom prevention */
 .pill.on  { background:#09361c; border-color:#1e8a46; color:#b6ffcc; }
 .pill.off { background:#0c1423; border-color:#243349; color:var(--muted); }
-button, .mp-pad__btn, .tab { touch-action: manipulation; }
+/* Include the floating Pad toggle in the no-double-tap rule */
+button, .mp-pad__btn, .mp-pad__toggle, .tab { touch-action: manipulation; }
