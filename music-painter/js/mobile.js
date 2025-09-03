@@ -288,6 +288,11 @@
       proxySelect('Drum Kit','drumKitSel', kitOpts)
     );
 
+    ss.append(
+  proxyButton('Mic: Toggle', () => document.getElementById('btnMicToggle')?.click()),
+  proxyRange('Mic Sensitivity', 'micSense', 0.005, 0.08, 0.005)
+);
+
     // Brush
     const sb = document.getElementById('mpsec_brush');
     sb.append(

@@ -81,6 +81,31 @@
     kitSel.addEventListener('change',   ()=>MP.drums.setKit(kitSel.value));
   })();
 
+  const micRow = document.createElement('div');
+micRow.className = 'row';
+micRow.innerHTML = `
+  <button id="btnMicToggle">Mic: Off</button>
+  <label class="muted" style="margin-left:8px">Sensitivity</label>
+  <input type="range" id="micSense" min="0.005" max="0.08" step="0.005" value="0.02" style="width:160px">
+  <label class="muted" style="margin-left:8px">Monitor</label>
+  <input type="checkbox" id="micMon">
+`;
+sec.appendChild(micRow);
+
+const micBtn  = sec.querySelector('#btnMicToggle');
+const micSense = sec.querySelector('#micSense');
+const micMon   = sec.querySelector('#micMon');
+
+micBtn.addEventListener('click', async () => {
+  try {
+    await MP.audio.unlock();                 // ensure AudioContext is running
+  } catch {}
+  MP.mic.toggle();
+  micBtn.textContent = MP.mic.isOn() ? 'Mic: On' : 'Mic: Off';
+});
+micSense.addEventListener('input', () => MP.mic.setSensitivity(parseFloat(micSense.value)));
+micMon.addEventListener('change', () => MP.mic.setMonitor(!!micMon.checked));
+
   // controls
   const brushTypeSel = el('brushType');
   const brushScale   = el('brushScale'); const brushScaleVal = el('brushScaleVal');
