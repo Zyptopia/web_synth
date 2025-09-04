@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Puzzle — Connect the Path</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Connect the Path</h1>
+    <div class="meta">
+      <div>⏱ <span id="timer">00:00</span></div>
+      <div>🌀 Moves: <span id="moves">0</span></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <p class="instructions">
+        Rotate the pieces so a continuous path connects <strong>Start</strong> (top‑left) to <strong>Goal</strong> (bottom‑right).
+        Click a tile to rotate it clockwise. You’ve got this!
+      </p>
+
+      <div id="grid" class="grid" role="grid" aria-label="Pipe rotation puzzle grid"></div>
+
+      <div class="controls">
+        <button id="shuffleBtn" class="btn">↻ Shuffle</button>
+        <button id="resetBtn" class="btn">⟲ Reset</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <small>Tip: Corners and straights are the key. A clean route from Start → Goal will auto-finish.</small>
+  </footer>
+
+  <script src="game.js"></script>
+</body>
+</html>
