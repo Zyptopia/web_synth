@@ -86,8 +86,6 @@
       <button id="btnMicToggle">Mic: Off</button>
       <label class="muted" style="margin-left:8px">Mic Sensitivity</label>
       <input type="range" id="micSense" min="0" max="1" step="0.01" value="0.50" style="width:180px">
-      <label class="muted" style="margin-left:8px">Drum Accents</label>
-      <input type="checkbox" id="micDrums">
       <label class="muted" style="margin-left:8px">Monitor</label>
       <input type="checkbox" id="micMon">
     `;
@@ -96,7 +94,6 @@
     const micBtn   = sec.querySelector('#btnMicToggle');
     const micSense = sec.querySelector('#micSense');
     const micMon   = sec.querySelector('#micMon');
-    const micDrums = sec.querySelector('#micDrums');
 
     const micStatus = MP.el('micStatus');
     const setMicIndicator = (on)=>{
@@ -105,7 +102,9 @@
       micStatus.classList.toggle('on',  !!on);
       micStatus.classList.toggle('off', !on);
     };
-    const mapMicThreshold = v => 0.005 + v * (0.08 - 0.005); // left=quiet (more sensitive), right=loud
+    // Slider: left = quiet sources (more sensitive), right = loud (less sensitive)
+    // Map 0..1 → ~0.004..0.040 RMS threshold
+    const mapMicThreshold = v => 0.004 + v * (0.040 - 0.004);
 
     async function doMicToggle(btn){
       try { await MP.audio.unlock(); } catch {}
@@ -128,7 +127,6 @@
       MP.mic.setSensitivity(mapMicThreshold(parseFloat(micSense.value)));
     });
     micMon.addEventListener('change', ()=> MP.mic.setMonitor(!!micMon.checked));
-    micDrums.addEventListener('change', ()=> MP.mic.setDrums(!!micDrums.checked));
 
     // Hook up topbar mic button too
     if (btnMicTop){

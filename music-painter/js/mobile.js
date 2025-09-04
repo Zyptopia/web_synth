@@ -292,28 +292,10 @@
     const kitOpts   = MP.drums.getKits ? MP.drums.getKits() : ['Clean','808','LoFi','Bright'];
     ss.append(
       proxySelect('Piano Synth','synthPresetSel', synthOpts),
-      proxySelect('Drum Kit','drumKitSel', kitOpts)
-    );
-
-    // Mic controls mirrored to mobile
-    ss.append(
+      proxySelect('Drum Kit','drumKitSel', kitOpts),
       proxyButton('Mic: Toggle', () => (document.getElementById('btnMicTop') || document.getElementById('btnMicToggle'))?.click()),
       proxyRange('Mic Sensitivity', 'micSense', 0, 1, 0.01)
     );
-    // Drum accents toggle (mirrors desktop checkbox)
-    let micDrumsBtn = proxyButton('Drum Accents: Off', ()=>{
-      const cb = document.getElementById('micDrums');
-      if (!cb) return;
-      cb.checked = !cb.checked;
-      cb.dispatchEvent(new Event('change', {bubbles:true}));
-      micDrumsBtn.textContent = 'Drum Accents: ' + (cb.checked ? 'On' : 'Off');
-    });
-    ss.append(micDrumsBtn);
-    // Sync initial label
-    requestAnimationFrame(()=>{
-      const cb = document.getElementById('micDrums');
-      if (cb) micDrumsBtn.textContent = 'Drum Accents: ' + (cb.checked ? 'On' : 'Off');
-    });
 
     // Brush
     const sb = document.getElementById('mpsec_brush');

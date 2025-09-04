@@ -1,22 +1,17 @@
-// js/mic.js (Drum accents gated + toggleable; pitched audio no longer triggers drums)
+// js/mic.js (Mic → pitched notes only. No drum triggers.)
 (function (MP) {
   let stream = null, source = null, analyser = null, buf = null, raf = null;
   let currentNote = null, stableCount = 0, monitorGain = null;
-  let specAnalyser = null, freqBuf = null;
-  const onset = {
-    emaL: 0, emaM: 0, emaH: 0,
-    lastK: 0, lastS: 0, lastH: 0
-  };
 
+  // UI maps 0..1 to roughly 0.004..0.040 RMS. Default ~0.022 @ mid.
   const params = {
-    sensitivity: 0.02,   // RMS below this = silence (mapped from UI 0..1)
-    minFreq: 60,         // Hz
-    maxFreq: 1200,       // Hz
-    monitor: false,      // route mic to speakers? (off by default)
-    drumsEnabled: false  // user toggle (off by default)
+    sensitivity: 0.022, // RMS below this = silence
+    minFreq: 60,        // Hz
+    maxFreq: 1200,      // Hz
+    monitor: false      // route mic to speakers? (off by default)
   };
 
-  function isOn() { return !!raf; }
+  const isOn = () => !!raf;
 
   async function start() {
     if (raf) return true;
@@ -41,11 +36,6 @@
       buf = new Float32Array(analyser.fftSize);
       source.connect(analyser);
 
-      specAnalyser = ctx.createAnalyser();
-      specAnalyser.fftSize = 2048;
-      freqBuf = new Uint8Array(specAnalyser.frequencyBinCount);
-      source.connect(specAnalyser);
-
       applyMonitor(); // optional, off by default
       loop();
       return true;
@@ -64,7 +54,6 @@
     }
     if (monitorGain) { try { monitorGain.disconnect(); } catch {} monitorGain = null; }
     if (analyser) { try { analyser.disconnect(); } catch {} analyser = null; }
-    if (specAnalyser) { try { specAnalyser.disconnect(); } catch {} specAnalyser = null; }
     if (source) { try { source.disconnect(); } catch {} source = null; }
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
   }
@@ -74,9 +63,16 @@
     const ok = await start();
     return !!ok;
   }
-  function setSensitivity(v) { params.sensitivity = Math.max(0.002, Math.min(0.2, v)); }
-  function setMonitor(on) { params.monitor = !!on; applyMonitor(); }
-  function setDrums(on) { params.drumsEnabled = !!on; }
+
+  function setSensitivity(v) {
+    // v is already mapped by UI; keep a safe clamp just in case
+    params.sensitivity = Math.max(0.001, Math.min(0.1, v));
+  }
+
+  function setMonitor(on) {
+    params.monitor = !!on;
+    applyMonitor();
+  }
 
   function applyMonitor() {
     if (!source) return;
@@ -115,53 +111,6 @@
     // --- Pitch estimation with confidence ---
     const p = estimatePitch(buf, sr, params.minFreq, params.maxFreq); // {freq,corr} or null
     const hasPitch = !!(p && p.freq && p.corr >= 0.06); // confident enough to be "pitched"
-
-    // --- Drum onset detection (low/mid/high), gated by unpitched audio + user toggle ---
-    if (params.drumsEnabled && specAnalyser && freqBuf && !hasPitch) {
-      specAnalyser.getByteFrequencyData(freqBuf);
-      const n  = specAnalyser.fftSize;
-      const hzPerBin = sr / n;
-
-      function band(lo, hi){
-        const i0 = Math.max(0, Math.floor(lo / hzPerBin));
-        const i1 = Math.min(freqBuf.length-1, Math.ceil(hi / hzPerBin));
-        let s = 0;
-        for (let i=i0;i<=i1;i++) s += freqBuf[i];
-        return s / Math.max(1, i1-i0+1); // average magnitude 0..255
-      }
-
-      const eL = band(35, 160);     // kick-ish
-      const eM = band(160, 1200);   // snare-ish
-      const eH = band(6000, 12000); // hat-ish
-
-      const a = 0.15; // EMA speed
-      onset.emaL = onset.emaL*(1-a) + eL*a;
-      onset.emaM = onset.emaM*(1-a) + eM*a;
-      onset.emaH = onset.emaH*(1-a) + eH*a;
-
-      const now = performance.now();
-      // require audible + transient
-      const loudEnough = rms > params.sensitivity * 0.9;
-
-      // Kick
-      if (loudEnough && eL > onset.emaL * 1.9 && now - onset.lastK > 240){
-        const vel = Math.min(127, 60 + Math.floor((eL/255)*67));
-        MP.midi.triggerPad('kick', vel);
-        onset.lastK = now;
-      }
-      // Snare
-      if (loudEnough && eM > onset.emaM * 1.7 && now - onset.lastS > 200){
-        const vel = Math.min(127, 65 + Math.floor((eM/255)*62));
-        MP.midi.triggerPad('snare', vel);
-        onset.lastS = now;
-      }
-      // Hats (closed)
-      if (loudEnough && eH > onset.emaH * 1.6 && now - onset.lastH > 140){
-        const vel = Math.min(127, 55 + Math.floor((eH/255)*72));
-        MP.midi.triggerPad('hat-closed', vel);
-        onset.lastH = now;
-      }
-    }
 
     // If we have a stable pitch, map it to a note; otherwise don't create pitched notes
     if (hasPitch) {
@@ -219,5 +168,6 @@
     return { freq: sampleRate / bestLag, corr: bestCorr };
   }
 
-  MP.mic = { start, stop, toggle, isOn, setSensitivity, setMonitor, setDrums };
+  // Export (no drums hookup here)
+  MP.mic = { start, stop, toggle, isOn, setSensitivity, setMonitor };
 })(window.MP);
